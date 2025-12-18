@@ -1,0 +1,9 @@
+@XBOL.Ticketing.API_HostAddress = https://localhost:7021
+
+GET {{XBOL.Ticketing.API_HostAddress}}/test/
+Accept: application/json
+###
+
+GET {{XBOL.Ticketing.API_HostAddress}}/test/role/2b63127c-116f-4177-9b28-2a44977a66bd
+Accept: application/json
+###

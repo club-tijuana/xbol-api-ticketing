@@ -1,0 +1,15 @@
+﻿namespace XBOL.Ticketing.Core.Model
+{
+    public class Device
+    {
+        public long Id { get; set; }
+
+        public string DeviceIdentifier { get; set; } = null!;
+        public string DeviceType { get; set; } = null!;
+        public string Status { get; set; } = null!;
+
+        public DateTimeOffset LastSeenAt { get; set; }
+
+        public IList<TicketScanLog> TicketScanLogs { get; set; } = [];
+    }
+}

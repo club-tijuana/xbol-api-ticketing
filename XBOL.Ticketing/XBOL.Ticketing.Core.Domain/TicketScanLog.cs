@@ -1,0 +1,20 @@
+﻿using System.Net.Sockets;
+
+namespace XBOL.Ticketing.Core.Model
+{
+    public class TicketScanLog
+    {
+        public long Id { get; set; }
+
+        public long TicketId { get; set; }
+        public Ticket Ticket { get; set; } = null!;
+
+        public long DeviceId { get; set; }
+        public Device Device { get; set; } = null!;
+
+        public Guid? StaffUserId { get; set; }
+
+        public DateTimeOffset ScannedAt { get; set; }
+        public string Result { get; set; } = null!;
+    }
+}
