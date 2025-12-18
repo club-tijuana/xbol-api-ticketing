@@ -17,7 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
-    <ProjectReference Include="..\XBOL.Ticketing.Core.Domain\XBOL.Ticketing.Core.Model.csproj" />
+    <ProjectReference Include="..\XBOL.Ticketing.Core.Model\XBOL.Ticketing.Core.Model.csproj" />
   </ItemGroup>
 
 </Project>
