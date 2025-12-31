@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class Device
+    public class Device : BaseModel
     {
-        public long Id { get; set; }
-
         public string DeviceIdentifier { get; set; } = null!;
         public string DeviceType { get; set; } = null!;
         public string Status { get; set; } = null!;

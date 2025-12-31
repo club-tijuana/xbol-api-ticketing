@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class ClientCreditTransaction
+    public class ClientCreditTransaction : BaseModel
     {
-        public long Id { get; set; }
-
         public long ClientCreditAccountId { get; set; }
         public ClientCreditAccount ClientCreditAccount { get; set; } = null!;
 

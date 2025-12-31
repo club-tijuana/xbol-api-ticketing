@@ -1,11 +1,7 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
-
-namespace XBOL.Ticketing.Core.Model
+﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class EventMedia
+    public class EventMedia : BaseModel
     {
-        public long Id { get; set; }
-
         public long EventId { get; set; }
         public Event Event { get; set; } = null!;
 

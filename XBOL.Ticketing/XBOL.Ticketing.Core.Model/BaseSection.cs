@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class BaseSection
+    public class BaseSection : BaseModel
     {
-        public long Id { get; set; }
-
         public long BaseZoneId { get; set; }
         public BaseZone BaseZone { get; set; } = null!;
 

@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class PromoCode
+    public class PromoCode : BaseModel
     {
-        public long Id { get; set; }
-
         public string Code { get; set; } = null!;
         public string DiscountType { get; set; } = null!;
 

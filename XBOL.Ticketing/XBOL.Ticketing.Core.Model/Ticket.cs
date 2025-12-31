@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class Ticket
+    public class Ticket : BaseModel
     {
-        public long Id { get; set; }
-
         public long EventScheduleId { get; set; }
         public EventSchedule EventSchedule { get; set; } = null!;
 

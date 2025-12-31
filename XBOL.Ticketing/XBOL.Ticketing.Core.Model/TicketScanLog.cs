@@ -1,11 +1,7 @@
-﻿using System.Net.Sockets;
-
-namespace XBOL.Ticketing.Core.Model
+﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class TicketScanLog
+    public class TicketScanLog : BaseModel
     {
-        public long Id { get; set; }
-
         public long TicketId { get; set; }
         public Ticket Ticket { get; set; } = null!;
 

@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class Season
+    public class Season : BaseModel
     {
-        public long Id { get; set; }
-
         public string Name { get; set; } = null!;
         public string Code { get; set; } = null!;
         public string Description { get; set; } = null!;

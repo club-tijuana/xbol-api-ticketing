@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class PriceRule
+    public class PriceRule : BaseModel
     {
-        public long Id { get; set; }
-
         public PriceRuleScope Scope { get; set; }
 
         public long? EventSectionId { get; set; }

@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using XBOL.Ticketing.Services;
+using XBOL.Ticketing.Services.Identity;
 
 namespace XBOL.Ticketing.API.Controllers
 {

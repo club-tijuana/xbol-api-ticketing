@@ -1,8 +1,8 @@
 ﻿using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.Mappers;
-using XBOL.Ticketing.Data.Repositories;
+using XBOL.Ticketing.Data.Repositories.Identity;
 
-namespace XBOL.Ticketing.Services
+namespace XBOL.Ticketing.Services.Identity
 {
     public class RoleService(RoleRepository repository)
     {

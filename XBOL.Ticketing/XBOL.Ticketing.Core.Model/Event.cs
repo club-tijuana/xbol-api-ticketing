@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class Event
+    public class Event : BaseModel
     {
-        public long Id { get; set; }
-
         public long VenueMapId { get; set; }
         public VenueMap VenueMap { get; set; } = null!;
 

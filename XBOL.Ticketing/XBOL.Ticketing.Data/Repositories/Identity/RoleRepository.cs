@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Model;
 
-namespace XBOL.Ticketing.Data.Repositories
+namespace XBOL.Ticketing.Data.Repositories.Identity
 {
     public class RoleRepository(XBOLDbContext dbContext)
     {

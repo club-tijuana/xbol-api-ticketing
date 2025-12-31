@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class GateAccessRule
+    public class GateAccessRule : BaseModel
     {
-        public long Id { get; set; }
-
         public long GateId { get; set; }
         public Gate Gate { get; set; } = null!;
 
