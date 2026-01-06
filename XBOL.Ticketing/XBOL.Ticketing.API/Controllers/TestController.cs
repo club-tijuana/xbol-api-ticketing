@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Services.Identity;
 
 namespace XBOL.Ticketing.API.Controllers
@@ -8,10 +9,10 @@ namespace XBOL.Ticketing.API.Controllers
     public class TestController : ControllerBase
     {
         [HttpGet]
-        public IActionResult Get([FromServices] IWebHostEnvironment env) => Ok($"{env.ApplicationName} - {env.EnvironmentName} OK 👍");
+        public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) => Ok(new TestResultObject { Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍" });
 
         [HttpGet("role/{id}")]
-        public async Task<IActionResult> GetRole([FromServices] RoleService service, [FromRoute] Guid id)
+        public async Task<ActionResult<Role?>> GetRole([FromServices] RoleService service, [FromRoute] Guid id)
         {
             try
             {
@@ -22,6 +23,11 @@ namespace XBOL.Ticketing.API.Controllers
             {
                 return BadRequest();
             }
+        }
+
+        public class TestResultObject
+        {
+            public string Result { get; set; }
         }
     }
 }
