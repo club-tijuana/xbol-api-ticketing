@@ -59,6 +59,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<PriceRuleService>();
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
+            services.AddScoped<SeatsIoService>();
 
             return services;
         }
