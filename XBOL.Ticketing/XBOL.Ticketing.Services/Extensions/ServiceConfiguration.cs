@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using XBOL.Ticketing.Services.Accreditation;
+using XBOL.Ticketing.Services.Category;
 using XBOL.Ticketing.Services.Client;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Identity;
@@ -16,6 +17,7 @@ namespace XBOL.Ticketing.Services.Extensions
         {
             services.AddScoped<AccreditationService>();
             services.AddScoped<AccreditationTypeService>();
+            services.AddScoped<CategoryService>();
             services.AddScoped<ClientCreditAccountService>();
             services.AddScoped<ClientCreditTransactionService>();
             services.AddScoped<ClientService>();
