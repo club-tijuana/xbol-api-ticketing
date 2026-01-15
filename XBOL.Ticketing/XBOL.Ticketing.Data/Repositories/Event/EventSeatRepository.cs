@@ -1,4 +1,5 @@
 ﻿using EFCore.BulkExtensions;
+using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Base;
 
@@ -28,6 +29,11 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             await DbContext.BulkUpdateAsync(rows, config);
 
             await tx.CommitAsync();
+        }
+
+        public async Task<EventSeat?> GetByExternalSeatObjectKey(string key)
+        {
+            return await DbSet.FirstOrDefaultAsync(x => x.ExternalSeatObjectKey == key);
         }
     }
 }
