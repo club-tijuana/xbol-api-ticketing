@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Options;
 using SeatsioDotNet;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
@@ -7,10 +7,10 @@ using XBOL.Ticketing.Core.DTO;
 
 namespace XBOL.Ticketing.Services
 {
-    public class SeatsIoService(IConfiguration configuration)
+    public class SeatsIoService(IOptions<SeatsIoOptions> options)
     {
         // TODO: Initialize on constructor according to event's region and key
-        private readonly SeatsioClient _client = new(Region.NA(), configuration["SeatsIoApi:SecretKey"]);
+        private readonly SeatsioClient _client = new(Region.NA(), options.Value.SecretKey);
 
         public async Task<ChangeObjectStatusResult> BookSeatsAsync(BookingRequest request)
         {

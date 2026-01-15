@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using XBOL.Ticketing.DynamicPricing;
 using XBOL.Ticketing.Services.Accreditation;
 using XBOL.Ticketing.Services.Category;
@@ -63,6 +66,11 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<PriceRuleService>();
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
+            services
+                .AddOptions<SeatsIoOptions>()
+                .BindConfiguration("SeatsIoApi")
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
             services.AddScoped<SeatsIoService>();
 
             services.AddScoped<RulesEngineService>();
@@ -72,3 +80,4 @@ namespace XBOL.Ticketing.Services.Extensions
         }
     }
 }
+

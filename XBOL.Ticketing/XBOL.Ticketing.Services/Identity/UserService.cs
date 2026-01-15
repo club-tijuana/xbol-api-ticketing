@@ -4,5 +4,6 @@ namespace XBOL.Ticketing.Services.Identity
 {
     public class UserService(UserRepository repository)
     {
+        private readonly UserRepository _repository = repository;
     }
 }

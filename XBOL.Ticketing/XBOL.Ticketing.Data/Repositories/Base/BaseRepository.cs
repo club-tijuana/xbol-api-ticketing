@@ -295,7 +295,11 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             var sqlParameters = new Dictionary<string, object>();
             foreach (PropertyInfo prop in parameters.GetType().GetProperties())
             {
-                sqlParameters.Add(prop.Name, prop.GetValue(parameters, null));
+                var value = prop.GetValue(parameters, null);
+                if (value is not null)
+                {
+                    sqlParameters.Add(prop.Name, value);
+                }
             }
             return sqlParameters;
         }
@@ -305,10 +309,14 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             var sqlParameters = new DynamicParameters();
             foreach (var pair in parameters)
             {
-                if (pair.Value is DataTable)
-                    sqlParameters.Add(pair.Key, ((DataTable)pair.Value).AsTableValuedParameter());
+                if (pair.Value is DataTable dataTable)
+                {
+                    sqlParameters.Add(pair.Key, dataTable.AsTableValuedParameter());
+                }
                 else
+                {
                     sqlParameters.Add(pair.Key, pair.Value);
+                }
             }
             return sqlParameters;
         }
@@ -338,18 +346,21 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             Type type = typeof(M);
             var keys = new object[keyNames.Length];
             for (int i = 0; i < keyNames.Length; i++)
-                keys[i] = type.GetProperty(keyNames[i]).GetValue(entity, null);
+            {
+                keys[i] = type.GetProperty(keyNames[i])?.GetValue(entity, null)
+                    ?? throw new InvalidOperationException($"Property '{keyNames[i]}' not found on type {type.Name}");
+            }
 
             return keys;
         }
 
         private string[] GetKeyNames()
         {
-            return DbContext
-                .Model.FindEntityType(typeof(M))
-                .FindPrimaryKey()
-                .Properties.Select(x => x.Name)
-                .ToArray();
+            var entityType = DbContext.Model.FindEntityType(typeof(M))
+                ?? throw new InvalidOperationException($"Entity type {typeof(M).Name} not found in model");
+            var primaryKey = entityType.FindPrimaryKey()
+                ?? throw new InvalidOperationException($"Primary key not found for entity {typeof(M).Name}");
+            return primaryKey.Properties.Select(x => x.Name).ToArray();
         }
     }
 }

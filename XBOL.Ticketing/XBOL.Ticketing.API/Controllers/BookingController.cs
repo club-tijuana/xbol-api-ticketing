@@ -7,7 +7,7 @@ namespace XBOL.Ticketing.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class BookingController : Controller
+    public class BookingController : ControllerBase
     {
         [HttpPost]
         public async Task<ActionResult<IEnumerable<string>>> CreateBooking([FromBody] BookingRequest request, [FromServices] SeatsIoService seatsIoService)

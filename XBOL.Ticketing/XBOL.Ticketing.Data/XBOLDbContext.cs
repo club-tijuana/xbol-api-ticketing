@@ -66,8 +66,10 @@ namespace XBOL.Ticketing.Data
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             if (!optionsBuilder.IsConfigured)
+            {
                 optionsBuilder.UseNpgsql(
                     @"Host=localhost;Port=5432;Database=XBOL;Username=postgres;Password=12345");
+            }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

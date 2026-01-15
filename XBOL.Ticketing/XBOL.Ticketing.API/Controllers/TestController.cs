@@ -6,14 +6,23 @@ using XBOL.Ticketing.Services.RulesEngine;
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("api/[controller]")]
     public class TestController : ControllerBase
     {
         [HttpGet]
-        public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) => Ok(new TestResultObject { Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍" });
+        public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) =>
+            Ok(
+                new TestResultObject
+                {
+                    Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍",
+                }
+            );
 
         [HttpGet("role/{id}")]
-        public async Task<ActionResult<Role?>> GetRole([FromServices] RoleService service, [FromRoute] Guid id)
+        public async Task<ActionResult<Role?>> GetRole(
+            [FromServices] RoleService service,
+            [FromRoute] Guid id
+        )
         {
             try
             {
@@ -42,7 +51,8 @@ namespace XBOL.Ticketing.API.Controllers
 
         public class TestResultObject
         {
-            public string Result { get; set; }
+            public required string Result { get; set; }
         }
     }
 }
+
