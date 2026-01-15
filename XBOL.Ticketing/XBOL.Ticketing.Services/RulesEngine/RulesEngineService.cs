@@ -1,4 +1,3 @@
-﻿using System.Diagnostics;
 using XBOL.Ticketing.Core.Commons.Extensions;
 using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.DynamicPricing;
