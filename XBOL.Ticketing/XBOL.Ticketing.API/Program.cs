@@ -34,8 +34,17 @@ builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddSchemaTransformer((schema, context, cancellationToken) =>
+    {
+        if (schema.Type == Microsoft.OpenApi.JsonSchemaType.Object)
+        {
+            schema.AdditionalPropertiesAllowed = false;
+        }
+        return Task.CompletedTask;
+    });
+});
 
 var app = builder.Build();
 

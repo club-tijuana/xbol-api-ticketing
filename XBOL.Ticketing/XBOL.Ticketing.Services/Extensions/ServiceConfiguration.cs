@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using XBOL.Ticketing.DynamicPricing;
@@ -80,4 +79,3 @@ namespace XBOL.Ticketing.Services.Extensions
         }
     }
 }
-

@@ -15,6 +15,7 @@ namespace XBOL.Ticketing.Data.Repositories.Venue
                 .VenueMaps.Select(vm => new VenueMapListItem
                 {
                     Id = vm.Id,
+                    VenueId = vm.VenueId,
                     Name = vm.Name,
                     ExternalMapKey = vm.ExternalMapKey,
                 })
