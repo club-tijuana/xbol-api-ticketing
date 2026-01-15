@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using SeatsioDotNet.Events;
 using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Event;
@@ -17,6 +18,7 @@ namespace XBOL.Ticketing.Services.Event
                               SeatsIoService _seatsIoService)
         : BaseService<EventRepository, Core.Model.Event>(repository)
     {
+        internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
 
         // TODO: move to OrderService
         public async Task BookSeatsAsync(BookingRequest request)
