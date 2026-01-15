@@ -1,10 +1,12 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using XBOL.Ticketing.DynamicPricing;
 using XBOL.Ticketing.Services.Accreditation;
 using XBOL.Ticketing.Services.Category;
 using XBOL.Ticketing.Services.Client;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.Order;
+using XBOL.Ticketing.Services.RulesEngine;
 using XBOL.Ticketing.Services.Season;
 using XBOL.Ticketing.Services.Ticket;
 using XBOL.Ticketing.Services.Venue;
@@ -62,6 +64,9 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
+
+            services.AddScoped<RulesEngineService>();
+            services.AddTransient<IEngine, Engine>();
 
             return services;
         }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Services.Identity;
+using XBOL.Ticketing.Services.RulesEngine;
 
 namespace XBOL.Ticketing.API.Controllers
 {
@@ -17,6 +18,20 @@ namespace XBOL.Ticketing.API.Controllers
             try
             {
                 var response = await service.GetById(id);
+                return Ok(response);
+            }
+            catch (Exception)
+            {
+                return BadRequest();
+            }
+        }
+
+        [HttpGet("dynamic-pricing/{eventId}")]
+        public async Task<IActionResult> GetRole([FromServices] RulesEngineService service, [FromRoute] long eventId)
+        {
+            try
+            {
+                var response = await service.ExecuteDynamicPricing(eventId);
                 return Ok(response);
             }
             catch (Exception)

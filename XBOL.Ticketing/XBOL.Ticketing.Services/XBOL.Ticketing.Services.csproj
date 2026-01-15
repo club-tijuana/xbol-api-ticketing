@@ -15,6 +15,7 @@
     <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.Mappers\XBOL.Ticketing.Core.Mappers.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />
+    <ProjectReference Include="..\XBOL.Ticketing.DynamicPricing\XBOL.Ticketing.DynamicPricing.csproj" />
   </ItemGroup>
 
 </Project>

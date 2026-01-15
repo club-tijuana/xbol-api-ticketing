@@ -1,17 +1,27 @@
 using SeatsioDotNet.Events;
 using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Services.Base;
 
 namespace XBOL.Ticketing.Services.Event
 {
-    public class EventService(EventRepository repository, SeatsIoService seatsIoService)
-        : BaseService<EventRepository, Core.Model.Event>(repository)
+    public class EventService : BaseService<EventRepository, Core.Model.Event>
     {
+        private readonly SeatsIoService _seatsIoService;
+
+        public EventService(EventRepository repository, SeatsIoService seatsIoService)
+            : base(repository)
+        {
+            _seatsIoService = seatsIoService;
+        }
+
+        internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
+
         public async Task BookSeatsAsync(BookingRequest request)
         {
-            ChangeObjectStatusResult result = await seatsIoService.BookSeatsAsync(request);
+            ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);
 
             // Get user
             foreach (var item in result.Objects)
