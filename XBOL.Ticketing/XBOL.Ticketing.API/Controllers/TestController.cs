@@ -11,29 +11,10 @@ namespace XBOL.Ticketing.API.Controllers
     {
         [HttpGet]
         public ActionResult<TestResultObject> GetApiEnvironmet([FromServices] IWebHostEnvironment env) =>
-            Ok(
-                new TestResultObject
-                {
-                    Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍",
-                }
-            );
-
-        [HttpGet("role/{id}")]
-        public async Task<ActionResult<Role?>> GetRoleByIdAsync(
-            [FromServices] RoleService service,
-            [FromRoute] Guid id
-        )
-        {
-            try
+            Ok(new TestResultObject
             {
-                var response = await service.GetById(id);
-                return Ok(response);
-            }
-            catch (Exception)
-            {
-                return BadRequest();
-            }
-        }
+                Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍",
+            });
 
         /// <summary>
         /// Calculates dynamic ticket prices for the specified event using the provided rules engine service.
