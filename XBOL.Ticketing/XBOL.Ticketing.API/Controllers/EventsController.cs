@@ -5,8 +5,10 @@ using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.API.Controllers
 {
+    // TODO: Move to Admin API
+
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/events")]
     public class EventsController : ControllerBase
     {
         [HttpGet]

@@ -4,7 +4,7 @@ using XBOL.Ticketing.Services.Category;
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/categories")]
     public class CategoriesController : ControllerBase
     {
         [HttpGet]

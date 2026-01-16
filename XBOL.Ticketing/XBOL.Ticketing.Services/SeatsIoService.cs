@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using SeatsioDotNet;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
@@ -26,6 +26,7 @@ namespace XBOL.Ticketing.Services
 
             return response;
         }
+
         public async Task ReleaseHoldTokenAsync(string holdToken)
         {
             await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);

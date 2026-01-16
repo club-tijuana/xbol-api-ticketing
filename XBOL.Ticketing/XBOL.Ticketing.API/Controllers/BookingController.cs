@@ -5,15 +5,31 @@ using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.API.Controllers
 {
-    [Route("api/[controller]")]
+    /// <summary>
+    /// Controller to handle booking operations.
+    /// </summary>
+    [Route("api/booking")]
     [ApiController]
     public class BookingController : ControllerBase
     {
+        private readonly SeatsIoService _seatsIoService;
+
+        public BookingController(SeatsIoService seatsIoService)
+        {
+            _seatsIoService = seatsIoService;
+        }
+
+        /// <summary>
+        /// Creates a new booking for the specified seat selection and returns the identifiers of the booked seats.
+        /// </summary>
+        /// <param name="request">The booking request containing event and seat selection details. Cannot be null.</param>
+        /// <returns>An action result containing a collection of strings that represent the keys of the successfully booked
+        /// seats.</returns>
         [HttpPost]
-        public async Task<ActionResult<IEnumerable<string>>> CreateBooking([FromBody] BookingRequest request, [FromServices] SeatsIoService seatsIoService)
+        public async Task<ActionResult<IEnumerable<string>>> CreateBookingAsync([FromBody] BookingRequest request)
         {
             // TODO: Replace with event or order service Booking method
-            ChangeObjectStatusResult result = await seatsIoService.BookSeatsAsync(request);
+            ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);
 
             return Ok(result.Objects.Select(x => x.Key));
         }

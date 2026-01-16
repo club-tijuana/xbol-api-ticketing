@@ -1,4 +1,4 @@
-﻿using EFCore.BulkExtensions;
+using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Base;
@@ -12,7 +12,10 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             ArgumentNullException.ThrowIfNull(eventSeats);
             var rows = eventSeats.ConvertAll(x => new EventSeat { Id = x.Id, PriceOverride = x.PriceOverride });
 
-            if (rows.Count == 0) return;
+            if (rows.Count == 0)
+            {
+                return;
+            }
 
             await using var tx = await DbContext.Database.BeginTransactionAsync();
 

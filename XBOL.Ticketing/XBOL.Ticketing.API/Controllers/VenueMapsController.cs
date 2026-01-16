@@ -4,8 +4,10 @@ using XBOL.Ticketing.Services.Venue;
 
 namespace XBOL.Ticketing.API.Controllers
 {
+    // TODO: Move to Admin API
+
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/venue-maps")]
     public class VenueMapsController : ControllerBase
     {
         [HttpGet]

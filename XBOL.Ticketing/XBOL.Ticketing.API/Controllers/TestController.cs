@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.RulesEngine;
@@ -6,11 +6,11 @@ using XBOL.Ticketing.Services.RulesEngine;
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/tests")]
     public class TestController : ControllerBase
     {
         [HttpGet]
-        public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) =>
+        public ActionResult<TestResultObject> GetApiEnvironmet([FromServices] IWebHostEnvironment env) =>
             Ok(
                 new TestResultObject
                 {
@@ -19,7 +19,7 @@ namespace XBOL.Ticketing.API.Controllers
             );
 
         [HttpGet("role/{id}")]
-        public async Task<ActionResult<Role?>> GetRole(
+        public async Task<ActionResult<Role?>> GetRoleByIdAsync(
             [FromServices] RoleService service,
             [FromRoute] Guid id
         )
@@ -35,12 +35,18 @@ namespace XBOL.Ticketing.API.Controllers
             }
         }
 
-        [HttpGet("dynamic-pricing/{eventId}")]
-        public async Task<IActionResult> GetRole([FromServices] RulesEngineService service, [FromRoute] long eventId)
+        /// <summary>
+        /// Calculates dynamic ticket prices for the specified event using the provided rules engine service.
+        /// </summary>
+        /// <param name="eventId">The unique identifier of the event for which to calculate dynamic prices.</param>
+        /// <returns>An <see cref="IActionResult"/> containing the calculated pricing information if successful; otherwise, a bad
+        /// request result.</returns>
+        [HttpPost("dynamic-pricing/{eventId}")]
+        public async Task<IActionResult> CalculatePricesAsync([FromServices] RulesEngineService service, [FromRoute] long eventId)
         {
             try
             {
-                var response = await service.ExecuteDynamicPricing(eventId);
+                var response = await service.ExecuteDynamicPricingAsync(eventId);
                 return Ok(response);
             }
             catch (Exception)
@@ -55,4 +61,3 @@ namespace XBOL.Ticketing.API.Controllers
         }
     }
 }
-

@@ -13,7 +13,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
         EventSeatService eventSeatService,
         IEngine engine)
     {
-        public async Task<DynamicPricingResult> ExecuteDynamicPricing(long eventId)
+        public async Task<DynamicPricingResult> ExecuteDynamicPricingAsync(long eventId)
         {
             IList<DynamicPricingEvent> entities = await eventService.GetDynamicPricingData(eventId);
             IList<Context> contexts = [];
@@ -21,13 +21,15 @@ namespace XBOL.Ticketing.Services.RulesEngine
 
             foreach (DynamicPricingEvent entity in entities)
             {
-                IList<DynamicPricingRule> dynamicPricingRules = await priceRuleService.GetRulesByEventScheduleId(entity.EventScheduleId);
+                IList<DynamicPricingRule> dynamicPricingRules = await priceRuleService.GetRulesByEventScheduleIdAsync(entity.EventScheduleId);
                 IList<Rule> rules = [.. dynamicPricingRules.Select(x => new Rule { Id = x.Id, Code = x.Code, Description = x.Description, Expression = x.Expression, Version = 1 })];
 
                 TimeSpan remainingTime = entity.EventDateTime - nowUtc;
 
                 if (entity.Seats is null || entity.Seats.Count == 0)
+                {
                     continue;
+                }
 
                 int seatsSold = entity.Seats.Count(x => x.IsSold);
                 decimal salesPace = CalculateSalesPace(entity.Seats, entity.EventDateTime, entity.EventPublishedDate, nowUtc);
