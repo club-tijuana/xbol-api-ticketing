@@ -12,6 +12,7 @@ namespace XBOL.Ticketing.API.Controllers
     public class EventsController : ControllerBase
     {
         [HttpGet]
+        [EndpointName("GetEvents")]
         public async Task<ActionResult<PagedResponse<EventListItem>>> GetEvents(
             [FromServices] EventService service,
             [FromQuery] string? venues = null,
@@ -48,6 +49,21 @@ namespace XBOL.Ticketing.API.Controllers
                 pageSize
             );
 
+            return Ok(result);
+        }
+
+        [HttpGet("{id:long}")]
+        [EndpointName("GetEvent")]
+        public async Task<ActionResult<EventListItem>> GetEvent(
+            [FromServices] EventService service,
+            [FromRoute] long id
+        )
+        {
+            var result = await service.GetEventByIdAsync(id);
+            if (result == null)
+            {
+                return NotFound();
+            }
             return Ok(result);
         }
     }

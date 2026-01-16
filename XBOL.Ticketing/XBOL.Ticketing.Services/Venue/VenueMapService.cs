@@ -11,5 +11,10 @@ namespace XBOL.Ticketing.Services.Venue
         {
             return await Repository.GetVenueMapListAsync();
         }
+
+        public async Task<VenueMapListItem?> GetVenueMapByIdAsync(long id)
+        {
+            return await Repository.GetVenueMapByIdAsync(id);
+        }
     }
 }

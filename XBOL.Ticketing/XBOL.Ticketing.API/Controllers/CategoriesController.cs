@@ -8,6 +8,7 @@ namespace XBOL.Ticketing.API.Controllers
     public class CategoriesController : ControllerBase
     {
         [HttpGet]
+        [EndpointName("GetCategories")]
         public ActionResult<List<string>> GetCategories([FromServices] CategoryService service)
         {
             return Ok(service.GetCategoryNames());

@@ -11,6 +11,7 @@ namespace XBOL.Ticketing.API.Controllers
     public class VenuesController : ControllerBase
     {
         [HttpGet]
+        [EndpointName("GetVenues")]
         public async Task<ActionResult<List<VenueListItem>>> GetVenues(
             [FromServices] VenueService service
         )
