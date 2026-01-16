@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using XBOL.Ticketing.Core.DTO;
-using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.RulesEngine;
 
 namespace XBOL.Ticketing.API.Controllers
@@ -9,6 +7,13 @@ namespace XBOL.Ticketing.API.Controllers
     [Route("api/tests")]
     public class TestController : ControllerBase
     {
+        private readonly RulesEngineService _rulesEngineService;
+
+        public TestController(RulesEngineService rulesEngineService)
+        {
+            _rulesEngineService = rulesEngineService;
+        }
+
         [HttpGet]
         public ActionResult<TestResultObject> GetApiEnvironmet([FromServices] IWebHostEnvironment env) =>
             Ok(new TestResultObject
@@ -23,11 +28,11 @@ namespace XBOL.Ticketing.API.Controllers
         /// <returns>An <see cref="IActionResult"/> containing the calculated pricing information if successful; otherwise, a bad
         /// request result.</returns>
         [HttpPost("dynamic-pricing/{eventId}")]
-        public async Task<IActionResult> CalculatePricesAsync([FromServices] RulesEngineService service, [FromRoute] long eventId)
+        public async Task<IActionResult> CalculatePricesAsync([FromRoute] long eventId)
         {
             try
             {
-                var response = await service.ExecuteDynamicPricingAsync(eventId);
+                var response = await _rulesEngineService.ExecuteDynamicPricingAsync(eventId);
                 return Ok(response);
             }
             catch (Exception)

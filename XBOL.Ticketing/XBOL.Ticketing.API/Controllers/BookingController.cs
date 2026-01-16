@@ -20,13 +20,13 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         /// <summary>
-        /// Creates a new booking for the specified seat selection and returns the identifiers of the booked seats.
+        /// Books the specified seat selection for the event and returns the identifiers of the booked seats.
         /// </summary>
         /// <param name="request">The booking request containing event and seat selection details. Cannot be null.</param>
         /// <returns>An action result containing a collection of strings that represent the keys of the successfully booked
         /// seats.</returns>
-        [HttpPost]
-        public async Task<ActionResult<IEnumerable<string>>> CreateBookingAsync([FromBody] BookingRequest request)
+        [HttpPost("book-seats")]
+        public async Task<ActionResult<IEnumerable<string>>> BookSeatsAsync([FromBody] BookingRequest request)
         {
             // TODO: Replace with event or order service Booking method
             ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);

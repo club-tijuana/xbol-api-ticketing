@@ -5,16 +5,21 @@ using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.API.Controllers
 {
-    // TODO: Move to Admin API
+    // TODO: Move to Admin API and add summary documentation
 
     [ApiController]
     [Route("api/events")]
     public class EventsController : ControllerBase
     {
+        private readonly EventService _eventService;
+
+        public EventsController(EventService eventService)
+        {
+            _eventService = eventService;
+        }
+
         [HttpGet]
-        [EndpointName("GetEvents")]
-        public async Task<ActionResult<PagedResponse<EventListItem>>> GetEvents(
-            [FromServices] EventService service,
+        public async Task<ActionResult<PagedResponse<EventListItem>>> GetEventsAsync(
             [FromQuery] string? venues = null,
             [FromQuery] string? categories = null,
             [FromQuery] DateTimeOffset? startDate = null,
@@ -23,8 +28,7 @@ namespace XBOL.Ticketing.API.Controllers
             [FromQuery] string sortBy = "dateTime",
             [FromQuery] bool descending = false,
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 10
-        )
+            [FromQuery] int pageSize = 10)
         {
             var venueList = string.IsNullOrWhiteSpace(venues)
                 ? null
@@ -37,7 +41,7 @@ namespace XBOL.Ticketing.API.Controllers
                     .Select(c => Enum.Parse<EventCategory>(c, ignoreCase: true))
                     .ToList();
 
-            var result = await service.GetEventListAsync(
+            var result = await _eventService.GetEventListAsync(
                 venueList,
                 categoryList,
                 startDate,
@@ -52,14 +56,10 @@ namespace XBOL.Ticketing.API.Controllers
             return Ok(result);
         }
 
-        [HttpGet("{id:long}")]
-        [EndpointName("GetEvent")]
-        public async Task<ActionResult<EventListItem>> GetEvent(
-            [FromServices] EventService service,
-            [FromRoute] long id
-        )
+        [HttpGet("{eventId}")]
+        public async Task<ActionResult<EventListItem>> GetEventByIdAsync([FromRoute] long id)
         {
-            var result = await service.GetEventByIdAsync(id);
+            var result = await _eventService.GetEventByIdAsync(id);
             if (result == null)
             {
                 return NotFound();

@@ -10,13 +10,17 @@ namespace XBOL.Ticketing.API.Controllers
     [Route("api/venues")]
     public class VenuesController : ControllerBase
     {
-        [HttpGet]
-        [EndpointName("GetVenues")]
-        public async Task<ActionResult<List<VenueListItem>>> GetVenues(
-            [FromServices] VenueService service
-        )
+        private readonly VenueService _venueService;
+
+        public VenuesController(VenueService venueService)
         {
-            var venues = await service.GetVenueListAsync();
+            _venueService = venueService;
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<List<VenueListItem>>> GetVenuesAsync()
+        {
+            var venues = await _venueService.GetVenuesAsync();
             return Ok(venues);
         }
     }
