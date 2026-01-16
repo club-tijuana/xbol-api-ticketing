@@ -6,10 +6,11 @@ using XBOL.Ticketing.Services.RulesEngine;
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/test")]
     public class TestController : ControllerBase
     {
         [HttpGet]
+        [EndpointName("GetTest")]
         public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) =>
             Ok(
                 new TestResultObject
@@ -19,6 +20,7 @@ namespace XBOL.Ticketing.API.Controllers
             );
 
         [HttpGet("role/{id}")]
+        [EndpointName("GetRole")]
         public async Task<ActionResult<Role?>> GetRole(
             [FromServices] RoleService service,
             [FromRoute] Guid id
@@ -36,7 +38,8 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet("dynamic-pricing/{eventId}")]
-        public async Task<IActionResult> GetRole([FromServices] RulesEngineService service, [FromRoute] long eventId)
+        [EndpointName("GetDynamicPricing")]
+        public async Task<IActionResult> GetDynamicPricing([FromServices] RulesEngineService service, [FromRoute] long eventId)
         {
             try
             {

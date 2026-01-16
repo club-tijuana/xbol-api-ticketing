@@ -21,5 +21,20 @@ namespace XBOL.Ticketing.Data.Repositories.Venue
                 })
                 .ToListAsync();
         }
+
+        public async Task<VenueMapListItem?> GetVenueMapByIdAsync(long id)
+        {
+            return await _context
+                .VenueMaps
+                .Where(vm => vm.Id == id)
+                .Select(vm => new VenueMapListItem
+                {
+                    Id = vm.Id,
+                    VenueId = vm.VenueId,
+                    Name = vm.Name,
+                    ExternalMapKey = vm.ExternalMapKey,
+                })
+                .FirstOrDefaultAsync();
+        }
     }
 }

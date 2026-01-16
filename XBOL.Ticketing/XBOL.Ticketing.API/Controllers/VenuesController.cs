@@ -5,10 +5,11 @@ using XBOL.Ticketing.Services.Venue;
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/venues")]
     public class VenuesController : ControllerBase
     {
         [HttpGet]
+        [EndpointName("GetVenues")]
         public async Task<ActionResult<List<VenueListItem>>> GetVenues(
             [FromServices] VenueService service
         )

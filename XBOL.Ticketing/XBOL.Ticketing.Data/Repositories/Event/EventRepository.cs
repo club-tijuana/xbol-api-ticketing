@@ -137,16 +137,51 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                 select new EventListItem
                 {
                     Id = q.Event.Id,
-                    DateTime = q.Schedule.StartDateTime,
+                    ScheduledStartDate = q.Schedule.StartDateTime,
                     Name = q.Event.Name,
                     Category = q.Event.Category.ToString(),
                     VenueMapId = q.Event.VenueMapId,
+                    VenueName = q.Event.VenueMap.Venue.Name,
+                    ExternalEventKey = q.Schedule.ExternalEventKey,
                     TotalSeats = sections.Sum(s => s.TotalSeats),
                     AvailableSeats = sections.Sum(s => s.AvailableSeats),
                 }
             ).ToListAsync();
 
             return (items, totalCount);
+        }
+
+        public async Task<EventListItem?> GetEventByIdAsync(long id)
+        {
+            var query =
+                from e in _context.Events
+                join es in _context.EventSchedules on e.Id equals es.EventId
+                where e.Id == id && e.Status != EventStatus.Cancelled
+                orderby es.StartDateTime
+                select new
+                {
+                    Event = e,
+                    Schedule = es,
+                };
+
+            return await (
+                from q in query.Take(1)
+                join esec in _context.EventSections
+                    on q.Schedule.Id equals esec.EventScheduleId
+                    into sections
+                select new EventListItem
+                {
+                    Id = q.Event.Id,
+                    ScheduledStartDate = q.Schedule.StartDateTime,
+                    Name = q.Event.Name,
+                    Category = q.Event.Category.ToString(),
+                    VenueMapId = q.Event.VenueMapId,
+                    VenueName = q.Event.VenueMap.Venue.Name,
+                    ExternalEventKey = q.Schedule.ExternalEventKey,
+                    TotalSeats = sections.Sum(s => s.TotalSeats),
+                    AvailableSeats = sections.Sum(s => s.AvailableSeats),
+                }
+            ).FirstOrDefaultAsync();
         }
     }
 }

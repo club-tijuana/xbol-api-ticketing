@@ -34,6 +34,9 @@ namespace XBOL.Ticketing.Services.Event
             // Process Payment
         }
 
+        public async Task<EventListItem?> GetEventByIdAsync(long id) =>
+            await Repository.GetEventByIdAsync(id);
+
         public async Task<PagedResponse<EventListItem>> GetEventListAsync(
             List<string>? venues = null,
             List<EventCategory>? categories = null,
