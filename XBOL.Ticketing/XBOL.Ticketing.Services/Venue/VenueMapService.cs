@@ -7,9 +7,9 @@ namespace XBOL.Ticketing.Services.Venue
 {
     public class VenueMapService(VenueMapRepository repository) : BaseService<VenueMapRepository, VenueMap>(repository)
     {
-        public async Task<List<VenueMapListItem>> GetVenueMapListAsync()
+        public async Task<List<VenueMapListItem>> GetVenueMapsAsync()
         {
-            return await Repository.GetVenueMapListAsync();
+            return await Repository.GetVenueMapsAsync();
         }
 
         public async Task<VenueMapListItem?> GetVenueMapByIdAsync(long id)

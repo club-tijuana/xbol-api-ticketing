@@ -26,6 +26,7 @@ namespace XBOL.Ticketing.API.Controllers
         /// <returns>An action result containing a collection of strings that represent the keys of the successfully booked
         /// seats.</returns>
         [HttpPost("book-seats")]
+        [EndpointName("BookSeatsAsync")]
         public async Task<ActionResult<IEnumerable<string>>> BookSeatsAsync([FromBody] BookingRequest request)
         {
             // TODO: Replace with event or order service Booking method

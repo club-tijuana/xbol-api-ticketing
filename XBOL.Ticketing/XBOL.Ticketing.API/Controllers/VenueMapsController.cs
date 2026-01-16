@@ -18,13 +18,15 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet]
+        [EndpointName("GetVenueMapsAsync")]
         public async Task<ActionResult<List<VenueMapListItem>>> GetVenueMapsAsync()
         {
-            var venueMaps = await _venueMapService.GetVenueMapListAsync();
+            var venueMaps = await _venueMapService.GetVenueMapsAsync();
             return Ok(venueMaps);
         }
 
         [HttpGet("{venueMapId}")]
+        [EndpointName("GetVenueMapByIdAsync")]
         public async Task<ActionResult<VenueMapListItem>> GetVenueMapByIdAsync([FromRoute] long venueMapId)
         {
             var result = await _venueMapService.GetVenueMapByIdAsync(venueMapId);

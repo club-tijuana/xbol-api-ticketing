@@ -19,6 +19,7 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet]
+        [EndpointName("GetEventsAsync")]
         public async Task<ActionResult<PagedResponse<EventListItem>>> GetEventsAsync(
             [FromQuery] string? venues = null,
             [FromQuery] string? categories = null,
@@ -50,16 +51,16 @@ namespace XBOL.Ticketing.API.Controllers
                 sortBy,
                 descending,
                 page,
-                pageSize
-            );
+                pageSize);
 
             return Ok(result);
         }
 
         [HttpGet("{eventId}")]
-        public async Task<ActionResult<EventListItem>> GetEventByIdAsync([FromRoute] long id)
+        [EndpointName("GetEvenByIdAsync")]
+        public async Task<ActionResult<EventListItem>> GetEventByIdAsync([FromRoute] long eventId)
         {
-            var result = await _eventService.GetEventByIdAsync(id);
+            var result = await _eventService.GetEventByIdAsync(eventId);
             if (result == null)
             {
                 return NotFound();

@@ -15,6 +15,7 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet("names")]
+        [EndpointName("GetCategoriesNames")]
         public ActionResult<List<string>> GetCategoriesNames()
         {
             return Ok(_categoryService.GetCategoryNames());

@@ -15,6 +15,7 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet]
+        [EndpointName("GetApiEnvironment")]
         public ActionResult<TestResultObject> GetApiEnvironmet([FromServices] IWebHostEnvironment env) =>
             Ok(new TestResultObject
             {
@@ -28,6 +29,7 @@ namespace XBOL.Ticketing.API.Controllers
         /// <returns>An <see cref="IActionResult"/> containing the calculated pricing information if successful; otherwise, a bad
         /// request result.</returns>
         [HttpPost("dynamic-pricing/{eventId}")]
+        [EndpointName("CalculatePricesAsync")]
         public async Task<IActionResult> CalculatePricesAsync([FromRoute] long eventId)
         {
             try
@@ -37,6 +39,7 @@ namespace XBOL.Ticketing.API.Controllers
             }
             catch (Exception)
             {
+                // TODO: An exception is not a bad request. Handle exceptions properly and return appropriate status codes.
                 return BadRequest();
             }
         }

@@ -18,6 +18,7 @@ namespace XBOL.Ticketing.API.Controllers
         }
 
         [HttpGet]
+        [EndpointName("GetVenuesAsync")]
         public async Task<ActionResult<List<VenueListItem>>> GetVenuesAsync()
         {
             var venues = await _venueService.GetVenuesAsync();
