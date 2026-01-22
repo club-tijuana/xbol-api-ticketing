@@ -7,11 +7,18 @@ namespace XBOL.Ticketing.API.Controllers
     [Route("api/categories")]
     public class CategoriesController : ControllerBase
     {
-        [HttpGet]
-        [EndpointName("GetCategories")]
-        public ActionResult<List<string>> GetCategories([FromServices] CategoryService service)
+        private readonly CategoryService _categoryService;
+
+        public CategoriesController(CategoryService categoryService)
         {
-            return Ok(service.GetCategoryNames());
+            _categoryService = categoryService;
+        }
+
+        [HttpGet("names")]
+        [EndpointName("GetCategoriesNames")]
+        public ActionResult<List<string>> GetCategoriesNames()
+        {
+            return Ok(_categoryService.GetCategoryNames());
         }
     }
 }

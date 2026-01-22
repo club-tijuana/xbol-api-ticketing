@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
 using XBOL.Ticketing.Data.Extensions;
@@ -34,16 +35,21 @@ builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi(options =>
+
+// Add OpenAPI services
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
 {
-    options.AddSchemaTransformer((schema, context, cancellationToken) =>
+    c.SwaggerDoc("v1", new() { Title = "XBOL Ticketing API", Version = "v1" });
+
+    // Include XML comments if available
+    string xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    string xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+
+    if (File.Exists(xmlPath))
     {
-        if (schema.Type == Microsoft.OpenApi.JsonSchemaType.Object)
-        {
-            schema.AdditionalPropertiesAllowed = false;
-        }
-        return Task.CompletedTask;
-    });
+        c.IncludeXmlComments(xmlPath);
+    }
 });
 
 var app = builder.Build();
@@ -51,14 +57,34 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.UseSwaggerUI(options =>
+    app.UseSwagger(c =>
     {
-        options.SwaggerEndpoint("/openapi/v1.json", "v1");
+        c.RouteTemplate = "swagger/{documentName}/ticketing-api.json";
     });
+
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/ticketing-api.json", "Ticketing API");
+    });
+
+    app.MapGet(
+        "/",
+        context =>
+        {
+            context.Response.Redirect("/swagger/index.html");
+            return Task.CompletedTask;
+        }
+    );
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection when running directly (Visual Studio, dotnet run)
+// Containers handle TLS at load balancer/reverse proxy level
+if (!app.Environment.IsProduction()
+    || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")))
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseAuthentication();
 app.UseAuthorization();
 

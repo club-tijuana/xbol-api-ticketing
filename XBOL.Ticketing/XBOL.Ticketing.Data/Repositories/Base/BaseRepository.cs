@@ -38,7 +38,7 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             GC.SuppressFinalize(this);
         }
 
-        public IEnumerable<M> Get(
+        public IQueryable<M> Get(
             Expression<Func<M, bool>>? filter = null,
             Func<IQueryable<M>, IOrderedQueryable<M>>? orderBy = null,
             int? pageSize = null,

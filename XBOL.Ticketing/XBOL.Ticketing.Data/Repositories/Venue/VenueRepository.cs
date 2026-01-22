@@ -9,7 +9,7 @@ namespace XBOL.Ticketing.Data.Repositories.Venue
     {
         private readonly XBOLDbContext _context = dbContext;
 
-        public async Task<List<VenueListItem>> GetVenueListAsync()
+        public async Task<List<VenueListItem>> GetVenuesAsync()
         {
             return await _context
                 .Venues.Select(vm => new VenueListItem { Id = vm.Id, Name = vm.Name })

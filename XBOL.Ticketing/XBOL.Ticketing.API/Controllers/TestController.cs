@@ -1,53 +1,45 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using XBOL.Ticketing.Core.DTO;
-using XBOL.Ticketing.Services.Identity;
+using Microsoft.AspNetCore.Mvc;
 using XBOL.Ticketing.Services.RulesEngine;
 
 namespace XBOL.Ticketing.API.Controllers
 {
     [ApiController]
-    [Route("api/test")]
+    [Route("api/tests")]
     public class TestController : ControllerBase
     {
-        [HttpGet]
-        [EndpointName("GetTest")]
-        public ActionResult<TestResultObject> Get([FromServices] IWebHostEnvironment env) =>
-            Ok(
-                new TestResultObject
-                {
-                    Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍",
-                }
-            );
+        private readonly RulesEngineService _rulesEngineService;
 
-        [HttpGet("role/{id}")]
-        [EndpointName("GetRole")]
-        public async Task<ActionResult<Role?>> GetRole(
-            [FromServices] RoleService service,
-            [FromRoute] Guid id
-        )
+        public TestController(RulesEngineService rulesEngineService)
         {
-            try
-            {
-                var response = await service.GetById(id);
-                return Ok(response);
-            }
-            catch (Exception)
-            {
-                return BadRequest();
-            }
+            _rulesEngineService = rulesEngineService;
         }
 
-        [HttpGet("dynamic-pricing/{eventId}")]
-        [EndpointName("GetDynamicPricing")]
-        public async Task<IActionResult> GetDynamicPricing([FromServices] RulesEngineService service, [FromRoute] long eventId)
+        [HttpGet]
+        [EndpointName("GetApiEnvironment")]
+        public ActionResult<TestResultObject> GetApiEnvironmet([FromServices] IWebHostEnvironment env) =>
+            Ok(new TestResultObject
+            {
+                Result = $"{env.ApplicationName} - {env.EnvironmentName} OK 👍",
+            });
+
+        /// <summary>
+        /// Calculates dynamic ticket prices for the specified event using the provided rules engine service.
+        /// </summary>
+        /// <param name="eventId">The unique identifier of the event for which to calculate dynamic prices.</param>
+        /// <returns>An <see cref="IActionResult"/> containing the calculated pricing information if successful; otherwise, a bad
+        /// request result.</returns>
+        [HttpPost("dynamic-pricing/{eventId}")]
+        [EndpointName("CalculatePricesAsync")]
+        public async Task<IActionResult> CalculatePricesAsync([FromRoute] long eventId)
         {
             try
             {
-                var response = await service.ExecuteDynamicPricing(eventId);
+                var response = await _rulesEngineService.ExecuteDynamicPricingAsync(eventId);
                 return Ok(response);
             }
             catch (Exception)
             {
+                // TODO: An exception is not a bad request. Handle exceptions properly and return appropriate status codes.
                 return BadRequest();
             }
         }
@@ -58,4 +50,3 @@ namespace XBOL.Ticketing.API.Controllers
         }
     }
 }
-

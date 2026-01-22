@@ -8,9 +8,9 @@ namespace XBOL.Ticketing.Services.Venue
     public class VenueService(VenueRepository repository)
         : BaseService<VenueRepository, VenueModel>(repository)
     {
-        public async Task<List<VenueListItem>> GetVenueListAsync()
+        public async Task<List<VenueListItem>> GetVenuesAsync()
         {
-            return await Repository.GetVenueListAsync();
+            return await Repository.GetVenuesAsync();
         }
     }
 }
