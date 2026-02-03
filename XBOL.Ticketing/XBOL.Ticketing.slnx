@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/Core/">
+    <Project Path="XBOL.Ticketing.Core.Commons/XBOL.Ticketing.Core.Commons.csproj" />
+    <Project Path="XBOL.Ticketing.Core.DTO/XBOL.Ticketing.Core.DTO.csproj" />
+    <Project Path="XBOL.Ticketing.Core.Mappers/XBOL.Ticketing.Core.Mappers.csproj" />
+    <Project Path="XBOL.Ticketing.Core.Model/XBOL.Ticketing.Core.Model.csproj" />
+  </Folder>
+  <Folder Name="/Data/">
+    <Project Path="XBOL.Ticketing.Data/XBOL.Ticketing.Data.csproj" />
+  </Folder>
+  <Folder Name="/Engine/">
+    <Project Path="XBOL.Ticketing.DynamicPricing/XBOL.Ticketing.DynamicPricing.csproj" />
+  </Folder>
+  <Folder Name="/Service/">
+    <Project Path="XBOL.Ticketing.Services/XBOL.Ticketing.Services.csproj" />
+  </Folder>
+  <Project Path="XBOL.Ticketing.API/XBOL.Ticketing.API.csproj" />
+</Solution>

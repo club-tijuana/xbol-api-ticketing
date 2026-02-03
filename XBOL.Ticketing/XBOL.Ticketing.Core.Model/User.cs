@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -10,14 +10,9 @@ namespace XBOL.Ticketing.Core.Model
         public long? OrganizerMemberId { get; set; }
         public OrganizerMember? OrganizerMember { get; set; }
 
-        public string EmailNormalized { get; set; } = null!;
-
-        public string CountryPhoneCode { get; set; } = null!;
-        public string CountryPhoneISO { get; set; } = null!;
-        public string PhoneNumberNormalized { get; set; } = null!;
-
-        public bool IsEmailVerified { get; set; }
-        public bool IsPhoneVerified { get; set; }
+        public string? CountryPhoneCode { get; set; } = null;
+        public string? CountryPhoneISO { get; set; } = null;
+        public string? PhoneNumberNormalized { get; set; } = null;
 
         public DateTimeOffset? EmailVerifiedTimeStamp { get; set; }
         public DateTimeOffset? PhoneVerifiedTimeStamp { get; set; }
@@ -33,8 +28,6 @@ namespace XBOL.Ticketing.Core.Model
         public Guid UpdatedBy { get; set; }
 
         public DateTimeOffset? LastLogin { get; set; }
-        public int FailedLoginAttempts { get; set; }
-        public DateTimeOffset? LockedUntil { get; set; }
 
         public IList<Order> Orders { get; set; } = [];
         public IList<PromoCodeRedemption> PromoCodeRedemptions { get; set; } = [];

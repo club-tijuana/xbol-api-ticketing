@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class OrganizerMember
+    public class OrganizerMember : BaseModel
     {
-        public long Id { get; set; }
-
         public long OrganizerId { get; set; }
         public Organizer Organizer { get; set; } = null!;
 

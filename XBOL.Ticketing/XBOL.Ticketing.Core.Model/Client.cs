@@ -2,9 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class Client
+    public class Client : BaseModel
     {
-        public long Id { get; set; }
         public ClientType ClientType { get; set; }
 
         public string FirstName { get; set; } = null!;

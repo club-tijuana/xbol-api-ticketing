@@ -1,8 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class Gate
+    public class Gate : BaseModel
     {
-        public long Id { get; set; }
         public string Name { get; set; } = null!;
 
         public long VenueMapId { get; set; }

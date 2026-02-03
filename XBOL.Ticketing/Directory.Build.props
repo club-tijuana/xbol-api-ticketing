@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- Target Linux for platform compatibility analyzer (CA1416) -->
+  <ItemGroup>
+    <SupportedPlatform Include="linux" />
+  </ItemGroup>
+</Project>

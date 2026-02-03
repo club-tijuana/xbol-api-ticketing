@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class TicketTransfer
+    public class TicketTransfer : BaseModel
     {
-        public long Id { get; set; }
-
         public long TicketId { get; set; }
         public Ticket Ticket { get; set; } = null!;
 

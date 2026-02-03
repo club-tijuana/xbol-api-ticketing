@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class Accreditation
+    public class Accreditation : BaseModel
     {
-        public long Id { get; set; }
-
         public long AccreditationTypeId { get; set; }
         public AccreditationType AccreditationType { get; set; } = null!;
 

@@ -1,8 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class TagType
+    public class TagType : BaseModel
     {
-        public long Id { get; set; }
         public string Name { get; set; } = null!;
 
         public DateTimeOffset CreatedAt { get; set; }

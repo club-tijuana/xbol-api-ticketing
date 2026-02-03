@@ -7,8 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
+    <PackageReference Include="Dapper" Version="2.1.66" />
+    <PackageReference Include="EFCore.BulkExtensions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
@@ -17,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
+    <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.Model\XBOL.Ticketing.Core.Model.csproj" />
   </ItemGroup>
 

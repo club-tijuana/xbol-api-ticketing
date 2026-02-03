@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class AuditLog
+    public class AuditLog : BaseModel
     {
-        public long Id { get; set; }
-
         public Guid? UserId { get; set; }
         public User? User { get; set; }
 

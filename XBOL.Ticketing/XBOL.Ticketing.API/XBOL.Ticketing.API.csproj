@@ -1,20 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>772ff3bb-fea4-4172-915a-e8c3dbc94460</UserSecretsId>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.1" />
-  </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="SeatsioDotNet" Version="107.1.0" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.0" />
+    </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
-    <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
-    <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />
-    <ProjectReference Include="..\XBOL.Ticketing.Services\XBOL.Ticketing.Services.csproj" />
-  </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
+        <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
+        <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />
+        <ProjectReference Include="..\XBOL.Ticketing.Services\XBOL.Ticketing.Services.csproj" />
+    </ItemGroup>
 
 </Project>

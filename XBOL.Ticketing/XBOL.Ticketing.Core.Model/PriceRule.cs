@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class PriceRule
+    public class PriceRule : BaseModel
     {
-        public long Id { get; set; }
-
         public PriceRuleScope Scope { get; set; }
 
         public long? EventSectionId { get; set; }
@@ -20,6 +18,8 @@ namespace XBOL.Ticketing.Core.Model
         public long? EventScheduleId { get; set; }
         public EventSchedule? EventSchedule { get; set; }
 
+        public string Code { get; set; } = null!;
+        public string Description { get; set; } = null!;
         public string Expression { get; set; } = null!;
 
         public DateTimeOffset StartDate { get; set; }

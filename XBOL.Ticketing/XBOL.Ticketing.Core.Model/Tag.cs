@@ -1,9 +1,7 @@
 ﻿namespace XBOL.Ticketing.Core.Model
 {
-    public class Tag
+    public class Tag : BaseModel
     {
-        public long Id { get; set; }
-
         public long TagTypeId { get; set; }
         public TagType TagType { get; set; } = null!;
 

@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class OrderItem
+    public class OrderItem : BaseModel
     {
-        public long Id { get; set; }
-
         public long OrderId { get; set; }
         public Order Order { get; set; } = null!;
 

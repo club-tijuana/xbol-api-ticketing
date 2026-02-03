@@ -2,10 +2,8 @@
 
 namespace XBOL.Ticketing.Core.Model
 {
-    public class BaseSeat
+    public class BaseSeat : BaseModel
     {
-        public long Id { get; set; }
-
         public long BaseRowId { get; set; }
         public BaseRow BaseRow { get; set; } = null!;
 
