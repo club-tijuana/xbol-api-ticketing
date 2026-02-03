@@ -34,7 +34,10 @@ builder.Services.ConfigureRepositories();
 builder.Services.AddAuthentication();
 builder.Services.AddAuthorization();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+}).AddNewtonsoftJson();
 
 // Add OpenAPI services
 builder.Services.AddEndpointsApiExplorer();
@@ -50,7 +53,7 @@ builder.Services.AddSwaggerGen(c =>
     {
         c.IncludeXmlComments(xmlPath);
     }
-});
+}).AddSwaggerGenNewtonsoftSupport();
 
 var app = builder.Build();
 
