@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi;
 using System.Reflection;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
@@ -53,6 +54,8 @@ builder.Services.AddSwaggerGen(c =>
     {
         c.IncludeXmlComments(xmlPath);
     }
+
+    c.MapType<decimal>(() => new OpenApiSchema { Type = JsonSchemaType.Number, Format = "decimal" });
 }).AddSwaggerGenNewtonsoftSupport();
 
 var app = builder.Build();

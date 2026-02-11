@@ -151,6 +151,15 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             return (items, totalCount);
         }
 
+        public async Task<string?> GetEventKeyAsync(long eventId)
+        {
+            return await dbContext.EventSchedules
+                .AsNoTracking()
+                .Where(sch => sch.EventId == eventId)
+                .Select(sch => sch.ExternalEventKey)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<EventListItem?> GetEventByIdAsync(long id)
         {
             var query =
