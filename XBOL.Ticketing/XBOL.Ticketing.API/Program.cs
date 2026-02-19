@@ -38,7 +38,10 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers(options =>
 {
     options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
-}).AddNewtonsoftJson();
+}).AddNewtonsoftJson(options =>
+{
+    options.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
+});
 
 // Add OpenAPI services
 builder.Services.AddEndpointsApiExplorer();
@@ -56,6 +59,9 @@ builder.Services.AddSwaggerGen(c =>
     }
 
     c.MapType<decimal>(() => new OpenApiSchema { Type = JsonSchemaType.Number, Format = "decimal" });
+
+    c.UseAllOfToExtendReferenceSchemas();
+    c.SupportNonNullableReferenceTypes();
 }).AddSwaggerGenNewtonsoftSupport();
 
 var app = builder.Build();
@@ -93,6 +99,14 @@ if (!app.Environment.IsProduction()
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+var supportedCultures = new[] { "en", "es" };
+var localizationOptions = new RequestLocalizationOptions()
+    .SetDefaultCulture("es")
+    .AddSupportedCultures(supportedCultures)
+    .AddSupportedUICultures(supportedCultures);
+
+app.UseRequestLocalization(localizationOptions);
 
 app.MapControllers();
 
