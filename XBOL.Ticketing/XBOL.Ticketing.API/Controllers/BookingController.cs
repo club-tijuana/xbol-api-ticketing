@@ -29,7 +29,6 @@ namespace XBOL.Ticketing.API.Controllers
         [EndpointName("BookSeatsAsync")]
         public async Task<ActionResult<IEnumerable<string>>> BookSeatsAsync([FromBody] BookingRequest request)
         {
-            // TODO: Replace with event or order service Booking method
             ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);
 
             return Ok(result.Objects.Select(x => x.Key));

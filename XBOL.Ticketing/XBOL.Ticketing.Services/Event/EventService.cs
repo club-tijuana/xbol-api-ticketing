@@ -83,6 +83,11 @@ namespace XBOL.Ticketing.Services.Event
             // Process Payment
         }
 
+        public async Task<string?> GetEventKeyAsync(long eventId)
+        {
+            return await Repository.GetEventKeyAsync(eventId);
+        }
+
         public async Task<EventListItem?> GetEventByIdAsync(long id) =>
             await Repository.GetEventByIdAsync(id);
 

@@ -7,6 +7,7 @@ namespace XBOL.Ticketing.Services
 {
     public class PriceRuleService(PriceRuleRepository repository) : BaseService<PriceRuleRepository, PriceRule>(repository)
     {
-        internal async Task<IList<DynamicPricingRule>> GetRulesByEventScheduleIdAsync(long eventScheduleId) => await repository.GetRulesByEventScheduleIdAsync(eventScheduleId);
+        internal async Task<IList<DynamicPricingRule>> GetRulesByEventScheduleIdAsync(long eventScheduleId)
+            => await Repository.GetRulesByEventScheduleIdAsync(eventScheduleId);
     }
 }

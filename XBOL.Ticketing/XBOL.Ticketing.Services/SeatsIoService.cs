@@ -21,15 +21,70 @@ namespace XBOL.Ticketing.Services
                 seatsToBook.Add(new ObjectProperties(seat, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
+            string? token = null;
+            // Try to retrieve hold token, if it doesn't succeed we ignore the error
+            try
+            {
+                var holdToken = await _client.HoldTokens.RetrieveAsync(request.HoldToken);
+                if (holdToken is not null && holdToken.ExpiresInSeconds > 0)
+                {
+                    token = holdToken.Token;
+                }
+            }
+            catch (Exception)
+            {
+
+            }
+
             // TODO: Handle exceptions SeatsioException
-            ChangeObjectStatusResult response = await _client.Events.BookAsync(request.EventId, seatsToBook, request.HoldToken);
+            ChangeObjectStatusResult response = await _client.Events.BookAsync(request.EventId, seatsToBook, token);
+
+            // Try to release hold token after booking attempt, if it doesn't succeed we ignore the error
+            try
+            {
+                await ReleaseHoldTokenAsync(request.HoldToken);
+            }
+            catch (Exception)
+            {
+            }
 
             return response;
         }
 
-        public async Task ReleaseHoldTokenAsync(string holdToken)
+        public async Task<HoldToken> CreateHoldTokenAsync()
         {
-            await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+            return await _client.HoldTokens.CreateAsync();
+        }
+
+        public async Task<HoldToken> CreateHoldTokenAsync(int expirationInMinutes)
+        {
+            return await _client.HoldTokens.CreateAsync(expirationInMinutes);
+        }
+
+        public async Task<ChangeObjectStatusResult> HoldSeatsAsync(string eventKey, string[] seats, string holdToken)
+        {
+            return await _client.Events.HoldAsync(eventKey, seats, holdToken);
+        }
+
+        public async Task<HoldToken> GetHoldTokenAsync(string holdToken)
+        {
+            return await _client.HoldTokens.RetrieveAsync(holdToken);
+        }
+
+        public async Task<HoldToken?> ReleaseHoldTokenAsync(string holdToken)
+        {
+            HoldToken? result = null;
+
+            try
+            {
+                result = await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error releasing hold token: {ex.Message}");
+            }
+
+            return result;
         }
 
         public async Task<HoldToken> SetHoldTokenExpirationAsync(string holdToken, int minutes)
