@@ -73,7 +73,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
                                                 .Select(x => new Seat
                                                 {
                                                     SeatId = x.SeatId,
-                                                    BasePrice = x.SectionBasePrice.Value,
+                                                    BasePrice = x.SectionBasePrice.HasValue ? x.SectionBasePrice.Value : 0m,
                                                     SeatCode = $"{x.SeatSection} - {x.SeatRow} - {x.SeatNumber}"
                                                 })],
                         Orders = []

@@ -2,20 +2,19 @@ using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.Core.DTO;
-using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Base;
 
 namespace XBOL.Ticketing.Data.Repositories.Event
 {
-    public class EventRepository(XBOLDbContext dbContext)
-        : BaseRepository<Core.Model.Event>(dbContext)
-    {
-        private readonly XBOLDbContext _context = dbContext;
+    // TODO: Consider splitting this repository into multiple repositories (e.g., EventScheduleRepository, EventSeatRepository)
+    // if it grows too large or if there are distinct areas of responsibility that can be separated for better maintainability.
 
+    public class EventRepository(XBOLDbContext dbContext) : BaseRepository<Core.Model.Event>(dbContext)
+    {
         public async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId)
         {
             // TODO: Implement logic to exclude EventSeats that have already been delivered to a distributor.
-            return await DbContext.Set<EventSchedule>()
+            return await dbContext.EventSchedules
                                   .AsNoTracking()
                                   .AsSplitQuery()
                                   .Where(es => es.EventId == eventId)
@@ -67,8 +66,8 @@ namespace XBOL.Ticketing.Data.Repositories.Event
         )
         {
             var query =
-                from e in _context.Events
-                join es in _context.EventSchedules on e.Id equals es.EventId
+                from e in dbContext.Events
+                join es in dbContext.EventSchedules on e.Id equals es.EventId
                 where e.Status != EventStatus.Cancelled
                 select new
                 {
@@ -131,7 +130,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             // Project to DTO with availability aggregation
             var items = await (
                 from q in pagedQuery
-                join esec in _context.EventSections
+                join esec in dbContext.EventSections
                     on q.Schedule.Id equals esec.EventScheduleId
                     into sections
                 select new EventListItem
@@ -163,8 +162,8 @@ namespace XBOL.Ticketing.Data.Repositories.Event
         public async Task<EventListItem?> GetEventByIdAsync(long id)
         {
             var query =
-                from e in _context.Events
-                join es in _context.EventSchedules on e.Id equals es.EventId
+                from e in dbContext.Events
+                join es in dbContext.EventSchedules on e.Id equals es.EventId
                 where e.Id == id && e.Status != EventStatus.Cancelled
                 orderby es.StartDateTime
                 select new
@@ -175,7 +174,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
 
             return await (
                 from q in query.Take(1)
-                join esec in _context.EventSections
+                join esec in dbContext.EventSections
                     on q.Schedule.Id equals esec.EventScheduleId
                     into sections
                 select new EventListItem

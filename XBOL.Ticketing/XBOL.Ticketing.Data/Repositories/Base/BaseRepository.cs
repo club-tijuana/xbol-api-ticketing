@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using System.Data;
@@ -345,10 +345,24 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             var keyNames = GetKeyNames();
             Type type = typeof(M);
             var keys = new object[keyNames.Length];
+
             for (int i = 0; i < keyNames.Length; i++)
             {
-                keys[i] = type.GetProperty(keyNames[i])?.GetValue(entity, null)
-                    ?? throw new InvalidOperationException($"Property '{keyNames[i]}' not found on type {type.Name}");
+                var propertyInfo = type.GetProperty(keyNames[i]);
+
+                if (propertyInfo == null)
+                {
+                    throw new InvalidOperationException($"Property '{keyNames[i]}' was not found on entity '{type.Name}'.");
+                }
+
+                var keyValue = propertyInfo.GetValue(entity, null);
+
+                if (keyValue == null)
+                {
+                    throw new InvalidOperationException($"The primary key property '{keyNames[i]}' on entity '{type.Name}' cannot be null when performing an update.");
+                }
+
+                keys[i] = keyValue;
             }
 
             return keys;
@@ -356,10 +370,14 @@ namespace XBOL.Ticketing.Data.Repositories.Base
 
         private string[] GetKeyNames()
         {
-            var entityType = DbContext.Model.FindEntityType(typeof(M))
-                ?? throw new InvalidOperationException($"Entity type {typeof(M).Name} not found in model");
-            var primaryKey = entityType.FindPrimaryKey()
-                ?? throw new InvalidOperationException($"Primary key not found for entity {typeof(M).Name}");
+            var entityType = DbContext.Model.FindEntityType(typeof(M));
+            var primaryKey = entityType?.FindPrimaryKey();
+
+            if (primaryKey == null)
+            {
+                throw new InvalidOperationException($"Entity type '{typeof(M).Name}' is not registered in the DbContext or does not have a primary key defined.");
+            }
+
             return primaryKey.Properties.Select(x => x.Name).ToArray();
         }
     }

@@ -71,9 +71,20 @@ namespace XBOL.Ticketing.Services
             return await _client.HoldTokens.RetrieveAsync(holdToken);
         }
 
-        public async Task<HoldToken> ReleaseHoldTokenAsync(string holdToken)
+        public async Task<HoldToken?> ReleaseHoldTokenAsync(string holdToken)
         {
-            return await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+            HoldToken? result = null;
+
+            try
+            {
+                result = await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error releasing hold token: {ex.Message}");
+            }
+
+            return result;
         }
 
         public async Task<HoldToken> SetHoldTokenExpirationAsync(string holdToken, int minutes)

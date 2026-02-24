@@ -17,7 +17,7 @@ namespace XBOL.Ticketing.API.Controllers
             // TODO: Handle exceptions, not found, and errors
             var eventKey = await eventService.GetEventKeyAsync(request.EventId) ?? string.Empty;
 
-            var token = await seatsIoService.CreateHoldTokenAsync(1);
+            var token = await seatsIoService.CreateHoldTokenAsync(5); // TODO: Get this value from a setting or config
 
             await seatsIoService.HoldSeatsAsync(eventKey, request.Seats.ToArray(), token.Token);
 
@@ -34,7 +34,7 @@ namespace XBOL.Ticketing.API.Controllers
 
         [HttpDelete]
         [EndpointName("ReleaseHoldSeatsAsync")]
-        public async Task<ActionResult<HoldToken>> ReleaseHoldSeatsAsync([FromQuery] string holdToken)
+        public async Task<ActionResult<HoldToken?>> ReleaseHoldSeatsAsync([FromQuery] string holdToken)
         {
             var result = await seatsIoService.ReleaseHoldTokenAsync(holdToken);
             return Ok(result);
