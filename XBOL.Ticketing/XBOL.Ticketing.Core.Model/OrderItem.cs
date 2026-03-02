@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {

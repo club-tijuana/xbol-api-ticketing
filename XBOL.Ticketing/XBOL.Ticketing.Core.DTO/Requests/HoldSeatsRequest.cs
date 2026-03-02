@@ -1,4 +1,4 @@
-namespace XBOL.Ticketing.Core.DTO
+namespace XBOL.Ticketing.Core.DTO.Requests
 {
     public class HoldSeatsRequest
     {

@@ -3,6 +3,8 @@ using SeatsioDotNet.Events;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.Core.DTO;
+using XBOL.Ticketing.Core.DTO.Requests;
+using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Data.Repositories.Order;
@@ -21,16 +23,16 @@ namespace XBOL.Ticketing.Services.Event
         internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
 
         // TODO: move to OrderService
-        public async Task BookSeatsAsync(BookingRequest request)
+        public async Task BookEventSeatsAsync(EventBookingRequest request)
         {
-            ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);
+            ChangeObjectStatusResult result = await _seatsIoService.BookEventSeatsAsync(request);
 
             // TODO: Get seller from Identity, and seller email from request, create custom NotFoundException
             User? buyer = await userManager.FindByEmailAsync("admin@xbol.com") ?? throw new KeyNotFoundException();
 
             User? seller = buyer;
 
-            EventSchedule schedule = eventScheduleRepository.Get(x => x.ExternalEventKey == request.EventId).First();
+            EventSchedule schedule = eventScheduleRepository.Get(x => x.ExternalEventKey == request.EventKey).First();
 
             // TODO: Calculate total, taxes, and fees
 
@@ -60,7 +62,6 @@ namespace XBOL.Ticketing.Services.Event
                     })]
             };
 
-
             // TODO: Confirm if Ticket creation should be done after payment confirmation
             foreach (var item in result.Objects)
             {
@@ -78,7 +79,6 @@ namespace XBOL.Ticketing.Services.Event
 
             await orderRepository.InsertAsync(newOrder);
             await orderRepository.CommitAsync();
-
 
             // Process Payment
         }
