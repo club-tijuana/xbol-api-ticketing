@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet.HoldTokens;
-using XBOL.Ticketing.Core.DTO;
+using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services;
 using XBOL.Ticketing.Services.Event;
 

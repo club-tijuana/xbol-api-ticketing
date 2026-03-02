@@ -3,7 +3,7 @@ using SeatsioDotNet;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
-using XBOL.Ticketing.Core.DTO;
+using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services
 {
@@ -12,41 +12,30 @@ namespace XBOL.Ticketing.Services
         // TODO: Initialize on constructor according to event's region and key
         private readonly SeatsioClient _client = new(Region.NA(), options.Value.SecretKey);
 
-        public async Task<ChangeObjectStatusResult> BookSeatsAsync(BookingRequest request)
+        public async Task<ChangeObjectStatusResult> BookEventSeatsAsync(EventBookingRequest request)
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (var seat in request.Seats)
+            foreach (KeyValuePair<string, decimal> seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
-            string? token = null;
-            // Try to retrieve hold token, if it doesn't succeed we ignore the error
-            try
-            {
-                var holdToken = await _client.HoldTokens.RetrieveAsync(request.HoldToken);
-                if (holdToken is not null && holdToken.ExpiresInSeconds > 0)
-                {
-                    token = holdToken.Token;
-                }
-            }
-            catch (Exception)
-            {
+            var response = await BookSeatsAsync(request.EventKey, seatsToBook, request.HoldToken);
 
+            return response;
+        }
+
+        public async Task<ChangeObjectStatusResult> BookSeasonSeatsAsync(SeasonBookingRequest request)
+        {
+            List<ObjectProperties> seatsToBook = [];
+
+            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            {
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
-            // TODO: Handle exceptions SeatsioException
-            ChangeObjectStatusResult response = await _client.Events.BookAsync(request.EventId, seatsToBook, token);
-
-            // Try to release hold token after booking attempt, if it doesn't succeed we ignore the error
-            try
-            {
-                await ReleaseHoldTokenAsync(request.HoldToken);
-            }
-            catch (Exception)
-            {
-            }
+            var response = await BookSeatsAsync(request.SeasonKey, seatsToBook, request.HoldToken);
 
             return response;
         }
@@ -105,6 +94,51 @@ namespace XBOL.Ticketing.Services
         public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(string eventKey, string[] seats)
         {
             return await _client.Events.ReleaseAsync(eventKey, seats);
+        }
+
+        private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)
+        {
+            string bookingToken = "";
+
+            // Try to retrieve hold token, if it doesn't succeed we ignore the error
+            try
+            {
+                if (string.IsNullOrWhiteSpace(token) == false)
+                {
+                    var holdToken = await _client.HoldTokens.RetrieveAsync(token);
+
+                    if (holdToken is not null && holdToken.ExpiresInSeconds > 0)
+                    {
+                        bookingToken = holdToken.Token;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            // TODO: Handle exceptions SeatsioException
+            ChangeObjectStatusResult response;
+
+            if (string.IsNullOrWhiteSpace(bookingToken))
+            {
+                response = await _client.Events.BookAsync(key, seats);
+            }
+            else
+            {
+                response = await _client.Events.BookAsync(key, seats, bookingToken);
+
+                // Try to release hold token after booking attempt, if it doesn't succeed we ignore the error
+                try
+                {
+                    await ReleaseHoldTokenAsync(token);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
+            return response;
         }
     }
 }

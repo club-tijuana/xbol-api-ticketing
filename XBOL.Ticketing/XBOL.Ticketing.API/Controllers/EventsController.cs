@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO;
+using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.API.Controllers
