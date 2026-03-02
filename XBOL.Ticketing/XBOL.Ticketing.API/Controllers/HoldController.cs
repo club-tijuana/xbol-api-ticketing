@@ -10,8 +10,18 @@ namespace XBOL.Ticketing.API.Controllers
     [ApiController]
     public class HoldController(SeatsIoService seatsIoService, EventService eventService) : ControllerBase
     {
+        /// <summary>
+        /// Asynchronously holds the specified seats for an event and returns a token representing the hold.
+        /// </summary>
+        /// <remarks>This method reserves the requested seats for a limited time, allowing further actions
+        /// such as purchase or release. If the event is not found or the seat information is invalid, the operation may
+        /// fail. Exception handling should be implemented to manage such cases appropriately.</remarks>
+        /// <param name="request">The request containing the event identifier and the collection of seat identifiers to be held. The event
+        /// identifier must correspond to an existing event, and the seat identifiers must be valid for that event.</param>
+        /// <returns>An ActionResult containing a HoldToken that represents the hold placed on the specified seats.</returns>
         [HttpPost]
         [EndpointName("HoldSeatsAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
         public async Task<ActionResult<HoldToken>> HoldSeatsAsync(HoldSeatsRequest request)
         {
             // TODO: Handle exceptions, not found, and errors
@@ -24,16 +34,35 @@ namespace XBOL.Ticketing.API.Controllers
             return Ok(token);
         }
 
+        /// <summary>
+        /// Retrieves the hold token associated with the specified token string.
+        /// </summary>
+        /// <remarks>This method is asynchronous and may involve network calls to retrieve the hold token.
+        /// Ensure that the hold token is valid before calling this method.</remarks>
+        /// <param name="holdToken">The hold token string used to identify the specific hold request. This parameter cannot be null or empty.</param>
+        /// <returns>An ActionResult containing the HoldToken object that matches the provided hold token. Returns an error
+        /// response if the token is invalid or not found.</returns>
         [HttpGet]
         [EndpointName("GetHoldTokenAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
         public async Task<ActionResult<HoldToken>> GetHoldTokenAsync([FromQuery] string holdToken)
         {
             var result = await seatsIoService.GetHoldTokenAsync(holdToken);
             return Ok(result);
         }
 
+        /// <summary>
+        /// Releases the hold on seats associated with the specified hold token.
+        /// </summary>
+        /// <remarks>This method is asynchronous and should be awaited. It communicates with the seat
+        /// management service to release the hold, and may throw exceptions if the hold token is invalid or if service
+        /// errors occur.</remarks>
+        /// <param name="holdToken">The token that identifies the hold to be released. This value must be a valid, non-null hold token.</param>
+        /// <returns>An ActionResult containing the released HoldToken if the operation is successful; otherwise, a not found
+        /// result.</returns>
         [HttpDelete]
         [EndpointName("ReleaseHoldSeatsAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
         public async Task<ActionResult<HoldToken?>> ReleaseHoldSeatsAsync([FromQuery] string holdToken)
         {
             var result = await seatsIoService.ReleaseHoldTokenAsync(holdToken);

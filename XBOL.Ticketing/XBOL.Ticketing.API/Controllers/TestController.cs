@@ -3,6 +3,7 @@ using XBOL.Ticketing.Services.RulesEngine;
 
 namespace XBOL.Ticketing.API.Controllers
 {
+    // TODO: Remove eventually. This is just for testing and demonstration purposes.
     [ApiController]
     [Route("api/tests")]
     public class TestController : ControllerBase
