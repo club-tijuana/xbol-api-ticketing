@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Configurations;
@@ -77,8 +77,11 @@ namespace XBOL.Ticketing.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.RemovePluralizingTableNameConvention();
 
+            modelBuilder.ApplyConfiguration(new ClientConfiguration());
+            modelBuilder.ApplyConfiguration(new OrganizerConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
+            modelBuilder.ApplyConfiguration(new VenueConfiguration());
         }
     }
 }
