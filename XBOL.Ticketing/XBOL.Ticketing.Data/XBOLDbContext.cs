@@ -81,7 +81,6 @@ namespace XBOL.Ticketing.Data
             modelBuilder.ApplyConfiguration(new OrganizerConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
-            modelBuilder.ApplyConfiguration(new VenueConfiguration());
         }
     }
 }

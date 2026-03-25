@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using XBOL.Ticketing.Data.Repositories;
 using XBOL.Ticketing.Data.Repositories.Accreditation;
 using XBOL.Ticketing.Data.Repositories.Client;
@@ -51,8 +51,6 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<BaseZoneRepository>();
             services.AddScoped<GateAccessRuleRepository>();
             services.AddScoped<GateRepository>();
-            services.AddScoped<VenueMapRepository>();
-            services.AddScoped<VenueRepository>();
             services.AddScoped<AuditLogRepository>();
             services.AddScoped<DeviceRepository>();
             services.AddScoped<DistributorRepository>();
