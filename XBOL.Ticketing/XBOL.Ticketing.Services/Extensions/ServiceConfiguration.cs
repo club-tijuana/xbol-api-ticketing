@@ -54,8 +54,6 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<BaseZoneService>();
             services.AddScoped<GateAccessRuleService>();
             services.AddScoped<GateService>();
-            services.AddScoped<VenueMapService>();
-            services.AddScoped<VenueService>();
             services.AddScoped<AuditLogService>();
             services.AddScoped<DeviceService>();
             services.AddScoped<DistributorService>();

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using SeatsioDotNet;
+using SeatsioDotNet.Charts;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
@@ -94,6 +95,33 @@ namespace XBOL.Ticketing.Services
         public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(string eventKey, string[] seats)
         {
             return await _client.Events.ReleaseAsync(eventKey, seats);
+        }
+
+        public async Task<Chart?> RetrieveMapChartAsync(string chartKey)
+        {
+            try
+            {
+                return await _client.Charts.RetrieveAsync(chartKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to get chart with key '{chartKey}'. {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<Chart>> RetreiveMapChartsAsync()
+        {
+            try
+            {
+                IAsyncEnumerable<Chart> charts = _client.Charts.ListAllAsync(null, null, false, false, false, false);
+                return await charts.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to get the list of charts. {ex.Message}");
+                return [];
+            }
         }
 
         private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)
