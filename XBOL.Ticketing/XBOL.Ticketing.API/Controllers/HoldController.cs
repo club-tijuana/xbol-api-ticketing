@@ -1,14 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet.HoldTokens;
+using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services;
 using XBOL.Ticketing.Services.Event;
+using XBOL.Ticketing.Services.Season;
 
 namespace XBOL.Ticketing.API.Controllers
 {
     [Route("api/hold-seats")]
     [ApiController]
-    public class HoldController(SeatsIoService seatsIoService, EventService eventService) : ControllerBase
+    public class HoldController(SeatsIoService seatsIoService, EventService eventService, SeasonService seasonService) : ControllerBase
     {
         /// <summary>
         /// Asynchronously holds the specified seats for an event and returns a token representing the hold.
@@ -25,7 +27,27 @@ namespace XBOL.Ticketing.API.Controllers
         public async Task<ActionResult<HoldToken>> HoldSeatsAsync(HoldSeatsRequest request)
         {
             // TODO: Handle exceptions, not found, and errors
-            var eventKey = await eventService.GetEventKeyAsync(request.EventId) ?? string.Empty;
+
+            string? eventKey;
+            switch (request.SaleType)
+            {
+                case SaleType.SeasonPass:
+                    {
+                        var season = await seasonService.GetByIdAsync(request.EventId);
+                        eventKey = season?.ExternalSeasonKey ?? string.Empty;
+                        break;
+                    }
+
+                case SaleType.Event:
+                    {
+                        eventKey = await eventService.GetEventKeyAsync(request.EventId) ?? string.Empty;
+                        break;
+                    }
+                default:
+                    // Handle unexpected SaleType values, possibly by throwing an exception or returning a bad request response
+                    eventKey = string.Empty;
+                    break;
+            }
 
             var token = await seatsIoService.CreateHoldTokenAsync(5); // TODO: Get this value from a setting or config
 
