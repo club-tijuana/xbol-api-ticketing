@@ -39,7 +39,7 @@ namespace XBOL.Ticketing.API.Controllers
         [ProducesResponseType(typeof(List<Chart>), StatusCodes.Status200OK)]
         public async Task<ActionResult<List<Chart>>> GetChartsAsync()
         {
-            var result = await _seatsIoService.RetreiveMapChartsAsync();
+            var result = await _seatsIoService.RetrieveMapChartsAsync();
 
             return Ok(result);
         }
