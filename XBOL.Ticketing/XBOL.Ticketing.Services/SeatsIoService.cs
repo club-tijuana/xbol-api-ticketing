@@ -13,6 +13,7 @@ namespace XBOL.Ticketing.Services
         // TODO: Initialize on constructor according to event's region and key
         private readonly SeatsioClient _client = new(Region.NA(), options.Value.SecretKey);
 
+        [Obsolete("Use BookSeatsAsync(string, Dictionary<string, decimal>, string) instead.")]
         public async Task<ChangeObjectStatusResult> BookEventSeatsAsync(EventBookingRequest request)
         {
             List<ObjectProperties> seatsToBook = [];
@@ -27,6 +28,7 @@ namespace XBOL.Ticketing.Services
             return response;
         }
 
+        [Obsolete("Use BookSeatsAsync(string, Dictionary<string, decimal>, string) instead.")]
         public async Task<ChangeObjectStatusResult> BookSeasonSeatsAsync(SeasonBookingRequest request)
         {
             List<ObjectProperties> seatsToBook = [];
@@ -39,6 +41,18 @@ namespace XBOL.Ticketing.Services
             var response = await BookSeatsAsync(request.SeasonKey, seatsToBook, request.HoldToken);
 
             return response;
+        }
+
+        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, Dictionary<string, decimal> seats, string holdToken)
+        {
+            List<ObjectProperties> seatsToBook = [];
+
+            foreach (KeyValuePair<string, decimal> seat in seats)
+            {
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+            }
+
+            return await BookSeatsAsync(eventKey, seatsToBook, holdToken);
         }
 
         public async Task<HoldToken> CreateHoldTokenAsync()
@@ -92,9 +106,15 @@ namespace XBOL.Ticketing.Services
             return await _client.Events.PutUpForResaleAsync(eventKey, seats, listing);
         }
 
-        public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(string eventKey, string[] seats)
+        public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(
+            string eventKey,
+            string[] seats,
+            string? holdToken = null,
+            bool? keepExtraData = null,
+            bool? ignoreChannels = null,
+            string[]? channelKeys = null)
         {
-            return await _client.Events.ReleaseAsync(eventKey, seats);
+            return await _client.Events.ReleaseAsync(eventKey, seats, holdToken: holdToken, keepExtraData: keepExtraData, ignoreChannels: ignoreChannels, channelKeys: channelKeys);
         }
 
         public async Task<Chart?> RetrieveMapChartAsync(string chartKey)
@@ -122,6 +142,25 @@ namespace XBOL.Ticketing.Services
                 Console.WriteLine($"Unable to get the list of charts. {ex.Message}");
                 return [];
             }
+        }
+
+        public async Task SetForSaleAsync(string eventKey, List<string> seatKeys, bool forSale)
+        {
+            var objects = seatKeys.Select(k => new ObjectAndQuantity(k)).ToArray();
+
+            await _client.Events.EditForSaleConfigAsync(
+                eventKey,
+                forSale: forSale ? objects : null,
+                notForSale: forSale ? null : objects);
+        }
+
+        public async Task UpdateExtraDataAsync(string eventKey, List<string> seatKeys, Dictionary<string, object> extraData)
+        {
+            var extraDatas = seatKeys.ToDictionary(
+                k => k,
+                _ => new Dictionary<string, object>(extraData));
+
+            await _client.Events.UpdateExtraDatasAsync(eventKey, extraDatas);
         }
 
         private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)

@@ -8,6 +8,7 @@ using XBOL.Ticketing.Services.Season;
 
 namespace XBOL.Ticketing.API.Controllers
 {
+    [Obsolete("Use ManageSeatsController hold endpoints instead.")]
     [Route("api/hold-seats")]
     [ApiController]
     public class HoldController(SeatsIoService seatsIoService, EventService eventService, SeasonService seasonService) : ControllerBase
