@@ -106,6 +106,11 @@ namespace XBOL.Ticketing.Services
             return await _client.Events.PutUpForResaleAsync(eventKey, seats, listing);
         }
 
+        public async Task<ChangeObjectStatusResult> ReleaseBookedSeatsAsync(ReleaseBookedSeatsRequest request)
+        {
+            return await _client.Events.ReleaseAsync(request.Key, request.Seats.ToArray());
+        }
+          
         public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(
             string eventKey,
             string[] seats,
@@ -130,7 +135,7 @@ namespace XBOL.Ticketing.Services
             }
         }
 
-        public async Task<List<Chart>> RetreiveMapChartsAsync()
+        public async Task<List<Chart>> RetrieveMapChartsAsync()
         {
             try
             {
@@ -144,6 +149,41 @@ namespace XBOL.Ticketing.Services
             }
         }
 
+        public async Task<bool> EventOrSeasonExistsAsync(string key)
+        {
+            try
+            {
+                await _client.Events.RetrieveAsync(key);
+
+                return true;
+            }
+            catch (SeatsioException ex) when (ex.Message.Contains("404"))
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> ValidateAllSeatsExistAsync(string key, List<string> seats)
+        {
+            if (seats == null || seats.Count == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                var objectInfos = await _client.Events.RetrieveObjectInfosAsync(key, seats.ToArray());
+
+                bool allExist = seats.All(seat => objectInfos.ContainsKey(seat));
+
+                return allExist;
+            }
+            catch (SeatsioException ex) when (ex.Message.ToLower().Contains("not found"))
+            {
+                return false;
+            }
+        }
+      
         public async Task SetForSaleAsync(string eventKey, List<string> seatKeys, bool forSale)
         {
             var objects = seatKeys.Select(k => new ObjectAndQuantity(k)).ToArray();
