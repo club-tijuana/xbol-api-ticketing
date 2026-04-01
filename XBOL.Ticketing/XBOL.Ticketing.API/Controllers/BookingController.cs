@@ -9,6 +9,7 @@ namespace XBOL.Ticketing.API.Controllers
     /// <summary>
     /// Controller to handle booking operations.
     /// </summary>
+    [Obsolete("Use ManageSeatsController hold and book endpoints instead.")]
     [Route("api/booking")]
     [ApiController]
     public class BookingController : ControllerBase
