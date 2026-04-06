@@ -26,6 +26,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<EventSeat> EventSeats => Set<EventSeat>();
         public DbSet<EventSection> EventSections => Set<EventSection>();
         public DbSet<EventTag> EventTags => Set<EventTag>();
+        public DbSet<EventCategory> EventCategories => Set<EventCategory>();
 
         public DbSet<Gate> Gates => Set<Gate>();
         public DbSet<GateAccessRule> GateAccessRules => Set<GateAccessRule>();
@@ -77,6 +78,7 @@ namespace XBOL.Ticketing.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.RemovePluralizingTableNameConvention();
 
+            modelBuilder.ApplyConfiguration(new EventConfiguration());
             modelBuilder.ApplyConfiguration(new ClientConfiguration());
             modelBuilder.ApplyConfiguration(new OrganizerConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
