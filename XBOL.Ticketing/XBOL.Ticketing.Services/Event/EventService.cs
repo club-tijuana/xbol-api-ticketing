@@ -2,9 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using SeatsioDotNet.Events;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
-using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.DTO.Requests;
-using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Data.Repositories.Order;
@@ -23,6 +21,7 @@ namespace XBOL.Ticketing.Services.Event
         internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
 
         // TODO: move to OrderService
+        [Obsolete]
         public async Task BookEventSeatsAsync(EventBookingRequest request)
         {
             ChangeObjectStatusResult result = await _seatsIoService.BookEventSeatsAsync(request);
@@ -86,42 +85,6 @@ namespace XBOL.Ticketing.Services.Event
         public async Task<string?> GetEventKeyAsync(long eventId)
         {
             return await Repository.GetEventKeyAsync(eventId);
-        }
-
-        public async Task<EventListItem?> GetEventByIdAsync(long id) =>
-            await Repository.GetEventByIdAsync(id);
-
-        public async Task<PagedResponse<EventListItem>> GetEventListAsync(
-            List<string>? venues = null,
-            List<EventCategory>? categories = null,
-            DateTimeOffset? startDate = null,
-            DateTimeOffset? endDate = null,
-            string? search = null,
-            string sortBy = "dateTime",
-            bool descending = false,
-            int page = 1,
-            int pageSize = 20
-        )
-        {
-            var (items, totalCount) = await Repository.GetEventListAsync(
-                venues,
-                categories,
-                startDate,
-                endDate,
-                search,
-                sortBy,
-                descending,
-                page,
-                pageSize
-            );
-
-            return new PagedResponse<EventListItem>
-            {
-                Items = items,
-                TotalCount = totalCount,
-                Page = page,
-                PageSize = pageSize,
-            };
         }
     }
 }
