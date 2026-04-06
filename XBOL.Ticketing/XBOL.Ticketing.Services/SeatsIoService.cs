@@ -4,6 +4,7 @@ using SeatsioDotNet.Charts;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
+using SeatsioDotNet.Reports.Events;
 using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services
@@ -110,7 +111,7 @@ namespace XBOL.Ticketing.Services
         {
             return await _client.Events.ReleaseAsync(request.Key, request.Seats.ToArray());
         }
-          
+
         public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(
             string eventKey,
             string[] seats,
@@ -183,7 +184,7 @@ namespace XBOL.Ticketing.Services
                 return false;
             }
         }
-      
+
         public async Task SetForSaleAsync(string eventKey, List<string> seatKeys, bool forSale)
         {
             var objects = seatKeys.Select(k => new ObjectAndQuantity(k)).ToArray();
@@ -201,6 +202,26 @@ namespace XBOL.Ticketing.Services
                 _ => new Dictionary<string, object>(extraData));
 
             await _client.Events.UpdateExtraDatasAsync(eventKey, extraDatas);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryBySectionAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryBySectionAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByZoneAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByZoneAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByAvailabilityAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByAvailabilityAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByAvailabilityReasonAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByAvailabilityReasonAsync(externalKey);
         }
 
         private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)
