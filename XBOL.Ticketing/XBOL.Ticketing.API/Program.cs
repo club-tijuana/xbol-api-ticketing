@@ -2,10 +2,20 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using System.Reflection;
+using XBOL.Ticketing.API.Extensions;
+using XBOL.Ticketing.API.Schema;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
 using XBOL.Ticketing.Data.Extensions;
 using XBOL.Ticketing.Services.Extensions;
+
+if (args.Contains("--generate-schema"))
+{
+    var outputPath = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "appsettings.schema.json"));
+    AppSettingsSchemaGenerator.GenerateAndWrite(outputPath);
+    return;
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +37,9 @@ builder.Services
     .AddEntityFrameworkStores<XBOLDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
+
+// Options (fail-fast validation on startup)
+builder.Services.ConfigureOptions(builder.Configuration);
 
 // Add services to the container.
 builder.Services.ConfigureServices();
