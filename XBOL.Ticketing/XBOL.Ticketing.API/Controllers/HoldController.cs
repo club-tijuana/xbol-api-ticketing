@@ -50,7 +50,7 @@ namespace XBOL.Ticketing.API.Controllers
                     break;
             }
 
-            var token = await seatsIoService.CreateHoldTokenAsync(5); // TODO: Get this value from a setting or config
+            var token = await seatsIoService.CreateHoldTokenAsync();
 
             await seatsIoService.HoldSeatsAsync(eventKey, request.Seats.ToArray(), token.Token);
 

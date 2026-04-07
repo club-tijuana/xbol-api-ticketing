@@ -59,11 +59,6 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<PriceRuleService>();
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
-            services
-                .AddOptions<SeatsIoOptions>()
-                .BindConfiguration("SeatsIoApi")
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
             services.AddScoped<SeatsIoService>();
 
             services.AddScoped<RulesEngineService>();

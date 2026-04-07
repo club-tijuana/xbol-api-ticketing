@@ -5,14 +5,24 @@ using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
+using SeatsioDotNet.Util;
 using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services
 {
     public class SeatsIoService(IOptions<SeatsIoOptions> options)
     {
-        // TODO: Initialize on constructor according to event's region and key
-        private readonly SeatsioClient _client = new(Region.NA(), options.Value.SecretKey);
+        private readonly SeatsIoOptions _options = options.Value;
+        private readonly SeatsioClient _client = new(ResolveRegion(options.Value.Region), options.Value.SecretKey);
+
+        private static Region ResolveRegion(string? region) => (region ?? "NA").ToUpperInvariant() switch
+        {
+            "NA" => Region.NA(),
+            "EU" => Region.EU(),
+            "SA" => Region.SA(),
+            "OC" => Region.OC(),
+            _ => throw new ArgumentException($"Unknown Seats.io region: {region}")
+        };
 
         [Obsolete("Use BookSeatsAsync(string, Dictionary<string, decimal>, string) instead.")]
         public async Task<ChangeObjectStatusResult> BookEventSeatsAsync(EventBookingRequest request)
@@ -58,12 +68,9 @@ namespace XBOL.Ticketing.Services
 
         public async Task<HoldToken> CreateHoldTokenAsync()
         {
-            return await _client.HoldTokens.CreateAsync();
-        }
-
-        public async Task<HoldToken> CreateHoldTokenAsync(int expirationInMinutes)
-        {
-            return await _client.HoldTokens.CreateAsync(expirationInMinutes);
+            return _options.HoldExpirationInMinutes.HasValue
+                ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
+                : await _client.HoldTokens.CreateAsync();
         }
 
         public async Task<ChangeObjectStatusResult> HoldSeatsAsync(string eventKey, string[] seats, string holdToken)
@@ -267,6 +274,31 @@ namespace XBOL.Ticketing.Services
             }
 
             return response;
+        }
+
+        public async Task<Page<StatusChange>> GetStatusChangesAsync(
+            string eventKey,
+            long? afterId = null,
+            int? pageSize = null)
+        {
+            var lister = _client.Events.StatusChanges(eventKey, sortField: "date", sortDirection: "asc");
+
+            return afterId.HasValue
+                ? await lister.PageAfterAsync(afterId.Value, pageSize)
+                : await lister.FirstPageAsync(pageSize);
+        }
+
+        public async Task<Page<StatusChange>> GetStatusChangesForObjectAsync(
+            string eventKey,
+            string objectLabel,
+            long? afterId = null,
+            int? pageSize = null)
+        {
+            var lister = _client.Events.StatusChangesForObject(eventKey, objectLabel);
+
+            return afterId.HasValue
+                ? await lister.PageAfterAsync(afterId.Value, pageSize)
+                : await lister.FirstPageAsync(pageSize);
         }
     }
 }
