@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.IdentityModel.Tokens;
+using SeatsioDotNet;
 using SeatsioDotNet.Events;
+using SeatsioDotNet.Util;
 using XBOL.Ticketing.Core.DTO.Requests;
+using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.API.Controllers
@@ -43,9 +46,15 @@ namespace XBOL.Ticketing.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            ChangeObjectStatusResult result = await _seatsIoService.BookEventSeatsAsync(request);
-
-            return Ok(result.Objects.Select(x => x.Key));
+            try
+            {
+                ChangeObjectStatusResult result = await _seatsIoService.BookEventSeatsAsync(request);
+                return Ok(result.Objects.Select(x => x.Key));
+            }
+            catch (SeatsioException ex)
+            {
+                return HandleSeatsioError(ex);
+            }
         }
 
         /// <summary>
@@ -69,9 +78,15 @@ namespace XBOL.Ticketing.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            ChangeObjectStatusResult result = await _seatsIoService.BookSeasonSeatsAsync(request);
-
-            return Ok(result.Objects.Select(x => x.Key));
+            try
+            {
+                ChangeObjectStatusResult result = await _seatsIoService.BookSeasonSeatsAsync(request);
+                return Ok(result.Objects.Select(x => x.Key));
+            }
+            catch (SeatsioException ex)
+            {
+                return HandleSeatsioError(ex);
+            }
         }
 
         /// <summary>
@@ -103,8 +118,48 @@ namespace XBOL.Ticketing.API.Controllers
                 return BadRequest("One or more seats doesn't exist.");
             }
 
-            ChangeObjectStatusResult result = await _seatsIoService.ReleaseBookedSeatsAsync(request);
-            return Ok(result);
+            try
+            {
+                ChangeObjectStatusResult result = await _seatsIoService.ReleaseBookedSeatsAsync(request);
+                return Ok(result);
+            }
+            catch (SeatsioException ex)
+            {
+                return HandleSeatsioError(ex);
+            }
+        }
+
+        private ObjectResult HandleSeatsioError(SeatsioException ex)
+        {
+            var response = new SeatsIoErrorResponse
+            {
+                RequestId = ex.RequestId,
+                Errors = ex.Errors.Select(e => new SeatsIoErrorDetail
+                {
+                    Code = e.Code,
+                    Message = e.Message
+                }).ToList()
+            };
+
+            if (ex is RateLimitExceededException)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, response);
+            }
+
+            if (ex.Errors is { Count: > 0 })
+            {
+                var hasNotFound = ex.Errors.Any(e =>
+                    e.Code.Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase));
+
+                if (hasNotFound)
+                {
+                    return StatusCode(StatusCodes.Status404NotFound, response);
+                }
+
+                return StatusCode(StatusCodes.Status400BadRequest, response);
+            }
+
+            return StatusCode(StatusCodes.Status502BadGateway, response);
         }
     }
 }
