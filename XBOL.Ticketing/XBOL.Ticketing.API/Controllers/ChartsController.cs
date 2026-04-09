@@ -23,9 +23,15 @@ namespace XBOL.Ticketing.API.Controllers
         [HttpGet("{chartKey}")]
         [EndpointName("GetChartByKeyAsync")]
         [ProducesResponseType(typeof(Chart), StatusCodes.Status200OK)]
-        public async Task<ActionResult<Chart?>> GetChartByKeyAsync([FromRoute] string chartKey)
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Chart>> GetChartByKeyAsync([FromRoute] string chartKey)
         {
             var result = await _seatsIoService.RetrieveMapChartAsync(chartKey);
+
+            if (result == null)
+            {
+                return NotFound();
+            }
 
             return Ok(result);
         }
