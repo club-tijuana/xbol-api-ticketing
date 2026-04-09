@@ -1,11 +1,38 @@
 # XBOL Ticketing API
 
-## Requirements
+API for the XBOL ticketing system (events, venues, tickets, orders).
 
-- .NET 10 SDK
-- Docker (for PostgreSQL)
+## Development Setup
 
-## Secrets
+This refers to development using Visual Studio 2026 on Windows, or using the .NET 10 SDK through the command line.
+
+### Requirements
+
+- [Visual Studio 2026](https://visualstudio.microsoft.com/insiders/) (Windows)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) (Linux)
+- PostgreSQL
+- [Docker](https://www.docker.com/) or [Podman](https://podman.io/) (for development services)
+
+### Quick Start
+
+In Visual Studio, set **XBOL.Ticketing.API** as the Startup Project and press `F5`.
+
+For the command-line interface:
+
+```bash
+make dev    # Start PostgreSQL
+dotnet run --project XBOL.Ticketing/XBOL.Ticketing.API
+```
+
+API runs at <http://localhost:5103>.
+
+### Build & Compilation
+
+```bash
+dotnet build XBOL.Ticketing/XBOL.Ticketing.sln
+```
+
+### Secrets
 
 Configure secrets using .NET Secret Manager:
 
@@ -19,65 +46,45 @@ List configured secrets:
 dotnet user-secrets list --project XBOL.Ticketing/XBOL.Ticketing.API
 ```
 
-## Quickstart
+### Configuration
+
+Edit `appsettings.Development.json` for local settings (connection strings, service URLs, etc.). Settings cascade: `appsettings.json` → `appsettings.{Environment}.json` → environment variables. All settings are validated at startup.
+
+IDE autocomplete is provided by `appsettings.schema.json`, which regenerates automatically on Debug builds.
+
+## Deployment
+
+The container is production-ready with:
+
+- **Security**: Non-root `app` user
+- **Health checks**: Automatic container health monitoring
+- **Restart policy**: `unless-stopped` for high availability
+- **Environment**: `ASPNETCORE_ENVIRONMENT=Production`
+
+#### Requirements
+
+- Make
+- [Podman](https://podman.io/) (or [Docker](https://www.docker.com/))
+- [Podman Compose](https://docs.podman.io/en/latest/markdown/podman-compose.1.html) (or [Docker Compose](https://docs.docker.com/compose/))
+
+#### Usage
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
-dotnet run --project XBOL.Ticketing/XBOL.Ticketing.API
+make build    # Create the Docker container
+make run      # Run the Docker Compose environment
 ```
 
-API runs at <http://localhost:5103> (or <https://localhost:7021>).
+**Access the containerized services**
 
-## Database
+- **API Base URL**: <http://localhost:5103>
+- **API Health Check**: <http://localhost:5103/healthz>
 
-```bash
-# Start
-docker compose -f docker-compose.dev.yml up -d
+#### Production Environment Variables
 
-# Stop (keeps data)
-docker compose -f docker-compose.dev.yml down
+Configure the following environment variables for production deployment:
 
-# Stop and delete data
-docker compose -f docker-compose.dev.yml down -v
 ```
-
-### Logs
-
-```bash
-# View logs
-docker compose -f docker-compose.dev.yml logs postgres
-
-# Follow logs
-docker compose -f docker-compose.dev.yml logs -f postgres
-```
-
-### Postgres Tools
-
-```bash
-# Connect to psql
-docker compose -f docker-compose.dev.yml exec postgres psql -U postgres -d XBOL
-
-# Run a SQL file
-docker compose -f docker-compose.dev.yml exec -T postgres psql -U postgres -d XBOL < file.sql
-
-# Backup
-docker compose -f docker-compose.dev.yml exec -T postgres pg_dump -U postgres XBOL > backup.sql
-
-# Restore
-docker compose -f docker-compose.dev.yml exec -T postgres psql -U postgres -d XBOL < backup.sql
-```
-
-### Migrations
-
-Run from `XBOL.Ticketing/XBOL.Ticketing.Data`:
-
-```bash
-dotnet ef migrations add <MigrationName> --startup-project ../XBOL.Ticketing.API
-dotnet ef database update --startup-project ../XBOL.Ticketing.API
-```
-
-### Seed Data
-
-```bash
-docker compose -f docker-compose.dev.yml exec -T postgres psql -U postgres -d XBOL < seed.sql
+ConnectionStrings__Default=Host=...;Database=...;Username=...;Password=...
+SeatsIoApi__SecretKey=<Seats.io workspace secret key>
+SeatsIoApi__Region=<Seats.io region>
 ```
