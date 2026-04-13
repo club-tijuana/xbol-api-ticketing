@@ -50,9 +50,19 @@ namespace XBOL.Ticketing.API.Controllers
                     break;
             }
 
-            var token = await seatsIoService.CreateHoldTokenAsync(5); // TODO: Get this value from a setting or config
+            var token = await seatsIoService.CreateHoldTokenAsync();
 
             await seatsIoService.HoldSeatsAsync(eventKey, request.Seats.ToArray(), token.Token);
+
+            return Ok(token);
+        }
+
+        [HttpPost("client")]
+        [EndpointName("ClientHoldSeatsAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
+        public async Task<ActionResult<HoldToken>> ClientHoldSeatsAsync()
+        {
+            var token = await seatsIoService.CreateHoldTokenAsync();
 
             return Ok(token);
         }

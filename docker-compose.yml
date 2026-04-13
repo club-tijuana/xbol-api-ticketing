@@ -1,0 +1,19 @@
+services:
+  xbol-api-ticketing:
+    container_name: xbol-api-ticketing
+    build:
+      context: ./XBOL.Ticketing
+      dockerfile: Dockerfile
+    ports:
+      - "5103:8080"
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ASPNETCORE_URLS: "http://+:8080"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    restart: unless-stopped
+    networks:
+      - xbol-network
+
+networks:
+  xbol-network:
+    external: true

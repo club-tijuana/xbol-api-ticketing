@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet;
 using SeatsioDotNet.EventReports;
+using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
+using XBOL.Ticketing.API.Models;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services;
@@ -188,7 +190,7 @@ namespace XBOL.Ticketing.API.Controllers
         {
             try
             {
-                var token = await seatsIoService.CreateHoldTokenAsync(5); // TODO: Get this value from a setting or config
+                var token = await seatsIoService.CreateHoldTokenAsync();
                 await seatsIoService.HoldSeatsAsync(request.EventKey, request.Seats.ToArray(), token.Token);
                 return Ok(token);
             }
@@ -216,6 +218,71 @@ namespace XBOL.Ticketing.API.Controllers
             {
                 var result = await seatsIoService.BookSeatsAsync(request.EventKey, request.Seats, request.HoldToken);
                 return Ok(result.Objects.Select(x => x.Key));
+            }
+            catch (SeatsioException ex)
+            {
+                return HandleSeatsioError(ex);
+            }
+        }
+
+        /// <summary>
+        /// Lists status changes for a Seats.io event, with cursor-based pagination.
+        /// </summary>
+        [HttpGet("events/{eventKey}/status-changes")]
+        [EndpointName("GetStatusChangesAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CursorPagedResponse<StatusChange>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoErrorResponse))]
+        public async Task<IActionResult> GetStatusChangesAsync(
+            [FromRoute] string eventKey,
+            [FromQuery] long? afterId = null,
+            [FromQuery] int? pageSize = null)
+        {
+            try
+            {
+                var page = await seatsIoService.GetStatusChangesAsync(
+                    eventKey, afterId, pageSize);
+
+                return Ok(new CursorPagedResponse<StatusChange>
+                {
+                    NextPageStartsAfter = page.NextPageStartsAfter,
+                    Items = page.Items
+                });
+            }
+            catch (SeatsioException ex)
+            {
+                return HandleSeatsioError(ex);
+            }
+        }
+
+        /// <summary>
+        /// Lists status change history for a specific object within a Seats.io event.
+        /// </summary>
+        [HttpGet("events/{eventKey}/objects/{objectLabel}/status-changes")]
+        [EndpointName("GetStatusChangesForObjectAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CursorPagedResponse<StatusChange>))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoErrorResponse))]
+        public async Task<IActionResult> GetStatusChangesForObjectAsync(
+            [FromRoute] string eventKey,
+            [FromRoute] string objectLabel,
+            [FromQuery] long? afterId = null,
+            [FromQuery] int? pageSize = null)
+        {
+            try
+            {
+                var page = await seatsIoService.GetStatusChangesForObjectAsync(
+                    eventKey, objectLabel, afterId, pageSize);
+
+                return Ok(new CursorPagedResponse<StatusChange>
+                {
+                    NextPageStartsAfter = page.NextPageStartsAfter,
+                    Items = page.Items
+                });
             }
             catch (SeatsioException ex)
             {
