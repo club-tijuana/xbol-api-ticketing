@@ -57,6 +57,16 @@ namespace XBOL.Ticketing.API.Controllers
             return Ok(token);
         }
 
+        [HttpPost("client")]
+        [EndpointName("ClientHoldSeatsAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
+        public async Task<ActionResult<HoldToken>> ClientHoldSeatsAsync()
+        {
+            var token = await seatsIoService.CreateHoldTokenAsync();
+
+            return Ok(token);
+        }
+
         /// <summary>
         /// Retrieves the hold token associated with the specified token string.
         /// </summary>

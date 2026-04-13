@@ -79,12 +79,30 @@ make run      # Run the Docker Compose environment
 - **API Base URL**: <http://localhost:5103>
 - **API Health Check**: <http://localhost:5103/healthz>
 
-#### Production Environment Variables
+#### GCP Secrets
 
-Configure the following environment variables for production deployment:
+Runtime configuration is stored in GCP Secret Manager. Each environment has a dedicated secret:
 
+| Secret                          | Contents                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------ |
+| `dev-xbol-db-secret`            | PostgreSQL credentials (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASS`, `DB_NAME`) |
+| `dev-xbol-api-ticketing-secret` | App configuration (connection strings, Seats.io credentials)                   |
+
+The app secret stores environment variables using ASP.NET's `__` (double underscore) convention for nested config:
+
+```json
+{
+    "ConnectionStrings__Default": "Host=<DB_HOST>;Port=<DB_PORT>;Database=<DB_NAME>;Username=<DB_USER>;Password=<DB_PASS>",
+    "SeatsIoApi__SecretKey": "<SEATS_IO_SECRET_KEY>"
+}
 ```
-ConnectionStrings__Default=Host=...;Database=...;Username=...;Password=...
-SeatsIoApi__SecretKey=<Seats.io workspace secret key>
-SeatsIoApi__Region=<Seats.io region>
+
+Connection strings are assembled from the values in `dev-xbol-db-secret`. To update:
+
+```bash
+gcloud secrets versions add dev-xbol-api-ticketing-secret --data-file=- <<'EOF'
+{ ... }
+EOF
 ```
+
+QA secrets follow the same pattern with a `qa-` prefix.
