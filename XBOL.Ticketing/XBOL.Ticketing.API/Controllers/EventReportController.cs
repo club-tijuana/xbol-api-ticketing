@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet.Reports.Events;
+using System.ComponentModel.DataAnnotations;
 using XBOL.Ticketing.Core.DTO.Reports;
 using XBOL.Ticketing.Services;
 

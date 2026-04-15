@@ -1,5 +1,5 @@
-using System.Reflection;
 using Microsoft.OpenApi;
+using System.Reflection;
 
 namespace XBOL.Ticketing.API.Extensions;
 
