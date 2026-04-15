@@ -41,7 +41,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
                     VenueLongitude = entity.VenueLongitude,
                     VenueCapacity = entity.VenueCapacity ?? 0,
 
-                    EventCategory = entity.EventCategory.GetDescription(),
+                    EventCategory = entity.EventCategory,
                     EventDateTime = entity.EventDateTime,
                     EventGameCategory = entity.EventGameCategory.GetDescription()
                 };

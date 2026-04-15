@@ -7,12 +7,25 @@
         <UserSecretsId>772ff3bb-fea4-4172-915a-e8c3dbc94460</UserSecretsId>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
+
+        <!-- Docker configuration for Visual Studio -->
+        <DockerfileContext>..\..</DockerfileContext>
+        <DockerfilePath>..\Dockerfile</DockerfilePath>
+    </PropertyGroup>
+
+    <!-- Production optimizations -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+        <ContainerUser>app</ContainerUser>
+        <PublishReadyToRun>true</PublishReadyToRun>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="SeatsioDotNet" Version="107.4.0" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.2" />
-        <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.2" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
+        <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.4" />
+        <!-- Container environment variables -->
+        <ContainerEnvironmentVariable Include="ASPNETCORE_HTTP_PORTS" Value="8080" />
+        <ContainerEnvironmentVariable Include="ASPNETCORE_URLS" Value="http://+:8080" />
     </ItemGroup>
 
     <ItemGroup>
@@ -21,5 +34,11 @@
         <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />
         <ProjectReference Include="..\XBOL.Ticketing.Services\XBOL.Ticketing.Services.csproj" />
     </ItemGroup>
+
+    <Target Name="GenerateAppSettingsSchema" AfterTargets="Build"
+            Condition="'$(Configuration)' == 'Debug'">
+        <Exec Command="dotnet run --project &quot;$(MSBuildProjectFullPath)&quot; --no-build -- --generate-schema"
+              WorkingDirectory="$(MSBuildProjectDirectory)" />
+    </Target>
 
 </Project>

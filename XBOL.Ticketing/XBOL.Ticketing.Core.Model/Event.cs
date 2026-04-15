@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -15,7 +15,7 @@ namespace XBOL.Ticketing.Core.Model
 
         public string Name { get; set; } = null!;
         public string Subtitle { get; set; } = null!;
-        public EventCategory Category { get; set; }
+        public IList<EventCategory> Categories { get; set; } = new List<EventCategory>();
 
         public string ShortDescription { get; set; } = null!;
         public string LongDescription { get; set; } = null!;
