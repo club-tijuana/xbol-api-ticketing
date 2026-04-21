@@ -1,64 +1,76 @@
 using Microsoft.Extensions.Options;
 using SeatsioDotNet;
+using SeatsioDotNet.Charts;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
-using XBOL.Ticketing.Core.DTO;
+using SeatsioDotNet.Reports.Events;
+using SeatsioDotNet.Util;
+using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services
 {
     public class SeatsIoService(IOptions<SeatsIoOptions> options)
     {
-        // TODO: Initialize on constructor according to event's region and key
-        private readonly SeatsioClient _client = new(Region.NA(), options.Value.SecretKey);
+        private readonly SeatsIoOptions _options = options.Value;
+        private readonly SeatsioClient _client = new(ResolveRegion(options.Value.Region), options.Value.SecretKey);
 
-        public async Task<ChangeObjectStatusResult> BookSeatsAsync(BookingRequest request)
+        private static Region ResolveRegion(string? region) => (region ?? "NA").ToUpperInvariant() switch
+        {
+            "NA" => Region.NA(),
+            "EU" => Region.EU(),
+            "SA" => Region.SA(),
+            "OC" => Region.OC(),
+            _ => throw new ArgumentException($"Unknown Seats.io region: {region}")
+        };
+
+        [Obsolete("Use BookSeatsAsync(string, Dictionary<string, decimal>, string) instead.")]
+        public async Task<ChangeObjectStatusResult> BookEventSeatsAsync(EventBookingRequest request)
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (var seat in request.Seats)
+            foreach (KeyValuePair<string, decimal> seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
-            string? token = null;
-            // Try to retrieve hold token, if it doesn't succeed we ignore the error
-            try
-            {
-                var holdToken = await _client.HoldTokens.RetrieveAsync(request.HoldToken);
-                if (holdToken is not null && holdToken.ExpiresInSeconds > 0)
-                {
-                    token = holdToken.Token;
-                }
-            }
-            catch (Exception)
-            {
-
-            }
-
-            // TODO: Handle exceptions SeatsioException
-            ChangeObjectStatusResult response = await _client.Events.BookAsync(request.EventId, seatsToBook, token);
-
-            // Try to release hold token after booking attempt, if it doesn't succeed we ignore the error
-            try
-            {
-                await ReleaseHoldTokenAsync(request.HoldToken);
-            }
-            catch (Exception)
-            {
-            }
+            var response = await BookSeatsAsync(request.EventKey, seatsToBook, request.HoldToken);
 
             return response;
         }
 
-        public async Task<HoldToken> CreateHoldTokenAsync()
+        [Obsolete("Use BookSeatsAsync(string, Dictionary<string, decimal>, string) instead.")]
+        public async Task<ChangeObjectStatusResult> BookSeasonSeatsAsync(SeasonBookingRequest request)
         {
-            return await _client.HoldTokens.CreateAsync();
+            List<ObjectProperties> seatsToBook = [];
+
+            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            {
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+            }
+
+            var response = await BookSeatsAsync(request.SeasonKey, seatsToBook, request.HoldToken);
+
+            return response;
         }
 
-        public async Task<HoldToken> CreateHoldTokenAsync(int expirationInMinutes)
+        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, Dictionary<string, decimal> seats, string holdToken)
         {
-            return await _client.HoldTokens.CreateAsync(expirationInMinutes);
+            List<ObjectProperties> seatsToBook = [];
+
+            foreach (KeyValuePair<string, decimal> seat in seats)
+            {
+                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+            }
+
+            return await BookSeatsAsync(eventKey, seatsToBook, holdToken);
+        }
+
+        public async Task<HoldToken> CreateHoldTokenAsync()
+        {
+            return _options.HoldExpirationInMinutes.HasValue
+                ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
+                : await _client.HoldTokens.CreateAsync();
         }
 
         public async Task<ChangeObjectStatusResult> HoldSeatsAsync(string eventKey, string[] seats, string holdToken)
@@ -102,9 +114,191 @@ namespace XBOL.Ticketing.Services
             return await _client.Events.PutUpForResaleAsync(eventKey, seats, listing);
         }
 
-        public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(string eventKey, string[] seats)
+        public async Task<ChangeObjectStatusResult> ReleaseBookedSeatsAsync(ReleaseBookedSeatsRequest request)
         {
-            return await _client.Events.ReleaseAsync(eventKey, seats);
+            return await _client.Events.ReleaseAsync(request.Key, request.Seats.ToArray());
+        }
+
+        public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(
+            string eventKey,
+            string[] seats,
+            string? holdToken = null,
+            bool? keepExtraData = null,
+            bool? ignoreChannels = null,
+            string[]? channelKeys = null)
+        {
+            return await _client.Events.ReleaseAsync(eventKey, seats, holdToken: holdToken, keepExtraData: keepExtraData, ignoreChannels: ignoreChannels, channelKeys: channelKeys);
+        }
+
+        public async Task<Chart?> RetrieveMapChartAsync(string chartKey)
+        {
+            try
+            {
+                return await _client.Charts.RetrieveAsync(chartKey);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to get chart with key '{chartKey}'. {ex.Message}");
+                return null;
+            }
+        }
+
+        public async Task<List<Chart>> RetrieveMapChartsAsync()
+        {
+            try
+            {
+                IAsyncEnumerable<Chart> charts = _client.Charts.ListAllAsync(null, null, false, false, false, false);
+                return await charts.ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unable to get the list of charts. {ex.Message}");
+                return [];
+            }
+        }
+
+        public async Task<bool> EventOrSeasonExistsAsync(string key)
+        {
+            try
+            {
+                await _client.Events.RetrieveAsync(key);
+
+                return true;
+            }
+            catch (SeatsioException ex) when (ex.Message.Contains("404"))
+            {
+                return false;
+            }
+        }
+
+        public async Task<bool> ValidateAllSeatsExistAsync(string key, List<string> seats)
+        {
+            if (seats == null || seats.Count == 0)
+            {
+                return false;
+            }
+
+            try
+            {
+                var objectInfos = await _client.Events.RetrieveObjectInfosAsync(key, seats.ToArray());
+
+                bool allExist = seats.All(seat => objectInfos.ContainsKey(seat));
+
+                return allExist;
+            }
+            catch (SeatsioException ex) when (ex.Message.ToLower().Contains("not found"))
+            {
+                return false;
+            }
+        }
+
+        public async Task SetForSaleAsync(string eventKey, List<string> seatKeys, bool forSale)
+        {
+            var objects = seatKeys.Select(k => new ObjectAndQuantity(k)).ToArray();
+
+            await _client.Events.EditForSaleConfigAsync(
+                eventKey,
+                forSale: forSale ? objects : null,
+                notForSale: forSale ? null : objects);
+        }
+
+        public async Task UpdateExtraDataAsync(string eventKey, List<string> seatKeys, Dictionary<string, object> extraData)
+        {
+            var extraDatas = seatKeys.ToDictionary(
+                k => k,
+                _ => new Dictionary<string, object>(extraData));
+
+            await _client.Events.UpdateExtraDatasAsync(eventKey, extraDatas);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryBySectionAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryBySectionAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByZoneAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByZoneAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByAvailabilityAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByAvailabilityAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByAvailabilityReasonAsync(string externalKey)
+        {
+            return await _client.EventReports.SummaryByAvailabilityReasonAsync(externalKey);
+        }
+
+        private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)
+        {
+            string bookingToken = "";
+
+            // Try to retrieve hold token, if it doesn't succeed we ignore the error
+            try
+            {
+                if (string.IsNullOrWhiteSpace(token) == false)
+                {
+                    var holdToken = await _client.HoldTokens.RetrieveAsync(token);
+
+                    if (holdToken is not null && holdToken.ExpiresInSeconds > 0)
+                    {
+                        bookingToken = holdToken.Token;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+            }
+
+            // TODO: Handle exceptions SeatsioException
+            ChangeObjectStatusResult response;
+
+            if (string.IsNullOrWhiteSpace(bookingToken))
+            {
+                response = await _client.Events.BookAsync(key, seats);
+            }
+            else
+            {
+                response = await _client.Events.BookAsync(key, seats, bookingToken);
+
+                // Try to release hold token after booking attempt, if it doesn't succeed we ignore the error
+                try
+                {
+                    await ReleaseHoldTokenAsync(token);
+                }
+                catch (Exception)
+                {
+                }
+            }
+
+            return response;
+        }
+		
+        public async Task<Page<StatusChange>> GetStatusChangesAsync(
+            string eventKey,
+            long? afterId = null,
+            int? pageSize = null)
+        {
+            var lister = _client.Events.StatusChanges(eventKey, sortField: "date", sortDirection: "asc");
+
+            return afterId.HasValue
+                ? await lister.PageAfterAsync(afterId.Value, pageSize)
+                : await lister.FirstPageAsync(pageSize);
+        }
+
+        public async Task<Page<StatusChange>> GetStatusChangesForObjectAsync(
+            string eventKey,
+            string objectLabel,
+            long? afterId = null,
+            int? pageSize = null)
+        {
+            var lister = _client.Events.StatusChangesForObject(eventKey, objectLabel);
+
+            return afterId.HasValue
+                ? await lister.PageAfterAsync(afterId.Value, pageSize)
+                : await lister.FirstPageAsync(pageSize);
         }
     }
 }

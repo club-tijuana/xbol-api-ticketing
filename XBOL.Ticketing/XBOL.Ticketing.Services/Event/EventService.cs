@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Identity;
 using SeatsioDotNet.Events;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
-using XBOL.Ticketing.Core.DTO;
+using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Data.Repositories.Order;
@@ -21,16 +21,17 @@ namespace XBOL.Ticketing.Services.Event
         internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
 
         // TODO: move to OrderService
-        public async Task BookSeatsAsync(BookingRequest request)
+        [Obsolete]
+        public async Task BookEventSeatsAsync(EventBookingRequest request)
         {
-            ChangeObjectStatusResult result = await _seatsIoService.BookSeatsAsync(request);
+            ChangeObjectStatusResult result = await _seatsIoService.BookEventSeatsAsync(request);
 
             // TODO: Get seller from Identity, and seller email from request, create custom NotFoundException
             User? buyer = await userManager.FindByEmailAsync("admin@xbol.com") ?? throw new KeyNotFoundException();
 
             User? seller = buyer;
 
-            EventSchedule schedule = eventScheduleRepository.Get(x => x.ExternalEventKey == request.EventId).First();
+            EventSchedule schedule = eventScheduleRepository.Get(x => x.ExternalEventKey == request.EventKey).First();
 
             // TODO: Calculate total, taxes, and fees
 
@@ -60,7 +61,6 @@ namespace XBOL.Ticketing.Services.Event
                     })]
             };
 
-
             // TODO: Confirm if Ticket creation should be done after payment confirmation
             foreach (var item in result.Objects)
             {
@@ -79,49 +79,17 @@ namespace XBOL.Ticketing.Services.Event
             await orderRepository.InsertAsync(newOrder);
             await orderRepository.CommitAsync();
 
-
             // Process Payment
         }
 
-        public async Task<string?> GetEventKeyAsync(long eventId)
+        public async Task<string?> GetEventKeyAsync(long eventScheduleId)
         {
-            return await Repository.GetEventKeyAsync(eventId);
+            return await Repository.GetEventScheduleKeyAsync(eventScheduleId);
         }
 
-        public async Task<EventListItem?> GetEventByIdAsync(long id) =>
-            await Repository.GetEventByIdAsync(id);
-
-        public async Task<PagedResponse<EventListItem>> GetEventListAsync(
-            List<string>? venues = null,
-            List<EventCategory>? categories = null,
-            DateTimeOffset? startDate = null,
-            DateTimeOffset? endDate = null,
-            string? search = null,
-            string sortBy = "dateTime",
-            bool descending = false,
-            int page = 1,
-            int pageSize = 20
-        )
+        public async Task<string?> GetSeasonKeyAsync(long seasonId)
         {
-            var (items, totalCount) = await Repository.GetEventListAsync(
-                venues,
-                categories,
-                startDate,
-                endDate,
-                search,
-                sortBy,
-                descending,
-                page,
-                pageSize
-            );
-
-            return new PagedResponse<EventListItem>
-            {
-                Items = items,
-                TotalCount = totalCount,
-                Page = page,
-                PageSize = pageSize,
-            };
+            return await Repository.GetSeasonKeyAsync(seasonId);
         }
     }
 }

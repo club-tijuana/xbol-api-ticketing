@@ -19,6 +19,8 @@ COPY ["XBOL.Ticketing.Core.DTO/XBOL.Ticketing.Core.DTO.csproj", "XBOL.Ticketing.
 COPY ["XBOL.Ticketing.Core.Mappers/XBOL.Ticketing.Core.Mappers.csproj", "XBOL.Ticketing.Core.Mappers/"]
 COPY ["XBOL.Ticketing.Data/XBOL.Ticketing.Data.csproj", "XBOL.Ticketing.Data/"]
 COPY ["XBOL.Ticketing.Core.Model/XBOL.Ticketing.Core.Model.csproj", "XBOL.Ticketing.Core.Model/"]
+COPY ["XBOL.Ticketing.Core.Commons/XBOL.Ticketing.Core.Commons.csproj", "XBOL.Ticketing.Core.Commons/"]
+COPY ["XBOL.Ticketing.Services/XBOL.Ticketing.Services.csproj", "XBOL.Ticketing.Services/"]
 COPY ["XBOL.Ticketing.DynamicPricing/XBOL.Ticketing.DynamicPricing.csproj", "XBOL.Ticketing.DynamicPricing/"]
 
 # Restore dependencies

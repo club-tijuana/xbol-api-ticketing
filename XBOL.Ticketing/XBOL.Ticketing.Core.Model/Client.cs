@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -9,10 +9,10 @@ namespace XBOL.Ticketing.Core.Model
         public string FirstName { get; set; } = null!;
         public string LastName { get; set; } = null!;
         public string? BusinessName { get; set; }
-
         public string Email { get; set; } = null!;
+        public long? PhoneRegionCodeId { get; set; }
+        public PhoneRegionCode? PhoneRegionCode { get; set; }
         public string PhoneNumber { get; set; } = null!;
-
         public bool IsActive { get; set; }
 
         public Guid? UserId { get; set; }
