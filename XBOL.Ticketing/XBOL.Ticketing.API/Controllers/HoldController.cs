@@ -34,14 +34,14 @@ namespace XBOL.Ticketing.API.Controllers
             {
                 case SaleType.SeasonPass:
                     {
-                        var season = await seasonService.GetByIdAsync(request.EventId);
+                        var season = await seasonService.GetByIdAsync(request.EventScheduleId);
                         eventKey = season?.ExternalSeasonKey ?? string.Empty;
                         break;
                     }
 
                 case SaleType.Event:
                     {
-                        eventKey = await eventService.GetEventKeyAsync(request.EventId) ?? string.Empty;
+                        eventKey = await eventService.GetEventKeyAsync(request.EventScheduleId) ?? string.Empty;
                         break;
                     }
                 default:
@@ -63,6 +63,30 @@ namespace XBOL.Ticketing.API.Controllers
         public async Task<ActionResult<HoldToken>> ClientHoldSeatsAsync()
         {
             var token = await seatsIoService.CreateHoldTokenAsync();
+
+            return Ok(token);
+        }
+
+        /// <summary>
+        /// Asynchronously holds the specified seats for a season and returns a token representing the hold.
+        /// </summary>
+        /// <remarks>This method reserves the requested seats for a limited time, allowing further actions
+        /// such as purchase or release. If the event is not found or the seat information is invalid, the operation may
+        /// fail. Exception handling should be implemented to manage such cases appropriately.</remarks>
+        /// <param name="request">The request containing the event identifier and the collection of seat identifiers to be held. The season
+        /// identifier must correspond to an existing season, and the seat identifiers must be valid for that season.</param>
+        /// <returns>An ActionResult containing a HoldToken that represents the hold placed on the specified seats.</returns>
+        [HttpPost("season")]
+        [EndpointName("HoldSeasonSeatsAsync")]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(HoldToken))]
+        public async Task<ActionResult<HoldToken>> GetSeasonKeyAsync(HoldSeasonSeatsRequest request)
+        {
+            // TODO: Handle exceptions, not found, and errors
+            var seasonKey = await eventService.GetSeasonKeyAsync(request.SeasonId) ?? string.Empty;
+
+            var token = await seatsIoService.CreateHoldTokenAsync(); // TODO: Get this value from a setting or config
+
+            await seatsIoService.HoldSeatsAsync(seasonKey, request.Seats.ToArray(), token.Token);
 
             return Ok(token);
         }

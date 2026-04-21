@@ -48,12 +48,22 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                   })
                                   .ToListAsync();
         }
-        public async Task<string?> GetEventKeyAsync(long eventId)
+
+        public async Task<string?> GetEventScheduleKeyAsync(long eventSheduleId)
         {
             return await dbContext.EventSchedules
                 .AsNoTracking()
-                .Where(sch => sch.EventId == eventId)
+                .Where(sch => sch.Id == eventSheduleId)
                 .Select(sch => sch.ExternalEventKey)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<string?> GetSeasonKeyAsync(long seasonId)
+        {
+            return await dbContext.Seasons
+                .AsNoTracking()
+                .Where(s => s.Id == seasonId)
+                .Select(s => s.ExternalSeasonKey)
                 .FirstOrDefaultAsync();
         }
     }

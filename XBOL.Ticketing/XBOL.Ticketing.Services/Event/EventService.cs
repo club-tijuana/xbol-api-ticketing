@@ -82,9 +82,14 @@ namespace XBOL.Ticketing.Services.Event
             // Process Payment
         }
 
-        public async Task<string?> GetEventKeyAsync(long eventId)
+        public async Task<string?> GetEventKeyAsync(long eventScheduleId)
         {
-            return await Repository.GetEventKeyAsync(eventId);
+            return await Repository.GetEventScheduleKeyAsync(eventScheduleId);
+        }
+
+        public async Task<string?> GetSeasonKeyAsync(long seasonId)
+        {
+            return await Repository.GetSeasonKeyAsync(seasonId);
         }
     }
 }
