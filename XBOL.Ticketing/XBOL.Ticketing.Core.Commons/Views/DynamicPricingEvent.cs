@@ -13,7 +13,7 @@ namespace XBOL.Ticketing.Core.Commons.Views
 
         public string EventCategory { get; set; } = null!;
         public DateTimeOffset EventDateTime { get; set; }
-        public DateTimeOffset EventPublishedDate { get; set; }
+        public DateTimeOffset? EventPublishedDate { get; set; }
         public GameCategory EventGameCategory { get; set; }
 
         public ProfitabilityType EventProfitability { get; set; }

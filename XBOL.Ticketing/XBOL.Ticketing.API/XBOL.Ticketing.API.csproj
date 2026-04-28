@@ -20,9 +20,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SeatsioDotNet" Version="107.4.0" />
-        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.4" />
-        <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.4" />
+        <PackageReference Include="SeatsioDotNet" Version="107.5.0" />
+        <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+        <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.7" />
         <!-- Container environment variables -->
         <ContainerEnvironmentVariable Include="ASPNETCORE_HTTP_PORTS" Value="8080" />
         <ContainerEnvironmentVariable Include="ASPNETCORE_URLS" Value="http://+:8080" />
@@ -35,10 +35,8 @@
         <ProjectReference Include="..\XBOL.Ticketing.Services\XBOL.Ticketing.Services.csproj" />
     </ItemGroup>
 
-    <Target Name="GenerateAppSettingsSchema" AfterTargets="Build"
-            Condition="'$(Configuration)' == 'Debug'">
-        <Exec Command="dotnet run --project &quot;$(MSBuildProjectFullPath)&quot; --no-build -- --generate-schema"
-              WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Target Name="GenerateAppSettingsSchema" AfterTargets="Build" Condition="'$(Configuration)' == 'Debug'">
+        <Exec Command="dotnet run --project &quot;$(MSBuildProjectFullPath)&quot; --no-build -- --generate-schema" WorkingDirectory="$(MSBuildProjectDirectory)" />
     </Target>
 
 </Project>

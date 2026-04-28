@@ -27,6 +27,8 @@ namespace XBOL.Ticketing.Core.Model
         public Guid CreatedBy { get; set; }
         public Guid UpdatedBy { get; set; }
 
+        public string ExternalSeasonKey { get; set; } = null!;
+
         public IList<SeasonPass> SeasonPasses { get; set; } = [];
         public IList<SeasonTag> SeasonTags { get; set; } = [];
 

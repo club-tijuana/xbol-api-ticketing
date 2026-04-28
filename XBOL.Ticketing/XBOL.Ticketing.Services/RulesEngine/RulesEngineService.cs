@@ -32,7 +32,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
                 }
 
                 int seatsSold = entity.Seats.Count(x => x.IsSold);
-                decimal salesPace = CalculateSalesPace(entity.Seats, entity.EventDateTime, entity.EventPublishedDate, nowUtc);
+                decimal salesPace = CalculateSalesPace(entity.Seats, entity.EventDateTime, entity.EventPublishedDate ?? nowUtc, nowUtc);
 
                 Signals signals = new()
                 {

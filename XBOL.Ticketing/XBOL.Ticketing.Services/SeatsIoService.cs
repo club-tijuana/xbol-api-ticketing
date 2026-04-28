@@ -275,7 +275,7 @@ namespace XBOL.Ticketing.Services
 
             return response;
         }
-
+		
         public async Task<Page<StatusChange>> GetStatusChangesAsync(
             string eventKey,
             long? afterId = null,
