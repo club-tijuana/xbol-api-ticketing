@@ -1,4 +1,4 @@
-namespace XBOL.Ticketing.Core.DTO
+namespace XBOL.Ticketing.Core.DTO.Responses
 {
     public class PagedResponse<T>
     {

@@ -1,75 +1,36 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi;
-using System.Reflection;
-using XBOL.Ticketing.Core.Model;
-using XBOL.Ticketing.Data;
+using XBOL.Ticketing.API.Extensions;
+using XBOL.Ticketing.API.Schema;
 using XBOL.Ticketing.Data.Extensions;
 using XBOL.Ticketing.Services.Extensions;
 
+if (args.Contains("--generate-schema"))
+{
+    var outputPath = Path.GetFullPath(
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "appsettings.schema.json"));
+    AppSettingsSchemaGenerator.GenerateAndWrite(outputPath);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Configuration.GetConnectionString("Default");
-builder.Services.AddDbContext<XBOLDbContext>(options =>
-    options.UseNpgsql(connectionString));
+// Infrastructure
+builder.Services.ConfigureOptions(builder.Configuration);
+builder.Services.ConfigureDatabase(builder.Configuration);
 
-// Identity + EF Core store
-builder.Services.AddDataProtection();
+// Security
+builder.Services.ConfigureIdentity();
 
-builder.Services
-    .AddIdentityCore<User>(options =>
-    {
-        options.Password.RequireDigit = true;
-        options.Password.RequiredLength = 8;
-        options.User.RequireUniqueEmail = true;
-    })
-    .AddRoles<Role>()
-    .AddEntityFrameworkStores<XBOLDbContext>()
-    .AddSignInManager()
-    .AddDefaultTokenProviders();
-
-// Add services to the container.
+// Application
 builder.Services.ConfigureServices();
 builder.Services.ConfigureRepositories();
 
-builder.Services.AddAuthentication();
-builder.Services.AddAuthorization();
-
-builder.Services.AddControllers(options =>
-{
-    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
-}).AddNewtonsoftJson(options =>
-{
-    options.SerializerSettings.Converters.Add(new Newtonsoft.Json.Converters.StringEnumConverter());
-});
-
-// Add health check services
+// Web framework
+builder.Services.ConfigureMvc();
 builder.Services.AddHealthChecks();
-
-// Add OpenAPI services
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new() { Title = "XBOL Ticketing API", Version = "v1" });
-
-    // Include XML comments if available
-    string xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-    string xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-
-    if (File.Exists(xmlPath))
-    {
-        c.IncludeXmlComments(xmlPath);
-    }
-
-    c.MapType<decimal>(() => new OpenApiSchema { Type = JsonSchemaType.Number, Format = "decimal" });
-
-    c.UseAllOfToExtendReferenceSchemas();
-    c.SupportNonNullableReferenceTypes();
-}).AddSwaggerGenNewtonsoftSupport();
+builder.Services.ConfigureSwagger();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger(c =>
@@ -88,14 +49,13 @@ if (app.Environment.IsDevelopment())
         {
             context.Response.Redirect("/swagger/index.html");
             return Task.CompletedTask;
-        }
-    );
+        });
 }
 
 // Only use HTTPS redirection when running directly (Visual Studio, dotnet run)
 // Containers handle TLS at load balancer/reverse proxy level
 if (!app.Environment.IsProduction()
-    || string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")))
+    || string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER")))
 {
     app.UseHttpsRedirection();
 }
@@ -129,7 +89,7 @@ app.MapHealthChecks("/healthz", new Microsoft.AspNetCore.Diagnostics.HealthCheck
             dockerImageVersion
         };
         await context.Response.WriteAsJsonAsync(response);
-    }
+    },
 });
 
 app.Run();

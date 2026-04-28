@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -26,6 +26,8 @@ namespace XBOL.Ticketing.Core.Model
         public DateTimeOffset UpdatedAt { get; set; }
         public Guid CreatedBy { get; set; }
         public Guid UpdatedBy { get; set; }
+
+        public string ExternalSeasonKey { get; set; } = null!;
 
         public IList<SeasonPass> SeasonPasses { get; set; } = [];
         public IList<SeasonTag> SeasonTags { get; set; } = [];

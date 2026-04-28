@@ -32,7 +32,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
                 }
 
                 int seatsSold = entity.Seats.Count(x => x.IsSold);
-                decimal salesPace = CalculateSalesPace(entity.Seats, entity.EventDateTime, entity.EventPublishedDate, nowUtc);
+                decimal salesPace = CalculateSalesPace(entity.Seats, entity.EventDateTime, entity.EventPublishedDate ?? nowUtc, nowUtc);
 
                 Signals signals = new()
                 {
@@ -41,7 +41,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
                     VenueLongitude = entity.VenueLongitude,
                     VenueCapacity = entity.VenueCapacity ?? 0,
 
-                    EventCategory = entity.EventCategory.GetDescription(),
+                    EventCategory = entity.EventCategory,
                     EventDateTime = entity.EventDateTime,
                     EventGameCategory = entity.EventGameCategory.GetDescription()
                 };
