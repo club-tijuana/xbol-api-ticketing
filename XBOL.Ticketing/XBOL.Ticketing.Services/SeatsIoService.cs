@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SeatsioDotNet;
 using SeatsioDotNet.Charts;
@@ -10,10 +11,18 @@ using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services
 {
-    public class SeatsIoService(IOptions<SeatsIoOptions> options)
+    public class SeatsIoService
     {
-        private readonly SeatsIoOptions _options = options.Value;
-        private readonly SeatsioClient _client = new(ResolveRegion(options.Value.Region), options.Value.SecretKey);
+        private readonly SeatsIoOptions _options;
+        private readonly SeatsioClient _client;
+        private readonly ILogger<SeatsIoService> _logger;
+
+        public SeatsIoService(IOptions<SeatsIoOptions> options, ILogger<SeatsIoService> logger)
+        {
+            _options = options.Value;
+            _client = new SeatsioClient(ResolveRegion(options.Value.Region), options.Value.SecretKey);
+            _logger = logger;
+        }
 
         private static Region ResolveRegion(string? region) => (region ?? "NA").ToUpperInvariant() switch
         {
@@ -66,6 +75,40 @@ namespace XBOL.Ticketing.Services
             return await BookSeatsAsync(eventKey, seatsToBook, holdToken);
         }
 
+        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(
+            string eventKey,
+            Dictionary<string, decimal> seats,
+            string holdToken)
+        {
+            _logger.LogInformation(
+                "Booking {SeatCount} seat(s) for {EventKey} (hold token supplied: {HasHoldToken}).",
+                seats.Count, eventKey, !string.IsNullOrWhiteSpace(holdToken));
+
+            var seatsToBook = seats
+                .Select(s => new ObjectProperties(s.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }))
+                .ToList();
+
+            ChangeObjectStatusResult response = string.IsNullOrWhiteSpace(holdToken)
+                ? await _client.Events.BookAsync(eventKey, seatsToBook)
+                : await _client.Events.BookAsync(eventKey, seatsToBook, holdToken);
+
+            if (!string.IsNullOrWhiteSpace(holdToken))
+            {
+                try
+                {
+                    await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "Booking succeeded for {EventKey} but releasing the hold token failed.",
+                        eventKey);
+                }
+            }
+
+            return response;
+        }
+
         public async Task<HoldToken> CreateHoldTokenAsync()
         {
             return _options.HoldExpirationInMinutes.HasValue
@@ -93,7 +136,7 @@ namespace XBOL.Ticketing.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error releasing hold token: {ex.Message}");
+                _logger.LogWarning(ex, "Error releasing hold token {HoldToken}.", holdToken);
             }
 
             return result;
@@ -138,7 +181,7 @@ namespace XBOL.Ticketing.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unable to get chart with key '{chartKey}'. {ex.Message}");
+                _logger.LogWarning(ex, "Unable to get chart with key '{ChartKey}'.", chartKey);
                 return null;
             }
         }
@@ -152,7 +195,7 @@ namespace XBOL.Ticketing.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unable to get the list of charts. {ex.Message}");
+                _logger.LogWarning(ex, "Unable to get the list of charts.");
                 return [];
             }
         }
@@ -165,7 +208,7 @@ namespace XBOL.Ticketing.Services
 
                 return true;
             }
-            catch (SeatsioException ex) when (ex.Message.Contains("404"))
+            catch (SeatsioException ex) when (SeatsIoErrorCodes.IsResourceNotFound(ex))
             {
                 return false;
             }
@@ -186,7 +229,7 @@ namespace XBOL.Ticketing.Services
 
                 return allExist;
             }
-            catch (SeatsioException ex) when (ex.Message.ToLower().Contains("not found"))
+            catch (SeatsioException ex) when (SeatsIoErrorCodes.IsResourceNotFound(ex))
             {
                 return false;
             }
@@ -275,7 +318,7 @@ namespace XBOL.Ticketing.Services
 
             return response;
         }
-		
+
         public async Task<Page<StatusChange>> GetStatusChangesAsync(
             string eventKey,
             long? afterId = null,

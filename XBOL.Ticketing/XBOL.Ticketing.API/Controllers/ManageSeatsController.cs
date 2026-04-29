@@ -3,6 +3,7 @@ using SeatsioDotNet;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
+using XBOL.Ticketing.API.Infrastructure;
 using XBOL.Ticketing.API.Models;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
@@ -208,21 +209,16 @@ namespace XBOL.Ticketing.API.Controllers
         [HttpPost("book")]
         [EndpointName("BookSeatsActionAsync")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<string>))]
-        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(SeatsIoErrorResponse))]
-        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(SeatsIoErrorResponse))]
-        [ProducesResponseType(StatusCodes.Status429TooManyRequests, Type = typeof(SeatsIoErrorResponse))]
-        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoErrorResponse))]
+        [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(SeatsIoProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(SeatsIoProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(SeatsIoProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests, Type = typeof(SeatsIoProblemDetails))]
+        [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoProblemDetails))]
         public async Task<IActionResult> BookSeatsActionAsync([FromBody] BookSeatsActionRequest request)
         {
-            try
-            {
-                var result = await seatsIoService.BookSeatsAsync(request.EventKey, request.Seats, request.HoldToken);
-                return Ok(result.Objects.Select(x => x.Key));
-            }
-            catch (SeatsioException ex)
-            {
-                return HandleSeatsioError(ex);
-            }
+            var result = await seatsIoService.BookSeatsWithDetailsAsync(
+                request.EventKey, request.Seats, request.HoldToken);
+            return Ok(result.Objects.Select(x => x.Key));
         }
 
         /// <summary>
