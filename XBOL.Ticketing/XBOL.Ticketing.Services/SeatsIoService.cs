@@ -7,7 +7,9 @@ using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
 using SeatsioDotNet.Util;
+using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
+using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.Services
 {
@@ -16,12 +18,14 @@ namespace XBOL.Ticketing.Services
         private readonly SeatsIoOptions _options;
         private readonly SeatsioClient _client;
         private readonly ILogger<SeatsIoService> _logger;
+        private readonly EventScheduleService _eventScheduleService;
 
-        public SeatsIoService(IOptions<SeatsIoOptions> options, ILogger<SeatsIoService> logger)
+        public SeatsIoService(IOptions<SeatsIoOptions> options, ILogger<SeatsIoService> logger, EventScheduleService eventScheduleService)
         {
             _options = options.Value;
             _client = new SeatsioClient(ResolveRegion(options.Value.Region), options.Value.SecretKey);
             _logger = logger;
+            _eventScheduleService = eventScheduleService;
         }
 
         private static Region ResolveRegion(string? region) => (region ?? "NA").ToUpperInvariant() switch
@@ -113,6 +117,17 @@ namespace XBOL.Ticketing.Services
         {
             return _options.HoldExpirationInMinutes.HasValue
                 ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
+                : await _client.HoldTokens.CreateAsync();
+        }
+
+        public async Task<HoldToken> CreateHoldTokenAsync(string eventKey)
+        {
+            var schedule = _eventScheduleService.GetList(x => x.ExternalEventKey == eventKey && x.Event.Status == EventStatus.Published).FirstOrDefault();
+
+            int? holdExpiration = schedule?.HoldExpirationInMinutes ?? _options.HoldExpirationInMinutes;
+
+            return holdExpiration.HasValue
+                ? await _client.HoldTokens.CreateAsync(holdExpiration.Value)
                 : await _client.HoldTokens.CreateAsync();
         }
 

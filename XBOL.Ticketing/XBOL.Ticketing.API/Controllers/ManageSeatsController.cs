@@ -191,7 +191,7 @@ namespace XBOL.Ticketing.API.Controllers
         {
             try
             {
-                var token = await seatsIoService.CreateHoldTokenAsync();
+                var token = await seatsIoService.CreateHoldTokenAsync(request.EventKey);
                 await seatsIoService.HoldSeatsAsync(request.EventKey, request.Seats.ToArray(), token.Token);
                 return Ok(token);
             }
