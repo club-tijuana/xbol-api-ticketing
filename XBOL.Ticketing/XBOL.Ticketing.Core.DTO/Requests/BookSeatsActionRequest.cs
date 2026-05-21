@@ -16,6 +16,7 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public required ItemType TicketType { get; set; }
         public required ClientInfoRequest ClientContact { get; set; }
         public required PaymentInfoRequest PaymentInfoRequest { get; set; }
+        public required ChangeInfoRequest ChangeInfoRequest { get; set; }
         public string? Localizer { get; set; }
         public long? ReferenceOrderId { get; set; }
     }
