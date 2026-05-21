@@ -50,7 +50,7 @@ namespace XBOL.Ticketing.API.Controllers
                     break;
             }
 
-            var token = await seatsIoService.CreateHoldTokenAsync();
+            var token = await seatsIoService.CreateHoldTokenAsync(eventKey);
 
             await seatsIoService.HoldSeatsAsync(eventKey, request.Seats.ToArray(), token.Token);
 
@@ -84,7 +84,7 @@ namespace XBOL.Ticketing.API.Controllers
             // TODO: Handle exceptions, not found, and errors
             var seasonKey = await eventService.GetSeasonKeyAsync(request.SeasonId) ?? string.Empty;
 
-            var token = await seatsIoService.CreateHoldTokenAsync(); // TODO: Get this value from a setting or config
+            var token = await seatsIoService.CreateHoldTokenAsync(seasonKey); // TODO: Get this value from a setting or config
 
             await seatsIoService.HoldSeatsAsync(seasonKey, request.Seats.ToArray(), token.Token);
 
