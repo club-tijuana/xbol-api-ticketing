@@ -7,6 +7,7 @@
         <UserSecretsId>772ff3bb-fea4-4172-915a-e8c3dbc94460</UserSecretsId>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
+        <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
 
         <!-- Docker configuration for Visual Studio -->
         <DockerfileContext>..\..</DockerfileContext>

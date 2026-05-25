@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <BuildInParallel>false</BuildInParallel>
   </PropertyGroup>
 
   <!-- Target Linux for platform compatibility analyzer (CA1416) -->

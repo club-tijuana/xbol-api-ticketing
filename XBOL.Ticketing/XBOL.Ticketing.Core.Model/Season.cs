@@ -31,7 +31,5 @@ namespace XBOL.Ticketing.Core.Model
 
         public IList<SeasonPass> SeasonPasses { get; set; } = [];
         public IList<SeasonTag> SeasonTags { get; set; } = [];
-
-        public string ExternalSeasonKey { get; set; } = null!;
     }
 }
