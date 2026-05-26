@@ -54,7 +54,7 @@ jobs:
             echo "❌ El secreto PROVIDER está vacío"
             exit 1
           else
-            echo "✅ El secreto PROVIDER tiene contenido"
+            echo "✅ El secreto PROVIDER tiene contenido: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
           fi
 
       - id: 'auth'
