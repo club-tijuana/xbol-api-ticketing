@@ -56,7 +56,9 @@ jobs:
           else
             echo "✅ El secreto PROVIDER tiene contenido: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
           fi
-
+      - name: Debug GitHub Context
+        run: |
+            echo "repository=${{ github.repository }}"
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
