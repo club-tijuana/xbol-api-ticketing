@@ -3,7 +3,7 @@ name: Build and Push Ticketing API to GCP (PROD)
 on:
   pull_request:
     branches:
-      - dev
+      - main
 env:
   IMAGE_VERSION: '0.0.0001'
   IMAGE_NAME: xbol-api-ticketing
@@ -54,11 +54,8 @@ jobs:
             echo "❌ El secreto PROVIDER está vacío"
             exit 1
           else
-            echo "✅ El secreto PROVIDER tiene contenido: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}"
+            echo "✅ El secreto PROVIDER tiene contenido"
           fi
-      - name: Debug GitHub Context
-        run: |
-            echo "repository=${{ github.repository }}"
       - id: 'auth'
         name: 'Authenticate to Google Cloud'
         uses: 'google-github-actions/auth@v2'
