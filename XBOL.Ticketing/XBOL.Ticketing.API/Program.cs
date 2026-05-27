@@ -23,6 +23,7 @@ builder.Services.ConfigureIdentity();
 // Application
 builder.Services.ConfigureServices();
 builder.Services.ConfigureRepositories();
+builder.Host.ConfigureWolverine();
 
 // Web framework
 builder.Services.ConfigureMvc();

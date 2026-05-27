@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet.HoldTokens;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
+using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Services;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Season;
@@ -11,7 +12,7 @@ namespace XBOL.Ticketing.API.Controllers
     [Obsolete("Use ManageSeatsController hold endpoints instead.")]
     [Route("api/hold-seats")]
     [ApiController]
-    public class HoldController(SeatsIoService seatsIoService, EventService eventService, SeasonService seasonService) : ControllerBase
+    public class HoldController(SeatsIoService seatsIoService, EventService eventService, SeasonService seasonService, IBundleRepository bundleRepository) : ControllerBase
     {
         /// <summary>
         /// Asynchronously holds the specified seats for an event and returns a token representing the hold.
@@ -39,13 +40,19 @@ namespace XBOL.Ticketing.API.Controllers
                         break;
                     }
 
+                case SaleType.Bundle:
+                    {
+                        var bundle = await bundleRepository.GetByIdAsync(request.EventScheduleId);
+                        eventKey = bundle?.ExternalKey;
+                        break;
+                    }
+
                 case SaleType.Event:
                     {
                         eventKey = await eventService.GetEventKeyAsync(request.EventScheduleId) ?? string.Empty;
                         break;
                     }
                 default:
-                    // Handle unexpected SaleType values, possibly by throwing an exception or returning a bad request response
                     eventKey = string.Empty;
                     break;
             }

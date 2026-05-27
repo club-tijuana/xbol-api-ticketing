@@ -13,6 +13,9 @@ namespace XBOL.Ticketing.Core.Model
         public long? SeasonPassEventTicketId { get; set; }
         public SeasonPassEventTicket? SeasonPassEventTicket { get; set; }
 
+        public long? BundlePassEventTicketId { get; set; }
+        public BundlePassEventTicket? BundlePassEventTicket { get; set; }
+
         public long EventSeatId { get; set; }
         public EventSeat EventSeat { get; set; } = null!;
 

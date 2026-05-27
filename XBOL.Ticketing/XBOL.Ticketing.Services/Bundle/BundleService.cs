@@ -108,7 +108,13 @@ namespace XBOL.Ticketing.Services.Bundle
             if (request.BannerImageUrl is not null) { bundle.BannerImageUrl = request.BannerImageUrl; }
             if (request.PosterImageUrl is not null) { bundle.PosterImageUrl = request.PosterImageUrl; }
             if (request.LandingUrl is not null) { bundle.LandingUrl = request.LandingUrl; }
-            if (request.Status is not null) { bundle.Status = request.Status.Value; }
+			
+            if (request.Status is not null)
+            {
+                EventStatusTransitions.ValidateTransition(bundle.Status, request.Status.Value);
+                bundle.Status = request.Status.Value;
+            }
+			
             if (request.BundleType is not null) { bundle.BundleType = request.BundleType.Value; }
             if (request.BundlePricingType is not null) { bundle.BundlePricingType = request.BundlePricingType.Value; }
             if (request.Code is not null) { bundle.Code = request.Code; }

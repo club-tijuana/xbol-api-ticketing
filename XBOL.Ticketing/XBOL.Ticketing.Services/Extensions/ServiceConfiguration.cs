@@ -20,11 +20,15 @@ namespace XBOL.Ticketing.Services.Extensions
         {
             services.AddScoped<AccreditationService>();
             services.AddScoped<AccreditationTypeService>();
+            services.AddScoped<BundleEventScheduleService>();
+            services.AddScoped<BundlePassService>();
+            services.AddScoped<BundlePassEventTicketService>();
             services.AddScoped<BundleService>();
             services.AddScoped<ClientCreditAccountService>();
             services.AddScoped<ClientCreditTransactionService>();
             services.AddScoped<ClientService>();
             services.AddScoped<EventMediaService>();
+            services.AddScoped<EventScheduleLifecycleService>();
             services.AddScoped<EventScheduleService>();
             services.AddScoped<EventSeatService>();
             services.AddScoped<EventSectionService>();
@@ -63,9 +67,10 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
 
+            services.AddScoped<ISeatsIoEventLifecycleClient>(sp => sp.GetRequiredService<SeatsIoService>());
+
             services.AddValidatorsFromAssembly(typeof(ServiceConfiguration).Assembly);
 
-            services.AddScoped<RulesEngineService>();
             services.AddTransient<IEngine, Engine>();
 
             services.AddScoped<PriceService>();

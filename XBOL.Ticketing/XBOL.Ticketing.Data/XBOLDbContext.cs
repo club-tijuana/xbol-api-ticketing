@@ -89,8 +89,12 @@ namespace XBOL.Ticketing.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.RemovePluralizingTableNameConvention();
 
+            modelBuilder.ApplyConfiguration(new BundleConfiguration());
+            modelBuilder.ApplyConfiguration(new BundleEventScheduleConfiguration());
+            modelBuilder.ApplyConfiguration(new BundlePassConfiguration());
             modelBuilder.ApplyConfiguration(new ClientConfiguration());
             modelBuilder.ApplyConfiguration(new EventConfiguration());
+            modelBuilder.ApplyConfiguration(new EventScheduleConfiguration());
             modelBuilder.ApplyConfiguration(new OrganizerConfiguration());
             modelBuilder.ApplyConfiguration(new PriceListConfiguration());
             modelBuilder.ApplyConfiguration(new PriceReferenceConfiguration());
@@ -98,8 +102,6 @@ namespace XBOL.Ticketing.Data
             modelBuilder.ApplyConfiguration(new PriceTypeConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
-            modelBuilder.ApplyConfiguration(new BundleConfiguration());
-            modelBuilder.ApplyConfiguration(new BundleEventScheduleConfiguration());
         }
     }
 }

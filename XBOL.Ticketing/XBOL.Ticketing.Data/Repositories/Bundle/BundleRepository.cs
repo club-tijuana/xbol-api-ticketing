@@ -1,4 +1,3 @@
-using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Data.Repositories.Base;
 

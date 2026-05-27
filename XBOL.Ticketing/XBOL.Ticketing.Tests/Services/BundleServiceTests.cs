@@ -102,6 +102,44 @@ public class BundleServiceTests
     }
 
     [Fact]
+    public async Task UpdateAsync_ValidStatusTransition_Succeeds()
+    {
+        var bundle = new Bundle { Id = 1, Status = EventStatus.Draft };
+        _repository.GetByIdAsync(1).Returns(bundle);
+
+        var result = await _sut.UpdateAsync(1,
+            new BundleUpdateRequest { Status = EventStatus.PendingReview }, Guid.NewGuid());
+
+        result!.Status.Should().Be(EventStatus.PendingReview);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_InvalidStatusTransition_ThrowsInvalidOperationException()
+    {
+        var bundle = new Bundle { Id = 1, Status = EventStatus.Draft };
+        _repository.GetByIdAsync(1).Returns(bundle);
+
+        var act = () => _sut.UpdateAsync(1,
+            new BundleUpdateRequest { Status = EventStatus.Published }, Guid.NewGuid());
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*Draft*Published*");
+    }
+
+    [Fact]
+    public async Task UpdateAsync_NullStatus_SkipsValidation()
+    {
+        var bundle = new Bundle { Id = 1, Name = "Test", Status = EventStatus.Draft };
+        _repository.GetByIdAsync(1).Returns(bundle);
+
+        var result = await _sut.UpdateAsync(1,
+            new BundleUpdateRequest { Name = "Updated" }, Guid.NewGuid());
+
+        result!.Status.Should().Be(EventStatus.Draft);
+        result.Name.Should().Be("Updated");
+    }
+
+    [Fact]
     public async Task DeleteAsync_NotFound_DoesNotAttemptDelete()
     {
         _repository.GetByIdAsync(999).Returns((Bundle?)null);

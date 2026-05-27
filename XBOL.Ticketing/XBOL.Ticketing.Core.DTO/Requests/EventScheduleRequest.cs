@@ -1,11 +1,10 @@
 using XBOL.Ticketing.Core.Commons.Enums;
 
-namespace XBOL.Ticketing.Core.Model
+namespace XBOL.Ticketing.Core.DTO.Requests
 {
-    public class EventSchedule : BaseModel
+    public class EventScheduleRequest
     {
         public long EventId { get; set; }
-        public Event Event { get; set; } = null!;
         public DateTimeOffset StartDateTime { get; set; }
         public DateTimeOffset EndDateTime { get; set; }
         public DateTimeOffset? PublishedDate { get; set; }
@@ -15,13 +14,6 @@ namespace XBOL.Ticketing.Core.Model
         public DateTimeOffset OffSaleDate { get; set; }
         public DateTimeOffset? GateOpenDate { get; set; }
         public GameCategory? GameCategory { get; set; }
-        public ScheduleStatus Status { get; set; }
-        public string? ExternalEventKey { get; set; }
-        public DateTimeOffset? DeletedAt { get; set; }
         public int? HoldExpirationInMinutes { get; set; }
-
-        public IList<EventSection> Sections { get; set; } = [];
-        public IList<Ticket> Tickets { get; set; } = [];
-        public IList<InventoryBatch> InventoryBatches { get; set; } = [];
     }
 }

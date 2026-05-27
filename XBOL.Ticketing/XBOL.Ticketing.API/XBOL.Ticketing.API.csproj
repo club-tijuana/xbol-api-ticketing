@@ -24,6 +24,8 @@
         <PackageReference Include="SeatsioDotNet" Version="107.7.0" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
         <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.7" />
+        <PackageReference Include="WolverineFx" Version="5.31.0" />
+        <PackageReference Include="WolverineFx.EntityFrameworkCore" Version="5.31.0" />
         <!-- Container environment variables -->
         <ContainerEnvironmentVariable Include="ASPNETCORE_HTTP_PORTS" Value="8080" />
         <ContainerEnvironmentVariable Include="ASPNETCORE_URLS" Value="http://+:8080" />
