@@ -1,3 +1,4 @@
+using XBOL.Ticketing.API.Filters;
 using XBOL.Ticketing.API.Infrastructure;
 
 namespace XBOL.Ticketing.API.Extensions;
@@ -8,6 +9,8 @@ public static class MvcConfiguration
     {
         services.AddControllers(options =>
         {
+            options.Filters.Add<ValidationFilter>();
+            options.Filters.Add<ApiExceptionFilter>();
             options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
         }).AddNewtonsoftJson(options =>
         {

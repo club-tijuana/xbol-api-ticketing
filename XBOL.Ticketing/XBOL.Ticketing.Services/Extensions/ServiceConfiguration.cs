@@ -1,6 +1,8 @@
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using XBOL.Ticketing.DynamicPricing;
 using XBOL.Ticketing.Services.Accreditation;
+using XBOL.Ticketing.Services.Bundle;
 using XBOL.Ticketing.Services.Client;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Identity;
@@ -18,6 +20,7 @@ namespace XBOL.Ticketing.Services.Extensions
         {
             services.AddScoped<AccreditationService>();
             services.AddScoped<AccreditationTypeService>();
+            services.AddScoped<BundleService>();
             services.AddScoped<ClientCreditAccountService>();
             services.AddScoped<ClientCreditTransactionService>();
             services.AddScoped<ClientService>();
@@ -59,6 +62,8 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
+
+            services.AddValidatorsFromAssembly(typeof(ServiceConfiguration).Assembly);
 
             services.AddScoped<RulesEngineService>();
             services.AddTransient<IEngine, Engine>();

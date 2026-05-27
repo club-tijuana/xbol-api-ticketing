@@ -27,6 +27,13 @@ namespace XBOL.Ticketing.Data
         public DbSet<EventSection> EventSections => Set<EventSection>();
         public DbSet<EventTag> EventTags => Set<EventTag>();
         public DbSet<EventCategory> EventCategories => Set<EventCategory>();
+        public DbSet<Bundle> Bundles => Set<Bundle>();
+        public DbSet<BundleEventSchedule> BundleEventSchedules => Set<BundleEventSchedule>();
+        public DbSet<BundleSection> BundleSections => Set<BundleSection>();
+        public DbSet<BundleSeat> BundleSeats => Set<BundleSeat>();
+        public DbSet<BundlePass> BundlePasses => Set<BundlePass>();
+        public DbSet<BundlePassEventTicket> BundlePassEventTickets => Set<BundlePassEventTicket>();
+        public DbSet<BundleTag> BundleTags => Set<BundleTag>();
         public DbSet<Gate> Gates => Set<Gate>();
         public DbSet<GateAccessRule> GateAccessRules => Set<GateAccessRule>();
         public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
@@ -91,6 +98,8 @@ namespace XBOL.Ticketing.Data
             modelBuilder.ApplyConfiguration(new PriceTypeConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
+            modelBuilder.ApplyConfiguration(new BundleConfiguration());
+            modelBuilder.ApplyConfiguration(new BundleEventScheduleConfiguration());
         }
     }
 }
