@@ -42,9 +42,9 @@ namespace XBOL.Ticketing.Services
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            foreach (BookingSeatRequest seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             var response = await BookSeatsAsync(request.EventKey, seatsToBook, request.HoldToken);
@@ -57,9 +57,9 @@ namespace XBOL.Ticketing.Services
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            foreach (BookingSeatRequest seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             var response = await BookSeatsAsync(request.SeasonKey, seatsToBook, request.HoldToken);
@@ -67,34 +67,33 @@ namespace XBOL.Ticketing.Services
             return response;
         }
 
-        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, Dictionary<string, decimal> seats, string holdToken)
+        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, List<BookingSeatRequest> seats, string holdToken)
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in seats)
+            foreach (BookingSeatRequest seat in seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             return await BookSeatsAsync(eventKey, seatsToBook, holdToken);
         }
 
-        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(
-            string eventKey,
-            Dictionary<string, decimal> seats,
-            string holdToken)
+        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(string eventKey, List<BookingSeatRequest> seats, string holdToken)
         {
             _logger.LogInformation(
                 "Booking {SeatCount} seat(s) for {EventKey} (hold token supplied: {HasHoldToken}).",
                 seats.Count, eventKey, !string.IsNullOrWhiteSpace(holdToken));
 
             var seatsToBook = seats
-                .Select(s => new ObjectProperties(s.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }))
-                .ToList();
+                                .Select(s => new ObjectProperties(
+                                    s.SeatKey,
+                                    new Dictionary<string, object> { { "salesPoint", "Admin" } }))
+                                .ToList();
 
             ChangeObjectStatusResult response = string.IsNullOrWhiteSpace(holdToken)
-                ? await _client.Events.BookAsync(eventKey, seatsToBook)
-                : await _client.Events.BookAsync(eventKey, seatsToBook, holdToken);
+                                                ? await _client.Events.BookAsync(eventKey, seatsToBook)
+                                                : await _client.Events.BookAsync(eventKey, seatsToBook, holdToken);
 
             if (!string.IsNullOrWhiteSpace(holdToken))
             {
@@ -104,9 +103,7 @@ namespace XBOL.Ticketing.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
-                        "Booking succeeded for {EventKey} but releasing the hold token failed.",
-                        eventKey);
+                    _logger.LogWarning(ex, "Booking succeeded for {EventKey} but releasing the hold token failed.", eventKey);
                 }
             }
 
@@ -116,8 +113,8 @@ namespace XBOL.Ticketing.Services
         public async Task<HoldToken> CreateHoldTokenAsync()
         {
             return _options.HoldExpirationInMinutes.HasValue
-                ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
-                : await _client.HoldTokens.CreateAsync();
+                    ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
+                    : await _client.HoldTokens.CreateAsync();
         }
 
         public async Task<HoldToken> CreateHoldTokenAsync(string eventKey)

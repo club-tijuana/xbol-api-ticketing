@@ -27,7 +27,6 @@ namespace XBOL.Ticketing.Data
         public DbSet<EventSection> EventSections => Set<EventSection>();
         public DbSet<EventTag> EventTags => Set<EventTag>();
         public DbSet<EventCategory> EventCategories => Set<EventCategory>();
-
         public DbSet<Gate> Gates => Set<Gate>();
         public DbSet<GateAccessRule> GateAccessRules => Set<GateAccessRule>();
         public DbSet<InventoryBatch> InventoryBatches => Set<InventoryBatch>();
@@ -38,10 +37,8 @@ namespace XBOL.Ticketing.Data
         public DbSet<Organizer> Organizers => Set<Organizer>();
         public DbSet<OrganizerMember> OrganizerMembers => Set<OrganizerMember>();
         public DbSet<Payment> Payments => Set<Payment>();
-        public DbSet<PriceRule> PriceRules => Set<PriceRule>();
         public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
         public DbSet<PromoCodeRedemption> PromoCodeRedemptions => Set<PromoCodeRedemption>();
-
         public DbSet<Season> Seasons => Set<Season>();
         public DbSet<SeasonPass> SeasonPasses => Set<SeasonPass>();
         public DbSet<SeasonPassEventTicket> SeasonPassEventTickets => Set<SeasonPassEventTicket>();
@@ -54,6 +51,14 @@ namespace XBOL.Ticketing.Data
         public DbSet<TicketTransfer> TicketTransfers => Set<TicketTransfer>();
         public DbSet<Venue> Venues => Set<Venue>();
         public DbSet<VenueMap> VenueMaps => Set<VenueMap>();
+        public DbSet<AdditionalCharge> AdditionalCharges => Set<AdditionalCharge>();
+        public DbSet<Price> Prices => Set<Price>();
+        public DbSet<PriceList> PriceLists => Set<PriceList>();
+        public DbSet<PriceListItem> PriceListItems => Set<PriceListItem>();
+        public DbSet<PriceListItemFee> PriceListItemFees => Set<PriceListItemFee>();
+        public DbSet<PriceReference> PriceReferences => Set<PriceReference>();
+        public DbSet<PriceSegment> PriceSegments => Set<PriceSegment>();
+        public DbSet<PriceType> PriceTypes => Set<PriceType>();
 
         public XBOLDbContext() : base()
         {
@@ -68,8 +73,7 @@ namespace XBOL.Ticketing.Data
         {
             if (!optionsBuilder.IsConfigured)
             {
-                optionsBuilder.UseNpgsql(
-                    @"Host=localhost;Port=5432;Database=XBOL;Username=postgres;Password=12345");
+                optionsBuilder.UseNpgsql(@"Host=localhost;Port=5432;Database=XBOL;Username=postgres;Password=12345");
             }
         }
 
@@ -78,9 +82,13 @@ namespace XBOL.Ticketing.Data
             base.OnModelCreating(modelBuilder);
             modelBuilder.RemovePluralizingTableNameConvention();
 
-            modelBuilder.ApplyConfiguration(new EventConfiguration());
             modelBuilder.ApplyConfiguration(new ClientConfiguration());
+            modelBuilder.ApplyConfiguration(new EventConfiguration());
             modelBuilder.ApplyConfiguration(new OrganizerConfiguration());
+            modelBuilder.ApplyConfiguration(new PriceListConfiguration());
+            modelBuilder.ApplyConfiguration(new PriceReferenceConfiguration());
+            modelBuilder.ApplyConfiguration(new PriceSegmentConfiguration());
+            modelBuilder.ApplyConfiguration(new PriceTypeConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
         }

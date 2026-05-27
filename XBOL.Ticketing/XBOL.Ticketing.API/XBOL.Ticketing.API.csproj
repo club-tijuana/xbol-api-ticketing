@@ -21,7 +21,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="SeatsioDotNet" Version="107.5.0" />
+        <PackageReference Include="SeatsioDotNet" Version="107.7.0" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
         <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.1.7" />
         <!-- Container environment variables -->

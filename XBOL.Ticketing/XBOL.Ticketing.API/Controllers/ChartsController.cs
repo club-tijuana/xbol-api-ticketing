@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using SeatsioDotNet.Charts;
+using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.API.Controllers
@@ -22,9 +22,9 @@ namespace XBOL.Ticketing.API.Controllers
         /// <returns>An ActionResult containing the object reprseenting the chart.</returns>
         [HttpGet("{chartKey}")]
         [EndpointName("GetChartByKeyAsync")]
-        [ProducesResponseType(typeof(Chart), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ChartResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<Chart>> GetChartByKeyAsync([FromRoute] string chartKey)
+        public async Task<ActionResult<ChartResponse>> GetChartByKeyAsync([FromRoute] string chartKey)
         {
             var result = await _seatsIoService.RetrieveMapChartAsync(chartKey);
 
@@ -33,7 +33,22 @@ namespace XBOL.Ticketing.API.Controllers
                 return NotFound();
             }
 
-            return Ok(result);
+            return Ok(new ChartResponse
+            {
+                Id = result.Id,
+                Key = result.Key,
+                Name = result.Name,
+                Status = result.Status,
+                Archived = result.Archived,
+                PublishedVersionThumbnailUrl = result.PublishedVersionThumbnailUrl,
+                DraftVersionThumbnailUrl = result.DraftVersionThumbnailUrl,
+                VenueType = result.VenueType,
+                Validation = new ChartValidationResponse
+                {
+                    Errors = result.Validation.Errors,
+                    Warnings = result.Validation.Warnings
+                }
+            });
         }
 
         /// <summary>
@@ -42,12 +57,27 @@ namespace XBOL.Ticketing.API.Controllers
         /// <returns>An ActionResult containing a list of objects representing the available charts.</returns>
         [HttpGet]
         [EndpointName("GetChartsAsync")]
-        [ProducesResponseType(typeof(List<Chart>), StatusCodes.Status200OK)]
-        public async Task<ActionResult<List<Chart>>> GetChartsAsync()
+        [ProducesResponseType(typeof(List<ChartResponse>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<List<ChartResponse>>> GetChartsAsync()
         {
             var result = await _seatsIoService.RetrieveMapChartsAsync();
 
-            return Ok(result);
+            return Ok(result.Select(c => new ChartResponse
+            {
+                Id = c.Id,
+                Key = c.Key,
+                Name = c.Name,
+                Status = c.Status,
+                Archived = c.Archived,
+                PublishedVersionThumbnailUrl = c.PublishedVersionThumbnailUrl,
+                DraftVersionThumbnailUrl = c.DraftVersionThumbnailUrl,
+                VenueType = c.VenueType,
+                Validation = new ChartValidationResponse
+                {
+                    Errors = c.Validation.Errors,
+                    Warnings = c.Validation.Warnings
+                }
+            }).ToList());
         }
     }
 }

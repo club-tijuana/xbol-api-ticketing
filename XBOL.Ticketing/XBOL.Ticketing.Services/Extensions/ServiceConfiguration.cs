@@ -56,13 +56,14 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<DeviceService>();
             services.AddScoped<DistributorService>();
             services.AddScoped<InventoryBatchService>();
-            services.AddScoped<PriceRuleService>();
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
 
             services.AddScoped<RulesEngineService>();
             services.AddTransient<IEngine, Engine>();
+
+            services.AddScoped<PriceService>();
 
             return services;
         }

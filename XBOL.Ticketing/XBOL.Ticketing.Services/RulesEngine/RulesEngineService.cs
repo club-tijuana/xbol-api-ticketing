@@ -7,9 +7,9 @@ using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.Services.RulesEngine
 {
+    [Obsolete("This class is deprecated and will be removed in a future release.")]
     public class RulesEngineService(
         EventService eventService,
-        PriceRuleService priceRuleService,
         EventSeatService eventSeatService,
         IEngine engine)
     {
@@ -21,7 +21,7 @@ namespace XBOL.Ticketing.Services.RulesEngine
 
             foreach (DynamicPricingEvent entity in entities)
             {
-                IList<DynamicPricingRule> dynamicPricingRules = await priceRuleService.GetRulesByEventScheduleIdAsync(entity.EventScheduleId);
+                IList<DynamicPricingRule> dynamicPricingRules = new List<DynamicPricingRule>(); //await priceRuleService.GetRulesByEventScheduleIdAsync(entity.EventScheduleId);
                 IList<Rule> rules = [.. dynamicPricingRules.Select(x => new Rule { Id = x.Id, Code = x.Code, Description = x.Description, Expression = x.Expression, Version = 1 })];
 
                 TimeSpan remainingTime = entity.EventDateTime - nowUtc;

@@ -40,8 +40,6 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                               SeatRow = seat.BaseSeat.BaseRow.RowLabel,
                                               SeatNumber = seat.BaseSeat.SeatNumber,
                                               SeatType = seat.BaseSeat.SeatType,
-
-                                              SectionBasePrice = seat.EventSection.Price,
                                               IsSold = seat.Tickets.Any(t => t.OriginalOrder != null && t.OriginalOrder.Status == OrderStatus.Paid)
                                           })
                                           .ToList()

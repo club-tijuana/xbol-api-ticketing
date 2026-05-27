@@ -55,7 +55,6 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<DeviceRepository>();
             services.AddScoped<DistributorRepository>();
             services.AddScoped<InventoryBatchRepository>();
-            services.AddScoped<PriceRuleRepository>();
             services.AddScoped<TagRepository>();
             services.AddScoped<TagTypeRepository>();
 
