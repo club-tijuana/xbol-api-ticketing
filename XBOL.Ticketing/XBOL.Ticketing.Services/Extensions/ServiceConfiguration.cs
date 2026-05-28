@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using XBOL.Ticketing.DynamicPricing;
 using XBOL.Ticketing.Services.Accreditation;
+using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Bundle;
 using XBOL.Ticketing.Services.Client;
 using XBOL.Ticketing.Services.Event;
@@ -21,6 +22,8 @@ namespace XBOL.Ticketing.Services.Extensions
         {
             services.AddScoped<AccreditationService>();
             services.AddScoped<AccreditationTypeService>();
+            services.AddScoped<IBookingOrchestrationService, BookingOrchestrationService>();
+            services.AddScoped<ISeatsIoBookingClient, SeatsIoBookingClient>();
             services.AddScoped<BundleEventScheduleService>();
             services.AddScoped<IBundleLifecycleService, BundleLifecycleService>();
             services.AddScoped<BundlePassService>();

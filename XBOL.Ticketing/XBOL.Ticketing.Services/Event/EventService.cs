@@ -49,7 +49,7 @@ namespace XBOL.Ticketing.Services.Event
                 TotalTaxes = 0,
                 Total = 0,
                 OrderType = OrderType.Ticket,
-                PayformType = PayformType.BoxOffice,
+                SaleChannel = SaleChannel.BoxOffice,
 
                 CreatedAt = DateTimeOffset.Now,
                 CreatedBy = seller.Id,
@@ -60,6 +60,7 @@ namespace XBOL.Ticketing.Services.Event
                         ItemType = ItemType.Ticket,
                     // TODO: Check what is this field
                         ItemReferenceId = 0,
+                        IsCourtesy = false,
                         Price = 0
                     })]
             };

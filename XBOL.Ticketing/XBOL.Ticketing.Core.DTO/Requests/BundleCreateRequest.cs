@@ -7,7 +7,6 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         // Event fields
         public required long VenueMapId { get; set; }
         public required long OrganizerId { get; set; }
-        public long? SeasonId { get; set; }
         public required string Name { get; set; }
         public string Subtitle { get; set; } = "";
         public string ShortDescription { get; set; } = "";

@@ -13,7 +13,6 @@ namespace XBOL.Ticketing.Core.Model
         public long? SeasonPassEventTicketId { get; set; }
         public SeasonPassEventTicket? SeasonPassEventTicket { get; set; }
 
-        public long? BundlePassEventTicketId { get; set; }
         public BundlePassEventTicket? BundlePassEventTicket { get; set; }
 
         public long EventSeatId { get; set; }
@@ -37,6 +36,8 @@ namespace XBOL.Ticketing.Core.Model
 
         public string SectionLabelSnapshot { get; set; } = null!;
         public string SeatLabelSnapshot { get; set; } = null!;
+
+        public bool IsDigital { get; set; } = true;
 
         public decimal PricePaid { get; set; }
 

@@ -12,6 +12,7 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public required List<BookingSeatRequest> Seats { get; set; } = [];
 
         public string HoldToken { get; set; } = "";
+        public long? BundleId { get; set; }
         public long EventScheduleId { get; set; }
         public required ItemType TicketType { get; set; }
         public required ClientInfoRequest ClientContact { get; set; }

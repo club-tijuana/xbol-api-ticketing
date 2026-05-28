@@ -14,7 +14,6 @@ namespace XBOL.Ticketing.Core.Mappers
             {
                 Id = entity.Id,
                 VenueMapId = entity.VenueMapId,
-                SeasonId = entity.SeasonId,
                 Name = entity.Name,
                 Subtitle = entity.Subtitle,
                 ShortDescription = entity.ShortDescription,
@@ -67,7 +66,6 @@ namespace XBOL.Ticketing.Core.Mappers
                 Id = entity.Id,
                 VenueMapId = entity.VenueMapId ?? 0,
                 OrganizerId = entity.OrganizerId,
-                SeasonId = entity.SeasonId,
                 Name = entity.Name,
                 Subtitle = entity.Subtitle,
                 ShortDescription = entity.ShortDescription,

@@ -10,10 +10,6 @@ namespace XBOL.Ticketing.Data.Configurations
         {
             builder.Property(x => x.PhoneNumber).HasMaxLength(15);
 
-            builder.HasOne(x => x.Client)
-                   .WithOne(x => x.User)
-                   .HasForeignKey<Client>(x => x.UserId);
-
             builder.HasOne(x => x.OrganizerMember)
                    .WithOne(x => x.User)
                    .HasForeignKey<OrganizerMember>(x => x.UserId);

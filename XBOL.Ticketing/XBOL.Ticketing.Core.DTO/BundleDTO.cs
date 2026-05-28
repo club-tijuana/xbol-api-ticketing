@@ -10,7 +10,6 @@ namespace XBOL.Ticketing.Core.DTO
 
         public long? VenueMapId { get; set; }
         public long OrganizerId { get; set; }
-        public long? SeasonId { get; set; }
         public string Name { get; set; } = null!;
         public string? Subtitle { get; set; }
         public string? ShortDescription { get; set; }

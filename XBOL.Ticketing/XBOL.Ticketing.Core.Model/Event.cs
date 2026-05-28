@@ -10,9 +10,6 @@ namespace XBOL.Ticketing.Core.Model
         public long? OrganizerId { get; set; }
         public Organizer? Organizer { get; set; }
 
-        public long? SeasonId { get; set; }
-        public Season? Season { get; set; }
-
         public string Name { get; set; } = null!;
         public string? Subtitle { get; set; }
         public string? ShortDescription { get; set; }

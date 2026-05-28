@@ -14,9 +14,9 @@ namespace XBOL.Ticketing.Data.Configurations
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasOne(bp => bp.BundleSeat)
-            .WithMany(bs => bs.BundlePasses) // TODO: This should be WithOne if a BundleSeat can only be associated with one BundlePass
-            .HasForeignKey(bp => bp.BundleSeatId)
-            .OnDelete(DeleteBehavior.Restrict);
+                .WithMany(bs => bs.BundlePasses) // TODO: This should be WithOne if a BundleSeat can only be associated with one BundlePass
+                .HasForeignKey(bp => bp.BundleSeatId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasOne(bp => bp.Client)
                 .WithMany()
