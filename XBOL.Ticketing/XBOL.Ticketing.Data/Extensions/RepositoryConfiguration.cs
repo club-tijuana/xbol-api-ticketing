@@ -9,6 +9,7 @@ using XBOL.Ticketing.Data.Repositories.Identity;
 using XBOL.Ticketing.Data.Repositories.Order;
 using XBOL.Ticketing.Data.Repositories.Season;
 using XBOL.Ticketing.Data.Repositories.Ticket;
+using XBOL.Ticketing.Data.Repositories.Media;
 using XBOL.Ticketing.Data.Repositories.Venue;
 
 namespace XBOL.Ticketing.Data.Extensions
@@ -65,6 +66,7 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<GateRepository>();
             services.AddScoped<AuditLogRepository>();
             services.AddScoped<DeviceRepository>();
+            services.AddScoped<MediaRepository>();
             services.AddScoped<DistributorRepository>();
             services.AddScoped<InventoryBatchRepository>();
             services.AddScoped<TagRepository>();

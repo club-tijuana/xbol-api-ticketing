@@ -6,6 +6,7 @@ namespace XBOL.Ticketing.Data.Abstractions;
 public interface IBundleRepository
 {
     Task<Core.Model.Bundle?> GetByIdAsync(long id);
+    Task<Core.Model.Bundle?> GetByIdWithVenueMapAndSchedulesAsync(long id);
     Task InsertAsync(Core.Model.Bundle entity);
     Task CommitAsync();
     Task UpdateAsync(Core.Model.Bundle entity);

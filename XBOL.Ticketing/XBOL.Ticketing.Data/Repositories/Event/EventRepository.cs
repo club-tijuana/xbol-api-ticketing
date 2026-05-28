@@ -7,6 +7,13 @@ namespace XBOL.Ticketing.Data.Repositories.Event
 {
     public class EventRepository(XBOLDbContext dbContext) : BaseRepository<Core.Model.Event>(dbContext)
     {
+        public async Task<Core.Model.Event?> GetByIdWithSchedulesAsync(long id)
+        {
+            return await dbContext.Events
+                .Include(e => e.Schedules)
+                .FirstOrDefaultAsync(e => e.Id == id);
+        }
+
         public async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId)
         {
             // TODO: Implement logic to exclude EventSeats that have already been delivered to a distributor.
@@ -17,7 +24,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                   .Select(es => new DynamicPricingEvent
                                   {
                                       EventScheduleId = es.Id,
-                                      VenueCategory = es.Event.VenueMap.Venue.Category,
+                                      VenueCategory = es.Event.VenueMap!.Venue.Category,
                                       VenueLatitude = es.Event.VenueMap.Venue.Latitude,
                                       VenueLongitude = es.Event.VenueMap.Venue.Longitude,
                                       VenueCapacity = es.Event.VenueMap.Capacity,
@@ -25,7 +32,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                       EventCategory = es.Event.Categories.Select(c => c.DisplayName).FirstOrDefault() ?? "",
                                       EventDateTime = es.StartDateTime,
                                       EventPublishedDate = es.PublishedDate,
-                                      EventGameCategory = es.GameCategory,
+                                      EventGameCategory = es.GameCategory ?? default,
 
                                       EventProfitability = ProfitabilityType.Regular,
                                       FeelingOfTheMarket = FeelingOfTheMarket.Neutral,

@@ -13,16 +13,24 @@ public class BundleEventScheduleServiceTests
     private readonly IBundleEventScheduleRepository _scheduleRepo = Substitute.For<IBundleEventScheduleRepository>();
     private readonly IBundleRepository _bundleRepo = Substitute.For<IBundleRepository>();
     private readonly IEventScheduleRepository _eventScheduleRepo = Substitute.For<IEventScheduleRepository>();
+    private readonly IBundleLifecycleService _bundleLifecycleService = Substitute.For<IBundleLifecycleService>();
     private readonly BundleEventScheduleService _sut;
 
     public BundleEventScheduleServiceTests()
     {
-        _sut = new BundleEventScheduleService(_scheduleRepo, _bundleRepo, _eventScheduleRepo);
+        _sut = new BundleEventScheduleService(
+            _scheduleRepo,
+            _bundleRepo,
+            _eventScheduleRepo,
+            _bundleLifecycleService);
     }
 
-    private static Core.Model.Bundle Bundle(EventStatus status, BundleType type = BundleType.Basic) => new()
+    private static Core.Model.Bundle Bundle(
+        EventStatus status,
+        BundleType type = BundleType.Basic,
+        string? externalKey = null) => new()
     {
-        Id = 1, Status = status, BundleType = type
+        Id = 1, Status = status, BundleType = type, ExternalKey = externalKey
     };
 
     private static EventSchedule Schedule(long id, string? extKey = null) => new()
@@ -30,12 +38,10 @@ public class BundleEventScheduleServiceTests
         Id = id, ExternalEventKey = extKey
     };
 
-    [Theory]
-    [InlineData(EventStatus.Published)]
-    [InlineData(EventStatus.Cancelled)]
-    public async Task AddAsync_NonEditableStatus_BlocksModifications(EventStatus status)
+    [Fact]
+    public async Task AddAsync_CancelledStatus_BlocksModifications()
     {
-        _bundleRepo.GetByIdAsync(1).Returns(Bundle(status));
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Cancelled));
 
         var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
         {
@@ -55,6 +61,7 @@ public class BundleEventScheduleServiceTests
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(status));
         _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+        _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
         _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
 
         await _sut.AddAsync(1, new BundleEventScheduleAddRequest
@@ -63,6 +70,53 @@ public class BundleEventScheduleServiceTests
         });
 
         await _scheduleRepo.Received(1).InsertAsync(Arg.Any<BundleEventSchedule>());
+    }
+
+    [Fact]
+    public async Task AddAsync_PublishedSeasonPass_AddsScheduleAndInvokesLifecycle()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.SeasonPass, "season-1"));
+        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+        _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
+        _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
+
+        await _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await _scheduleRepo.Received(1).InsertAsync(Arg.Is<BundleEventSchedule>(link =>
+            link.BundleId == 1 &&
+            link.EventScheduleId == 10));
+        await _scheduleRepo.Received(1).CommitAsync();
+        await _bundleLifecycleService.Received(1).AddSchedulesAsync(
+            1,
+            Arg.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L })),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AddAsync_PublishedBasicBundle_AddsScheduleAndInvokesLifecycle()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.Basic));
+        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+        _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
+        _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
+
+        await _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await _scheduleRepo.Received(1).InsertAsync(Arg.Is<BundleEventSchedule>(link =>
+            link.BundleId == 1 &&
+            link.EventScheduleId == 10));
+        await _bundleLifecycleService.Received(1).AddSchedulesAsync(
+            1,
+            Arg.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L })),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -155,7 +209,32 @@ public class BundleEventScheduleServiceTests
     [Fact]
     public async Task RemoveAsync_StatusGate_BlocksNonEditable()
     {
-        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published));
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Cancelled));
+
+        var act = () => _sut.RemoveAsync(1, 10);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*status*");
+    }
+
+    [Fact]
+    public async Task RemoveAsync_PublishedBasicBundle_RemovesLocalMembership()
+    {
+        var entry = new BundleEventSchedule { BundleId = 1, EventScheduleId = 10 };
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.Basic));
+        _scheduleRepo.GetByCompositeKeyAsync(1, 10).Returns(entry);
+
+        var result = await _sut.RemoveAsync(1, 10);
+
+        result.Should().BeTrue();
+        _scheduleRepo.Received(1).Remove(entry);
+        await _scheduleRepo.Received(1).CommitAsync();
+    }
+
+    [Fact]
+    public async Task RemoveAsync_PublishedSeasonPass_BlocksModifications()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.SeasonPass, "season-1"));
 
         var act = () => _sut.RemoveAsync(1, 10);
 

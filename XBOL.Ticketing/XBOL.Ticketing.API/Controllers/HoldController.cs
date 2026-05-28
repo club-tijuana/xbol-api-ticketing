@@ -43,7 +43,7 @@ namespace XBOL.Ticketing.API.Controllers
                 case SaleType.Bundle:
                     {
                         var bundle = await bundleRepository.GetByIdAsync(request.EventScheduleId);
-                        eventKey = bundle?.ExternalKey;
+                        eventKey = bundle?.ExternalKey ?? string.Empty;
                         break;
                     }
 

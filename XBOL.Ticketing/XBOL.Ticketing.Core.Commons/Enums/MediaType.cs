@@ -3,11 +3,13 @@ using System.Text.Json.Serialization;
 namespace XBOL.Ticketing.Core.Commons.Enums
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum ScheduleStatus
+    public enum MediaType
     {
-        Draft,
-        OnSale,
-        Closed,
-        Completed
+        Banner,
+        Gallery,
+        Logo,
+        GeneralView,
+        Facade,
+        Sponsor,
     }
 }

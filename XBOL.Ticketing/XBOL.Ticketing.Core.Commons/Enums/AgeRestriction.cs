@@ -3,11 +3,10 @@ using System.Text.Json.Serialization;
 namespace XBOL.Ticketing.Core.Commons.Enums
 {
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum ScheduleStatus
+    public enum AgeRestriction
     {
-        Draft,
-        OnSale,
-        Closed,
-        Completed
+        AllAges,
+        AdultsOnly,
+        None
     }
 }

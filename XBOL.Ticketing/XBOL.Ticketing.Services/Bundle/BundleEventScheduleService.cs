@@ -10,7 +10,8 @@ namespace XBOL.Ticketing.Services.Bundle
     public class BundleEventScheduleService(
         IBundleEventScheduleRepository bundleEventScheduleRepository,
         IBundleRepository bundleRepository,
-        IEventScheduleRepository eventScheduleRepository)
+        IEventScheduleRepository eventScheduleRepository,
+        IBundleLifecycleService lifecycleService)
     {
         private static readonly HashSet<EventStatus> EditableStatuses =
         [
@@ -34,7 +35,7 @@ namespace XBOL.Ticketing.Services.Bundle
             var bundle = await bundleRepository.GetByIdAsync(bundleId)
                 ?? throw new KeyNotFoundException($"Bundle {bundleId} not found.");
 
-            ValidateBundleStatus(bundle);
+            ValidateBundleStatus(bundle, allowPublishedSeasonPassAdd: true);
 
             foreach (var item in request.Items)
             {
@@ -52,6 +53,10 @@ namespace XBOL.Ticketing.Services.Bundle
             }
 
             await bundleEventScheduleRepository.CommitAsync();
+
+            await lifecycleService.AddSchedulesAsync(
+                bundleId,
+                request.Items.Select(item => item.EventScheduleId).ToArray());
 
             var entries = await bundleEventScheduleRepository.GetByBundleIdWithSchedulesAsync(bundleId);
             return entries.ToDto();
@@ -99,10 +104,25 @@ namespace XBOL.Ticketing.Services.Bundle
             return removed;
         }
 
-        private void ValidateBundleStatus(Core.Model.Bundle bundle)
+        private void ValidateBundleStatus(
+            Core.Model.Bundle bundle,
+            bool allowPublishedSeasonPassAdd = false)
         {
             if (!EditableStatuses.Contains(bundle.Status))
             {
+                if (allowPublishedSeasonPassAdd &&
+                    bundle.Status == EventStatus.Published &&
+                    bundle.BundleType == BundleType.SeasonPass)
+                {
+                    return;
+                }
+
+                if (bundle.Status == EventStatus.Published &&
+                    bundle.BundleType != BundleType.SeasonPass)
+                {
+                    return;
+                }
+
                 throw new InvalidOperationException(
                     $"Cannot modify schedules for bundle in status '{bundle.Status}'. " +
                     $"Allowed statuses: {string.Join(", ", EditableStatuses)}.");

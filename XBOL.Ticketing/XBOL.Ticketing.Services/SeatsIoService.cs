@@ -13,7 +13,7 @@ using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.Services
 {
-    public class SeatsIoService : ISeatsIoEventLifecycleClient
+    public class SeatsIoService : ISeatsIoEventLifecycleClient, ISeatsIoSeasonLifecycleClient
     {
         private readonly SeatsIoOptions _options;
         private readonly SeatsioClient _client;
@@ -381,6 +381,22 @@ namespace XBOL.Ticketing.Services
             }
         }
 
+        public async Task DeleteSeasonAsync(string seasonKey)
+        {
+            _logger.LogInformation("Deleting season {SeasonKey}.", seasonKey);
+
+            try
+            {
+                await _client.Events.DeleteAsync(seasonKey);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to delete season {SeasonKey}. ErrorCodes: {ErrorCodes}",
+                    seasonKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
         public async Task<SeatsioDotNet.Events.Event> CreateEventAsync(string chartKey, string eventKey)
         {
             _logger.LogInformation("Creating event {EventKey} on chart {ChartKey}.", eventKey, chartKey);
@@ -471,6 +487,29 @@ namespace XBOL.Ticketing.Services
         public async Task DeleteSeatsIoEventAsync(string eventKey)
         {
             await DeleteEventAsync(eventKey);
+        }
+
+        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[] eventKeys)
+        {
+            await CreateSeasonAsync(chartKey, seasonKey, eventKeys);
+        }
+
+        public async Task CreateSeatsIoEventsInSeasonAsync(string seasonKey, string[] eventKeys)
+        {
+            await CreateEventsInSeasonAsync(seasonKey, eventKeys);
+        }
+
+        public async Task DeleteSeatsIoSeasonAsync(string seasonKey)
+        {
+            await DeleteSeasonAsync(seasonKey);
+        }
+
+        public async Task UpdateSeatsIoSeasonAsync(string seasonKey, string name)
+        {
+            await UpdateSeasonAsync(seasonKey, new UpdateSeasonParams
+            {
+                Name = name
+            });
         }
 
         public async Task<Page<StatusChange>> GetStatusChangesAsync(

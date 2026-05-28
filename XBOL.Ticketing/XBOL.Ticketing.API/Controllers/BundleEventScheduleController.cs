@@ -11,7 +11,9 @@ namespace XBOL.Ticketing.API.Controllers
     /// <remarks>
     /// Bundles are created via the Bundles endpoint. This controller handles
     /// adding, listing, and removing EventSchedules from an existing Bundle.
-    /// Modifications are only allowed when the Bundle is in Draft, PendingReview, or Approved status.
+    /// Modifications are allowed when the Bundle is in Draft, PendingReview, or Approved status.
+    /// Published Basic bundles may update membership locally. Published SeasonPass bundles may receive
+    /// new EventSchedules created inside the season, but existing SeasonPass membership cannot be removed.
     /// </remarks>
     [Route("api/bundles/{bundleId:long}/schedules")]
     [ApiController]

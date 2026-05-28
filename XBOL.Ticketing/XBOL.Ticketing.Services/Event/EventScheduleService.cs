@@ -30,6 +30,7 @@ namespace XBOL.Ticketing.Services.Event
             EventScheduleRequest request,
             Guid userId)
         {
+            var now = DateTimeOffset.UtcNow;
             var scheduleEvent = await dbContext.Events
                 .FirstOrDefaultAsync(x => x.Id == request.EventId)
                 ?? throw new KeyNotFoundException($"Event {request.EventId} not found.");
@@ -47,7 +48,11 @@ namespace XBOL.Ticketing.Services.Event
                 EndDateTime = request.EndDateTime.ToUniversalTime(),
                 GameCategory = request.GameCategory,
                 Status = ScheduleStatus.Draft,
-                HoldExpirationInMinutes = request.HoldExpirationInMinutes
+                HoldExpirationInMinutes = request.HoldExpirationInMinutes,
+                CreatedAt = now,
+                UpdatedAt = now,
+                CreatedBy = userId,
+                UpdatedBy = userId
             };
 
             newSchedule.Sections = await dbContext.BaseSections
@@ -88,6 +93,8 @@ namespace XBOL.Ticketing.Services.Event
             existingSchedule.EndDateTime = request.EndDateTime.ToUniversalTime();
             existingSchedule.GameCategory = request.GameCategory;
             existingSchedule.HoldExpirationInMinutes = request.HoldExpirationInMinutes;
+            existingSchedule.UpdatedAt = DateTimeOffset.UtcNow;
+            existingSchedule.UpdatedBy = userId;
 
             await Repository.UpdateAsync(existingSchedule);
             await lifecycleService.SyncMetadataAsync(id);

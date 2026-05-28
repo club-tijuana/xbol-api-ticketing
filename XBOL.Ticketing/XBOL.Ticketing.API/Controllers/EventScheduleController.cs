@@ -31,7 +31,7 @@ namespace XBOL.Ticketing.API.Controllers
             [FromBody] EventScheduleRequest request)
         {
             var result = await scheduleService.CreateEventScheduleAsync(request, GetUserId());
-            return CreatedAtAction(nameof(GetScheduleByIdAsync), new { id = result.Id }, result);
+            return CreatedAtAction("GetScheduleById", new { id = result.Id }, result);
         }
 
         [HttpPut("{id:long}")]

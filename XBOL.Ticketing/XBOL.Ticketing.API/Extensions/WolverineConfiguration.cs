@@ -1,6 +1,5 @@
 using Wolverine;
-using Wolverine.EntityFrameworkCore;
-using XBOL.Ticketing.Services.Messages;
+using XBOL.Ticketing.Services.Extensions;
 
 namespace XBOL.Ticketing.API.Extensions;
 
@@ -8,11 +7,7 @@ public static class WolverineConfiguration
 {
     public static IHostBuilder ConfigureWolverine(this IHostBuilder host)
     {
-        host.UseWolverine(opts =>
-        {
-            opts.UseEntityFrameworkCoreTransactions();
-            opts.Discovery.IncludeAssembly(typeof(CreateSeatsIoEventCommand).Assembly);
-        });
+        host.UseWolverine(TicketingWolverineConfiguration.ConfigureTicketingLifecycle);
 
         return host;
     }

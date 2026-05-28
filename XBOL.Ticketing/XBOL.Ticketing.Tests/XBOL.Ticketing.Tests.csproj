@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\XBOL.Ticketing.API\XBOL.Ticketing.API.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Services\XBOL.Ticketing.Services.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.Model\XBOL.Ticketing.Core.Model.csproj" />

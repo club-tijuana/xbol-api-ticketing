@@ -4,6 +4,7 @@ using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Model;
+using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Data.Repositories.Order;
 using XBOL.Ticketing.Services.Base;
@@ -15,7 +16,9 @@ namespace XBOL.Ticketing.Services.Event
                               OrderRepository orderRepository,
                               EventSeatRepository eventSeatRepository,
                               EventScheduleRepository eventScheduleRepository,
-                              SeatsIoService _seatsIoService)
+                              SeatsIoService _seatsIoService,
+                              IEventScheduleLifecycleService scheduleLifecycleService,
+                              IBundleEventScheduleRepository bundleEventScheduleRepository)
         : BaseService<EventRepository, Core.Model.Event>(repository)
     {
         internal async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId) => await Repository.GetDynamicPricingData(eventId);
@@ -90,6 +93,35 @@ namespace XBOL.Ticketing.Services.Event
         public async Task<string?> GetSeasonKeyAsync(long seasonId)
         {
             return await Repository.GetSeasonKeyAsync(seasonId);
+        }
+
+        public async Task<bool> CancelEventAsync(long id, Guid userId, CancellationToken cancellation = default)
+        {
+            var existingEvent = await Repository.GetByIdWithSchedulesAsync(id);
+            if (existingEvent is null)
+            {
+                return false;
+            }
+
+            EventStatusTransitions.ValidateTransition(existingEvent.Status, EventStatus.Cancelled);
+
+            foreach (var schedule in existingEvent.Schedules.OrderBy(s => s.Id))
+            {
+                var links = await bundleEventScheduleRepository.GetByEventScheduleIdAsync(schedule.Id);
+                if (links.Any(link => link.Bundle?.BundleType == BundleType.SeasonPass))
+                {
+                    continue;
+                }
+
+                await scheduleLifecycleService.CancelAsync(schedule.Id, userId, cancellation);
+            }
+
+            existingEvent.Status = EventStatus.Cancelled;
+            existingEvent.UpdatedAt = DateTimeOffset.UtcNow;
+            existingEvent.UpdatedBy = userId;
+            await Repository.UpdateAsync(existingEvent);
+
+            return true;
         }
     }
 }

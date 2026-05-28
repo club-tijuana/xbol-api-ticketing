@@ -56,6 +56,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<Ticket> Tickets => Set<Ticket>();
         public DbSet<TicketScanLog> TicketScanLogs => Set<TicketScanLog>();
         public DbSet<TicketTransfer> TicketTransfers => Set<TicketTransfer>();
+        public DbSet<Media> Media => Set<Media>();
         public DbSet<Venue> Venues => Set<Venue>();
         public DbSet<VenueMap> VenueMaps => Set<VenueMap>();
         public DbSet<AdditionalCharge> AdditionalCharges => Set<AdditionalCharge>();

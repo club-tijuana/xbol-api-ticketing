@@ -21,7 +21,7 @@ namespace XBOL.Ticketing.Core.Mappers
                     StartDateTime = entity.EventSchedule.StartDateTime,
                     EndDateTime = entity.EventSchedule.EndDateTime,
                     ExternalEventKey = entity.EventSchedule.ExternalEventKey,
-                    GameCategory = (Commons.Enums.GameCategory)entity.EventSchedule.GameCategory,
+                    GameCategory = entity.EventSchedule.GameCategory ?? default,
                     Status = entity.EventSchedule.Status
                 }
             };
