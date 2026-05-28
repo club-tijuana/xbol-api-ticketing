@@ -1,3 +1,4 @@
+using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.Services.Booking
@@ -6,13 +7,13 @@ namespace XBOL.Ticketing.Services.Booking
     {
         public async Task<IReadOnlyList<string>> BookSeatsAsync(
             string eventKey,
-            IReadOnlyDictionary<string, decimal> seats,
+            List<BookingSeatRequest> seats,
             string holdToken,
             CancellationToken cancellationToken = default)
         {
             var result = await seatsIoService.BookSeatsWithDetailsAsync(
                 eventKey,
-                seats.ToDictionary(),
+                seats,
                 holdToken);
 
             return result.Objects.Select(x => x.Key).ToList();

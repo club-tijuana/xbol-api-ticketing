@@ -1,10 +1,12 @@
+using XBOL.Ticketing.Core.DTO.Requests;
+
 namespace XBOL.Ticketing.Services.Booking
 {
     public interface ISeatsIoBookingClient
     {
         Task<IReadOnlyList<string>> BookSeatsAsync(
             string eventKey,
-            IReadOnlyDictionary<string, decimal> seats,
+            List<BookingSeatRequest> seats,
             string holdToken,
             CancellationToken cancellationToken = default);
 
@@ -14,3 +16,4 @@ namespace XBOL.Ticketing.Services.Booking
             CancellationToken cancellationToken = default);
     }
 }
+

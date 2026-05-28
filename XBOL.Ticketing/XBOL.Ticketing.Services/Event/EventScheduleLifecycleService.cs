@@ -10,6 +10,7 @@ public class EventScheduleLifecycleService(
     IEventScheduleRepository eventScheduleRepository,
     IBundleEventScheduleRepository bundleEventScheduleRepository,
     IMessageBus bus)
+    : IEventScheduleLifecycleService
 {
     public async Task PublishAsync(long eventScheduleId, Guid userId, CancellationToken cancellation = default)
     {

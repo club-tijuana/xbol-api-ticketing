@@ -79,7 +79,7 @@ namespace XBOL.Ticketing.Services.Booking
             var schedules = ResolveBundleSchedules(bundle, request);
             var now = DateTimeOffset.UtcNow;
             ValidateBundleBookingWindow(bundle, now);
-            var bundleSeats = ResolveRequestedBundleSeats(bundle, request.Seats.Keys);
+            var bundleSeats = ResolveRequestedBundleSeats(bundle, request.Seats.Select(s => s.SeatKey));
             var requestedSeatKeys = bundleSeats.Keys.ToHashSet(StringComparer.Ordinal);
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
             await ValidateBundleRenewalSourceAsync(
@@ -166,7 +166,7 @@ namespace XBOL.Ticketing.Services.Booking
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
-            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.Value);
+            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.SeatPrice);
             var order = new ModelOrder
             {
                 Client = client,
@@ -205,7 +205,7 @@ namespace XBOL.Ticketing.Services.Booking
                     SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                     SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
                     IsDigital = true,
-                    PricePaid = request.Seats[eventSeat.ExternalSeatObjectKey],
+                    PricePaid = request.Seats.First(s => s.SeatKey == eventSeat.ExternalSeatObjectKey).SeatPrice,
                     Status = TicketStatus.Issued,
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -255,7 +255,7 @@ namespace XBOL.Ticketing.Services.Booking
         {
             await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
             var now = DateTimeOffset.UtcNow;
-            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.Value);
+            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.SeatPrice);
             var order = new ModelOrder
             {
                 Client = client,
@@ -279,26 +279,26 @@ namespace XBOL.Ticketing.Services.Booking
 
             foreach (var seat in request.Seats)
             {
-                var bundleSeat = bundleSeats[seat.Key];
+                var bundleSeat = bundleSeats[seat.SeatKey];
                 var pass = new ModelBundlePass
                 {
                     BundleId = bundle.Id,
                     Client = client,
                     UserId = null,
                     BundleSeatId = bundleSeat?.Id,
-                    TrackingCode = seat.Key,
+                    TrackingCode = seat.SeatKey,
                     PrivateToken = Guid.NewGuid().ToString("N"),
                     BundlePassType = BundlePassType.Full,
                     Status = BundlePassStatus.Active,
                     IsDigital = true,
-                    Price = seat.Value,
+                    Price = seat.SeatPrice,
                     PurchasedAt = now,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = actorUserId,
                     UpdatedBy = actorUserId
                 };
-                passesBySeatKey[seat.Key] = pass;
+                passesBySeatKey[seat.SeatKey] = pass;
                 dbContext.BundlePasses.Add(pass);
             }
 
@@ -418,7 +418,7 @@ namespace XBOL.Ticketing.Services.Booking
             BookSeatsActionRequest request,
             CancellationToken cancellationToken)
         {
-            var seatKeys = request.Seats.Keys.ToHashSet(StringComparer.Ordinal);
+            var seatKeys = request.Seats.Select(s => s.SeatKey).ToHashSet(StringComparer.Ordinal);
             var query = dbContext.EventSeats
                 .Include(s => s.EventSection)
                 .ThenInclude(s => s.EventSchedule)

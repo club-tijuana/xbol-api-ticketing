@@ -29,7 +29,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "schedule-100",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1", "A-2"]);
@@ -43,11 +43,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
             Localizer = "ORD-E-100-000001",
-            Seats = new Dictionary<string, decimal>
-            {
-                ["A-1"] = 125m,
-                ["A-2"] = 175m
-            },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 }, new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 175m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "buyer@example.com",
@@ -67,10 +63,10 @@ public class BookingOrchestrationServiceTests
 
         await bookingClient.Received(1).BookSeatsAsync(
             "schedule-100",
-            Arg.Is<IReadOnlyDictionary<string, decimal>>(seats =>
+            Arg.Is<List<BookingSeatRequest>>(seats =>
                 seats.Count == 2 &&
-                seats["A-1"] == 125m &&
-                seats["A-2"] == 175m),
+                seats.Any(s => s.SeatKey == "A-1" && s.SeatPrice == 125m) &&
+                seats.Any(s => s.SeatKey == "A-2" && s.SeatPrice == 175m)),
             "hold-123",
             Arg.Any<CancellationToken>());
 
@@ -125,7 +121,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "schedule-100",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -138,7 +134,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
             Localizer = "ORD-E-100-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 125m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "buyer@example.com",
@@ -179,7 +175,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "season-20",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -195,7 +191,7 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -215,9 +211,9 @@ public class BookingOrchestrationServiceTests
 
         await bookingClient.Received(1).BookSeatsAsync(
             "season-20",
-            Arg.Is<IReadOnlyDictionary<string, decimal>>(seats =>
+            Arg.Is<List<BookingSeatRequest>>(seats =>
                 seats.Count == 1 &&
-                seats["A-1"] == 500m),
+                seats.Any(s => s.SeatKey == "A-1" && s.SeatPrice == 500m)),
             "hold-123",
             Arg.Any<CancellationToken>());
 
@@ -278,7 +274,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "season-20",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -294,7 +290,7 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -312,9 +308,9 @@ public class BookingOrchestrationServiceTests
 
         await bookingClient.Received(1).BookSeatsAsync(
             "season-20",
-            Arg.Is<IReadOnlyDictionary<string, decimal>>(seats =>
+            Arg.Is<List<BookingSeatRequest>>(seats =>
                 seats.Count == 1 &&
-                seats["A-1"] == 500m),
+                seats.Any(s => s.SeatKey == "A-1" && s.SeatPrice == 500m)),
             "hold-123",
             Arg.Any<CancellationToken>());
 
@@ -352,7 +348,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 Arg.Any<string>(),
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(["A-404"]);
@@ -366,7 +362,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-404"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-404", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -409,7 +405,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 Arg.Any<string>(),
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -423,7 +419,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -474,7 +470,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -525,7 +521,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -577,7 +573,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -629,7 +625,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -676,7 +672,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -717,7 +713,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 Arg.Any<string>(),
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 Arg.Any<string>(),
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -732,7 +728,7 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = sourceOrder.Client.Email!,
@@ -787,7 +783,7 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -842,7 +838,7 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -893,7 +889,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 500m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
@@ -932,7 +928,7 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "basic-21-schedule-201",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
@@ -946,7 +942,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-21-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 100m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "basic@example.com",
@@ -964,12 +960,12 @@ public class BookingOrchestrationServiceTests
         result.TicketIds.Should().ContainSingle();
         await bookingClient.Received(1).BookSeatsAsync(
             "basic-21-schedule-201",
-            Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+            Arg.Any<List<BookingSeatRequest>>(),
             "hold-123",
             Arg.Any<CancellationToken>());
         await bookingClient.DidNotReceive().BookSeatsAsync(
             "basic-21-schedule-202",
-            Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+            Arg.Any<List<BookingSeatRequest>>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
 
@@ -1008,13 +1004,13 @@ public class BookingOrchestrationServiceTests
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
                 "basic-21-schedule-201",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns(["A-1"]);
         bookingClient.BookSeatsAsync(
                 "basic-21-schedule-202",
-                Arg.Any<IReadOnlyDictionary<string, decimal>>(),
+                Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
             .Returns<Task<IReadOnlyList<string>>>(_ => throw new InvalidOperationException("Seats.io failed"));
@@ -1028,7 +1024,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-21-000001",
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 100m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "basic@example.com",
@@ -1136,7 +1132,6 @@ public class BookingOrchestrationServiceTests
             EventSchedule = schedule,
             BaseSection = baseSection,
             DisplayName = "Lower 101",
-            Price = 125m,
             TotalSeats = 2,
             AvailableSeats = 2
         };
@@ -1224,7 +1219,6 @@ public class BookingOrchestrationServiceTests
                 {
                     BaseSection = baseSection,
                     DisplayName = "Lower 101",
-                    Price = 500m,
                     TotalSeats = 1,
                     AvailableSeats = 1,
                     BundleSeats =
@@ -1329,7 +1323,6 @@ public class BookingOrchestrationServiceTests
             BundlePassType = BundlePassType.Full,
             Status = passStatus,
             IsDigital = true,
-            Price = 500m,
             PurchasedAt = now,
             CreatedAt = now,
             UpdatedAt = now
@@ -1418,7 +1411,6 @@ public class BookingOrchestrationServiceTests
                 {
                     BaseSection = baseSection,
                     DisplayName = "Lower 101",
-                    Price = 100m,
                     TotalSeats = 1,
                     AvailableSeats = 1,
                     BundleSeats =
@@ -1527,7 +1519,6 @@ public class BookingOrchestrationServiceTests
             EventSchedule = schedule,
             BaseSection = baseSection,
             DisplayName = "Lower 101",
-            Price = 500m,
             TotalSeats = 1,
             AvailableSeats = 1
         };

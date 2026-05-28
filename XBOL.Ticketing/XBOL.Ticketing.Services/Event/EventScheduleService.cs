@@ -14,7 +14,7 @@ namespace XBOL.Ticketing.Services.Event
     public class EventScheduleService(
         EventScheduleRepository repository,
         XBOLDbContext dbContext,
-        EventScheduleLifecycleService lifecycleService)
+        IEventScheduleLifecycleService lifecycleService)
         : BaseService<EventScheduleRepository, EventSchedule>(repository)
     {
         public async Task<EventScheduleDTO?> GetScheduleByIdAsync(long id)

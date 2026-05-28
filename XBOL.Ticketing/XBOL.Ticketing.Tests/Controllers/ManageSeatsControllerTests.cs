@@ -21,7 +21,7 @@ public class ManageSeatsControllerTests
             EventScheduleId = 100,
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
-            Seats = new Dictionary<string, decimal> { ["A-1"] = 125m },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest(),
             PaymentInfoRequest = new PaymentInfoRequest(),
             ChangeInfoRequest = new ChangeInfoRequest()
