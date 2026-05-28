@@ -5,6 +5,7 @@ using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Mappers;
 using XBOL.Ticketing.Data.Abstractions;
+using XBOL.Ticketing.Data.Queries;
 using XBOL.Ticketing.Data.Repositories.Media;
 using XBOL.Ticketing.Services.Media;
 
@@ -35,17 +36,25 @@ namespace XBOL.Ticketing.Services.Bundle
 
             var bundleIds = bundles.Select(b => b.Id).ToList();
 
-            var bannerMedia = await mediaRepository
+            var media = await mediaRepository
                 .Get()
                 .AsNoTracking()
+                .Include(m => m.BlobAsset)
                 .Where(m => m.ReferenceType == SaleType.Bundle
-                         && m.DeletedAt == null
                          && bundleIds.Contains(m.ReferenceId)
                          && (m.MediaType == MediaType.Banner || m.MediaType == MediaType.Logo))
+                .AvailableBlobMedia()
+                .OrderBy(m => m.ReferenceId)
+                .ThenBy(m => m.MediaType)
+                .ThenBy(m => m.Order)
+                .ThenBy(m => m.Id)
+                .ToListAsync();
+
+            var bannerMedia = media
                 .GroupBy(m => m.ReferenceId)
-                .ToDictionaryAsync(
+                .ToDictionary(
                     g => g.Key,
-                    g => g.ToDictionary(m => m.MediaType, m => m)
+                    g => g.GroupBy(m => m.MediaType).ToDictionary(m => m.Key, m => m.First())
                 );
 
             var dtos = bundles.ToDto();
@@ -56,11 +65,11 @@ namespace XBOL.Ticketing.Services.Bundle
                 {
                     if (mediaByType.TryGetValue(MediaType.Banner, out var banner))
                     {
-                        dto.BannerImageUrl = $"data:{banner.ContentType};base64,{Convert.ToBase64String(banner.Content)}";
+                        dto.BannerImageUrl = banner.BlobAsset.Url ?? dto.BannerImageUrl;
                     }
                     if (mediaByType.TryGetValue(MediaType.Logo, out var poster))
                     {
-                        dto.PosterImageUrl = $"data:{poster.ContentType};base64,{Convert.ToBase64String(poster.Content)}";
+                        dto.PosterImageUrl = poster.BlobAsset.Url ?? dto.PosterImageUrl;
                     }
                 }
             }
@@ -84,15 +93,16 @@ namespace XBOL.Ticketing.Services.Bundle
 
             var mediaByType = dto.Media
                 .Where(m => m.MediaType == MediaType.Banner || m.MediaType == MediaType.Logo)
-                .ToDictionary(m => m.MediaType);
+                .GroupBy(m => m.MediaType)
+                .ToDictionary(g => g.Key, g => g.First());
 
             if (mediaByType.TryGetValue(MediaType.Banner, out var banner))
             {
-                dto.BannerImageUrl = $"data:{banner.ContentType};base64,{banner.ImageBase64}";
+                dto.BannerImageUrl = banner.Url ?? dto.BannerImageUrl;
             }
             if (mediaByType.TryGetValue(MediaType.Logo, out var poster))
             {
-                dto.PosterImageUrl = $"data:{poster.ContentType};base64,{poster.ImageBase64}";
+                dto.PosterImageUrl = poster.Url ?? dto.PosterImageUrl;
             }
 
             return dto;

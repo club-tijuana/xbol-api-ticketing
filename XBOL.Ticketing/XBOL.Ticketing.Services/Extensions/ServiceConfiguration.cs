@@ -35,6 +35,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<EventMediaService>();
             services.AddScoped<IEventScheduleLifecycleService, EventScheduleLifecycleService>();
             services.AddScoped<MediaService>();
+            services.AddScoped<EventCatalogService>();
             services.AddScoped<EventScheduleService>();
             services.AddScoped<EventSeatService>();
             services.AddScoped<EventSectionService>();

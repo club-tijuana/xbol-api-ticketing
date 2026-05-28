@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Responses;
+using XBOL.Ticketing.Data.Queries;
 using XBOL.Ticketing.Data.Repositories.Media;
 
 namespace XBOL.Ticketing.Services.Media
@@ -12,20 +13,12 @@ namespace XBOL.Ticketing.Services.Media
             return await _mediaRepository
                             .Get()
                             .AsNoTracking()
-                            .Where(m => m.ReferenceId == referenceId && m.ReferenceType == referenceType)
-                            .Where(x => x.DeletedAt == null)
-                            .Select(m => new MediaResponse
-                            {
-                                Id = m.Id,
-                                ReferenceId = m.ReferenceId,
-                                ReferenceType = m.ReferenceType,
-                                Title = m.FileName,
-                                ImageBase64 = Convert.ToBase64String(m.Content),
-                                ContentType = m.ContentType,
-                                Url = m.Url,
-                                MediaType = m.MediaType,
-                                Order = m.Order
-                            }).ToListAsync();
+                            .ForReference(referenceId, referenceType)
+                            .AvailableBlobMedia()
+                            .OrderBy(m => m.Order)
+                            .ThenBy(m => m.Id)
+                            .SelectMediaResponse()
+                            .ToListAsync();
         }
 
         public async Task<List<MediaResponse>> GetProductMediaByMediaTypeAsync(long referenceId, SaleType referenceType, MediaType mediaType)
@@ -33,20 +26,13 @@ namespace XBOL.Ticketing.Services.Media
             return await _mediaRepository
                             .Get()
                             .AsNoTracking()
-                            .Where(m => m.ReferenceId == referenceId && m.ReferenceType == referenceType && m.MediaType == mediaType)
-                            .Where(x => x.DeletedAt == null)
-                            .Select(m => new MediaResponse
-                            {
-                                Id = m.Id,
-                                ReferenceId = m.ReferenceId,
-                                ReferenceType = m.ReferenceType,
-                                Title = m.FileName,
-                                ImageBase64 = Convert.ToBase64String(m.Content),
-                                ContentType = m.ContentType,
-                                Url = m.Url,
-                                MediaType = m.MediaType,
-                                Order = m.Order
-                            }).ToListAsync();
+                            .ForReference(referenceId, referenceType)
+                            .Where(m => m.MediaType == mediaType)
+                            .AvailableBlobMedia()
+                            .OrderBy(m => m.Order)
+                            .ThenBy(m => m.Id)
+                            .SelectMediaResponse()
+                            .ToListAsync();
         }
     }
 }

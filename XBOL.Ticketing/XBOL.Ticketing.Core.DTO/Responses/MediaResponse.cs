@@ -8,7 +8,7 @@ namespace XBOL.Ticketing.Core.DTO.Responses
         public long ReferenceId { get; set; }
         public SaleType ReferenceType { get; set; }
         public string Title { get; set; } = "";
-        public string ImageBase64 { get; set; } = "";
+        public string FileName { get; set; } = "";
         public string ContentType { get; set; } = "";
         public string? Url { get; set; }
         public MediaType MediaType { get; set; }

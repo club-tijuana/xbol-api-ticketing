@@ -15,6 +15,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<BaseSeat> BaseSeats => Set<BaseSeat>();
         public DbSet<BaseSection> BaseSections => Set<BaseSection>();
         public DbSet<BaseZone> BaseZones => Set<BaseZone>();
+        public DbSet<BlobAsset> BlobAssets => Set<BlobAsset>();
         public DbSet<Client> Clients => Set<Client>();
         public DbSet<ClientCreditAccount> ClientCreditAccounts => Set<ClientCreditAccount>();
         public DbSet<ClientCreditTransaction> ClientCreditTransactions => Set<ClientCreditTransaction>();
@@ -103,6 +104,8 @@ namespace XBOL.Ticketing.Data
             modelBuilder.ApplyConfiguration(new PriceTypeConfiguration());
             modelBuilder.ApplyConfiguration(new TicketConfiguration());
             modelBuilder.ApplyConfiguration(new UserConfiguration());
+            modelBuilder.ApplyConfiguration(new BlobAssetConfiguration());
+            modelBuilder.ApplyConfiguration(new MediaConfiguration());
         }
     }
 }
