@@ -9,7 +9,6 @@ using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.Media;
 using XBOL.Ticketing.Services.Order;
-using XBOL.Ticketing.Services.RulesEngine;
 using XBOL.Ticketing.Services.Season;
 using XBOL.Ticketing.Services.Ticket;
 using XBOL.Ticketing.Services.Venue;
@@ -41,7 +40,6 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<EventSectionService>();
             services.AddScoped<EventService>();
             services.AddScoped<EventTagService>();
-            services.AddScoped<OrganizerMemberService>();
             services.AddScoped<OrganizerService>();
             services.AddScoped<RoleService>();
             services.AddScoped<UserService>();

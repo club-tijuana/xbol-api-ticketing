@@ -6,10 +6,10 @@ using XBOL.Ticketing.Data.Repositories.Bundle;
 using XBOL.Ticketing.Data.Repositories.Client;
 using XBOL.Ticketing.Data.Repositories.Event;
 using XBOL.Ticketing.Data.Repositories.Identity;
+using XBOL.Ticketing.Data.Repositories.Media;
 using XBOL.Ticketing.Data.Repositories.Order;
 using XBOL.Ticketing.Data.Repositories.Season;
 using XBOL.Ticketing.Data.Repositories.Ticket;
-using XBOL.Ticketing.Data.Repositories.Media;
 using XBOL.Ticketing.Data.Repositories.Venue;
 
 namespace XBOL.Ticketing.Data.Extensions
@@ -37,7 +37,6 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<IBundlePassRepository, BundlePassRepository>();
             services.AddScoped<IBundlePassEventTicketRepository, BundlePassEventTicketRepository>();
             services.AddScoped<BundleTagRepository>();
-            services.AddScoped<OrganizerMemberRepository>();
             services.AddScoped<OrganizerRepository>();
             services.AddScoped<RoleRepository>();
             services.AddScoped<UserRepository>();

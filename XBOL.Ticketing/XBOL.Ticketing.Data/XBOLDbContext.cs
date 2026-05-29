@@ -43,7 +43,6 @@ namespace XBOL.Ticketing.Data
         public DbSet<OrderItem> OrderItems => Set<OrderItem>();
         public DbSet<OrderTax> OrderTaxs => Set<OrderTax>();
         public DbSet<Organizer> Organizers => Set<Organizer>();
-        public DbSet<OrganizerMember> OrganizerMembers => Set<OrganizerMember>();
         public DbSet<Payment> Payments => Set<Payment>();
         public DbSet<PromoCode> PromoCodes => Set<PromoCode>();
         public DbSet<PromoCodeRedemption> PromoCodeRedemptions => Set<PromoCodeRedemption>();
