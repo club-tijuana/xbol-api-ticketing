@@ -21,18 +21,17 @@ namespace XBOL.Ticketing.API.Controllers
         /// </summary>
         /// <param name="referenceType">Reference type (Event, Season, Bundle)</param>
         /// <param name="referenceId">Id of the reference</param>
-        /// <returns>Seats.io price structure or 204 if no data is available</returns>
+        /// <returns>Seats.io price structure</returns>
         [HttpGet]
         [EndpointName("GetSeatsIoPricesAsync")]
         [ProducesResponseType(typeof(List<SeatsIoPriceDTO>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status204NoContent)]
         public async Task<ActionResult> GetSeatsIoPrices([FromQuery] SaleType referenceType, [FromQuery] long referenceId)
         {
             var prices = await _priceService.GetSeatsIoPricesAsync(referenceType, referenceId);
 
-            if (prices == null || !prices.Any())
+            if (prices == null)
             {
-                return NoContent();
+                return Ok(new List<SeatsIoPriceDTO>());
             }
 
             return Ok(prices);
