@@ -143,6 +143,74 @@ public class BundleMediaProjectionTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_ReturnsAttachedSchedules()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = Options(connection);
+        long bundleId;
+        long scheduleId;
+        await using (var context = new XBOLDbContext(options))
+        {
+            await context.Database.EnsureCreatedAsync();
+            var now = DateTimeOffset.UtcNow;
+            var eventItem = new Event
+            {
+                Id = 1001,
+                Name = "Included Event",
+                Status = EventStatus.Draft,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            var schedule = new EventSchedule
+            {
+                Event = eventItem,
+                StartDateTime = now.AddDays(10),
+                EndDateTime = now.AddDays(10).AddHours(2),
+                OnSaleDate = now,
+                OffSaleDate = now.AddDays(9),
+                Status = ScheduleStatus.Draft,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            var bundle = new Bundle
+            {
+                Id = 2001,
+                Name = "Bundle",
+                BundleType = BundleType.Basic,
+                BundlePricingType = BundlePricingType.Single,
+                Status = EventStatus.Draft,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            context.Events.Add(eventItem);
+            context.EventSchedules.Add(schedule);
+            context.Bundles.Add(bundle);
+            await context.SaveChangesAsync();
+
+            context.BundleEventSchedules.Add(new BundleEventSchedule
+            {
+                BundleId = bundle.Id,
+                EventScheduleId = schedule.Id,
+                SortOrder = 0
+            });
+            await context.SaveChangesAsync();
+            bundleId = bundle.Id;
+            scheduleId = schedule.Id;
+        }
+
+        await using var readContext = new XBOLDbContext(options);
+        var service = CreateBundleService(readContext);
+
+        var result = await service.GetByIdAsync(bundleId);
+
+        result.Should().NotBeNull();
+        result!.Schedules.Should().ContainSingle().Which.Id.Should().Be(scheduleId);
+    }
+
+    [Fact]
     public async Task GetPagedAsync_UsesBlobAssetUrlsForBannerAndPoster()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
@@ -279,6 +347,8 @@ public class BundleMediaProjectionTests
         return new BundleService(
             bundleRepository,
             Substitute.For<IBaseSectionRepository>(),
+            Substitute.For<IBundleEventScheduleRepository>(),
+            Substitute.For<IEventScheduleRepository>(),
             mediaRepository,
             mediaService,
             Substitute.For<IBundleLifecycleService>());
@@ -355,5 +425,6 @@ public class BundleMediaProjectionTests
         public Task CommitAsync() => throw new NotSupportedException();
         public Task UpdateAsync(Bundle entity) => throw new NotSupportedException();
         public Task HardDeleteAsync(Bundle entity) => throw new NotSupportedException();
+        public Task<List<EventCategory>> GetCategoriesByIdsAsync(IReadOnlyCollection<long> categoryIds) => throw new NotSupportedException();
     }
 }

@@ -49,18 +49,22 @@ public class CreateSeatsIoSeasonHandler(
             seasonKey,
             bundle.Id);
 
-        bundle.ExternalKey = seasonKey;
-        bundle.Status = EventStatus.Published;
-        bundle.PublishedDate ??= DateTimeOffset.UtcNow;
-
-        for (var index = 0; index < links.Count; index++)
-        {
-            links[index].EventSchedule.ExternalEventKey = eventKeys[index];
-        }
-        bundle.UpdatedAt = DateTimeOffset.UtcNow;
-
         try
         {
+            var now = DateTimeOffset.UtcNow;
+            bundle.ExternalKey = seasonKey;
+            bundle.Status = EventStatus.Published;
+            bundle.PublishedDate ??= now;
+
+            for (var index = 0; index < links.Count; index++)
+            {
+                BundleSeatsIoSchedulePublisher.PublishSeasonSchedule(
+                    links[index].EventSchedule,
+                    eventKeys[index],
+                    now);
+            }
+
+            bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);
         }
         catch
@@ -124,14 +128,18 @@ public class AddEventsToSeasonHandler(
             seasonKey,
             bundle.Id);
 
-        for (var index = 0; index < links.Count; index++)
-        {
-            links[index].EventSchedule.ExternalEventKey = eventKeys[index];
-        }
-        bundle.UpdatedAt = DateTimeOffset.UtcNow;
-
         try
         {
+            var now = DateTimeOffset.UtcNow;
+            for (var index = 0; index < links.Count; index++)
+            {
+                BundleSeatsIoSchedulePublisher.PublishSeasonSchedule(
+                    links[index].EventSchedule,
+                    eventKeys[index],
+                    now);
+            }
+
+            bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);
         }
         catch
@@ -143,6 +151,24 @@ public class AddEventsToSeasonHandler(
 
             throw;
         }
+    }
+}
+
+internal static class BundleSeatsIoSchedulePublisher
+{
+    public static void PublishSeasonSchedule(
+        EventSchedule schedule,
+        string eventKey,
+        DateTimeOffset publishedAt)
+    {
+        if (schedule.Status != ScheduleStatus.OnSale)
+        {
+            ScheduleStatusTransitions.ValidateTransition(schedule.Status, ScheduleStatus.OnSale);
+        }
+
+        schedule.ExternalEventKey = eventKey;
+        schedule.Status = ScheduleStatus.OnSale;
+        schedule.PublishedDate ??= publishedAt;
     }
 }
 

@@ -47,6 +47,10 @@ public class BundleSeatsIoHandlerTests
         bundle.PublishedDate.Should().NotBeNull();
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.ExternalEventKey)
             .Should().Equal("season-20-schedule-10", "season-20-schedule-11");
+        bundle.BundleEventSchedules.Select(link => link.EventSchedule.Status)
+            .Should().Equal(ScheduleStatus.OnSale, ScheduleStatus.OnSale);
+        bundle.BundleEventSchedules.Select(link => link.EventSchedule.PublishedDate)
+            .Should().OnlyContain(publishedDate => publishedDate.HasValue);
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
 
@@ -130,6 +134,10 @@ public class BundleSeatsIoHandlerTests
                 })));
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.ExternalEventKey)
             .Should().Equal("season-20-schedule-10", "season-20-schedule-11");
+        bundle.BundleEventSchedules.Select(link => link.EventSchedule.Status)
+            .Should().Equal(ScheduleStatus.OnSale, ScheduleStatus.OnSale);
+        bundle.BundleEventSchedules.Select(link => link.EventSchedule.PublishedDate)
+            .Should().OnlyContain(publishedDate => publishedDate.HasValue);
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
 

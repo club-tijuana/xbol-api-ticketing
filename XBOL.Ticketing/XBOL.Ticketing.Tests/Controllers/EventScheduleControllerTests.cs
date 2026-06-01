@@ -17,7 +17,7 @@ namespace XBOL.Ticketing.Tests.Controllers;
 public class EventScheduleControllerTests
 {
     [Fact]
-    public async Task CreateScheduleAsync_ReturnsCreatedAtResolvableGetRoute()
+    public async Task CreateScheduleAsync_ReturnsCreatedLocation()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
@@ -54,7 +54,9 @@ public class EventScheduleControllerTests
         var result = await controller.CreateScheduleAsync(CreateRequest());
 
         var created = result.Result.Should().BeOfType<CreatedAtActionResult>().Subject;
+        var payload = created.Value.Should().BeOfType<XBOL.Ticketing.Core.DTO.Results.EventScheduleResponse>().Subject;
         created.ActionName.Should().Be("GetScheduleById");
+        created.RouteValues.Should().ContainKey("id").WhoseValue.Should().Be(payload.Id);
     }
 
     private static EventScheduleRequest CreateRequest()

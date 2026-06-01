@@ -1,4 +1,5 @@
 using FluentValidation;
+using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services.Validators;
@@ -14,6 +15,8 @@ public class BundleUpdateRequestValidator : AbstractValidator<BundleUpdateReques
 
         RuleFor(x => x.BundleType)
             .IsInEnum()
+            .Must(type => type is BundleType.Basic or BundleType.SeasonPass)
+            .WithMessage("Bundle type must be Basic or Season Pass.")
             .When(x => x.BundleType is not null);
 
         RuleFor(x => x.BundlePricingType)

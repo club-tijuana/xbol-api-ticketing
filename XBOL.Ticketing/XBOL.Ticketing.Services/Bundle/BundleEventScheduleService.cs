@@ -1,4 +1,3 @@
-using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Mappers;
@@ -13,13 +12,6 @@ namespace XBOL.Ticketing.Services.Bundle
         IEventScheduleRepository eventScheduleRepository,
         IBundleLifecycleService lifecycleService)
     {
-        private static readonly HashSet<EventStatus> EditableStatuses =
-        [
-            EventStatus.Draft,
-            EventStatus.PendingReview,
-            EventStatus.Approved
-        ];
-
         public async Task<List<BundleEventScheduleResponseDTO>> GetByBundleAsync(long bundleId)
         {
             var bundle = await bundleRepository.GetByIdAsync(bundleId)
@@ -35,11 +27,15 @@ namespace XBOL.Ticketing.Services.Bundle
             var bundle = await bundleRepository.GetByIdAsync(bundleId)
                 ?? throw new KeyNotFoundException($"Bundle {bundleId} not found.");
 
-            ValidateBundleStatus(bundle, allowPublishedSeasonPassAdd: true);
+            BundleEventScheduleValidator.ValidateBundleStatus(bundle, allowPublishedSeasonPassAdd: true);
 
             foreach (var item in request.Items)
             {
-                await ValidateAdditionAsync(bundle, item.EventScheduleId);
+                await BundleEventScheduleValidator.ValidateAdditionAsync(
+                    bundle,
+                    item.EventScheduleId,
+                    bundleEventScheduleRepository,
+                    eventScheduleRepository);
             }
 
             foreach (var item in request.Items)
@@ -67,7 +63,7 @@ namespace XBOL.Ticketing.Services.Bundle
             var bundle = await bundleRepository.GetByIdAsync(bundleId)
                 ?? throw new KeyNotFoundException($"Bundle {bundleId} not found.");
 
-            ValidateBundleStatus(bundle);
+            BundleEventScheduleValidator.ValidateBundleStatus(bundle);
 
             var entry = await bundleEventScheduleRepository.GetByCompositeKeyAsync(bundleId, eventScheduleId)
                 ?? throw new KeyNotFoundException(
@@ -83,7 +79,7 @@ namespace XBOL.Ticketing.Services.Bundle
             var bundle = await bundleRepository.GetByIdAsync(bundleId)
                 ?? throw new KeyNotFoundException($"Bundle {bundleId} not found.");
 
-            ValidateBundleStatus(bundle);
+            BundleEventScheduleValidator.ValidateBundleStatus(bundle);
 
             var removed = 0;
             foreach (var eventScheduleId in request.EventScheduleIds)
@@ -102,65 +98,6 @@ namespace XBOL.Ticketing.Services.Bundle
             }
 
             return removed;
-        }
-
-        private void ValidateBundleStatus(
-            Core.Model.Bundle bundle,
-            bool allowPublishedSeasonPassAdd = false)
-        {
-            if (!EditableStatuses.Contains(bundle.Status))
-            {
-                if (allowPublishedSeasonPassAdd &&
-                    bundle.Status == EventStatus.Published &&
-                    bundle.BundleType == BundleType.SeasonPass)
-                {
-                    return;
-                }
-
-                if (bundle.Status == EventStatus.Published &&
-                    bundle.BundleType != BundleType.SeasonPass)
-                {
-                    return;
-                }
-
-                throw new InvalidOperationException(
-                    $"Cannot modify schedules for bundle in status '{bundle.Status}'. " +
-                    $"Allowed statuses: {string.Join(", ", EditableStatuses)}.");
-            }
-        }
-
-        private async Task ValidateAdditionAsync(Core.Model.Bundle bundle, long eventScheduleId)
-        {
-            var eventSchedule = await eventScheduleRepository.GetByIdAsync(eventScheduleId)
-                ?? throw new KeyNotFoundException($"EventSchedule {eventScheduleId} not found.");
-
-            if (await bundleEventScheduleRepository.ExistsAsync(bundle.Id, eventScheduleId))
-            {
-                throw new InvalidOperationException(
-                    $"EventSchedule {eventScheduleId} is already in Bundle {bundle.Id}.");
-            }
-
-            if (bundle.BundleType == BundleType.SeasonPass)
-            {
-                if (!string.IsNullOrEmpty(eventSchedule.ExternalEventKey))
-                {
-                    throw new InvalidOperationException(
-                        $"EventSchedule {eventScheduleId} already has ExternalEventKey " +
-                        $"'{eventSchedule.ExternalEventKey}' — cannot add to SeasonPass bundle. " +
-                        $"Events must be born inside a Seats.io season.");
-                }
-
-                var existingLinks = await bundleEventScheduleRepository.GetByEventScheduleIdAsync(eventScheduleId);
-                if (existingLinks.Any(bes =>
-                        bes.Bundle is not null &&
-                        bes.Bundle.BundleType == BundleType.SeasonPass &&
-                        bes.BundleId != bundle.Id))
-                {
-                    throw new InvalidOperationException(
-                        $"EventSchedule {eventScheduleId} already belongs to another SeasonPass bundle " +
-                        $"(Seats.io 1-season-parent constraint).");
-                }
-            }
         }
     }
 }

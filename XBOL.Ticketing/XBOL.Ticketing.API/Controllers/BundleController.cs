@@ -45,6 +45,7 @@ namespace XBOL.Ticketing.API.Controllers
         [EndpointName("CreateBundle")]
         [ProducesResponseType(typeof(BundleDTO), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status422UnprocessableEntity)]
         public async Task<ActionResult<BundleDTO>> CreateBundle(
             [FromBody] BundleCreateRequest request)
         {

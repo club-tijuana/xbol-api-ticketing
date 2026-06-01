@@ -13,6 +13,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             return await DbSet
                 .Include(s => s.Event)
                 .ThenInclude(e => e.VenueMap)
+                .Include(s => s.Sections)
                 .FirstOrDefaultAsync(s => s.Id == id);
         }
 

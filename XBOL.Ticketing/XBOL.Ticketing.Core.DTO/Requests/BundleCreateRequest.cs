@@ -14,11 +14,16 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public string? BannerImageUrl { get; set; }
         public string? PosterImageUrl { get; set; }
         public string? LandingUrl { get; set; }
+        public AgeRestriction? AgeRestriction { get; set; }
+        public string? SecurityPolicies { get; set; }
+        public string? AdditionalComments { get; set; }
+        public List<long> CategoryIds { get; set; } = [];
 
         // Bundle-specific fields
         public required BundleType BundleType { get; set; }
         public required BundlePricingType BundlePricingType { get; set; }
         public string? Code { get; set; }
+        public List<long> EventScheduleIds { get; set; } = [];
 
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }

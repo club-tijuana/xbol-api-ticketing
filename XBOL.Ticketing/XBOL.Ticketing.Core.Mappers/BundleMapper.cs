@@ -14,6 +14,7 @@ namespace XBOL.Ticketing.Core.Mappers
             {
                 Id = entity.Id,
                 VenueMapId = entity.VenueMapId,
+                OrganizerId = entity.OrganizerId ?? 0,
                 Name = entity.Name,
                 Subtitle = entity.Subtitle,
                 ShortDescription = entity.ShortDescription,
@@ -35,7 +36,13 @@ namespace XBOL.Ticketing.Core.Mappers
                     DisplayName = c.DisplayName,
                     IsActive = c.IsActive
                 }).ToList() ?? [],
-                Schedules = [],
+                Schedules = entity.BundleEventSchedules
+                    .Where(link => link.EventSchedule is not null)
+                    .OrderBy(link => link.SortOrder ?? int.MaxValue)
+                    .ThenBy(link => link.EventSchedule.StartDateTime)
+                    .Select(link => ToScheduleDto(link.EventSchedule))
+                    .ToList(),
+                BundleSaleWindow = ToSaleWindowDto(entity),
                 BundleType = entity.BundleType,
                 BundlePricingType = entity.BundlePricingType,
                 Code = entity.Code,
@@ -58,6 +65,44 @@ namespace XBOL.Ticketing.Core.Mappers
 
         public static List<EntityModel> ToModel(this IList<EntityDTO> entities)
             => [.. entities.Select(x => x.ToModel())];
+
+        private static DTO.EventScheduleDTO ToScheduleDto(Core.Model.EventSchedule schedule)
+        {
+            return new DTO.EventScheduleDTO
+            {
+                Id = schedule.Id,
+                StartDateTime = schedule.StartDateTime,
+                EndDateTime = schedule.EndDateTime,
+                PublishedDate = schedule.PublishedDate,
+                PreSaleStartDate = schedule.PreSaleStartDate,
+                PreSaleEndDate = schedule.PreSaleEndDate,
+                OnSaleDate = schedule.OnSaleDate,
+                OffSaleDate = schedule.OffSaleDate,
+                GateOpenDate = schedule.GateOpenDate,
+                ExternalEventKey = schedule.ExternalEventKey,
+                TotalSeats = schedule.Sections.Sum(section => section.TotalSeats),
+                AvailableSeats = schedule.Sections.Sum(section => section.AvailableSeats),
+                Status = schedule.Status
+            };
+        }
+
+        private static DTO.BundleSaleWindowDTO ToSaleWindowDto(EntityModel entity)
+        {
+            return new DTO.BundleSaleWindowDTO
+            {
+                BundleScheduleKey = $"bundle-sale-window:{entity.Id}",
+                BundleId = entity.Id,
+                StartDate = entity.StartDate,
+                EndDate = entity.EndDate,
+                PublishedDate = entity.PublishedDate,
+                OnSaleDate = entity.OnSaleDate,
+                PreSaleDate = entity.PreSaleDate,
+                OffSaleDate = entity.OffSaleDate,
+                RenewalStartDate = entity.RenewalStartDate,
+                RenewalEndDate = entity.RenewalEndDate,
+                ExternalKey = entity.ExternalKey
+            };
+        }
 
         public static EntityModel ToModel(this EntityDTO entity)
         {

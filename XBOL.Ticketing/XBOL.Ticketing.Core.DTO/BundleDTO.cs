@@ -27,6 +27,7 @@ namespace XBOL.Ticketing.Core.DTO
         public bool IsSeason { get; set; }
         public List<EventCategoryResult> Categories { get; set; } = [];
         public IList<EventScheduleDTO> Schedules { get; set; } = [];
+        public BundleSaleWindowDTO? BundleSaleWindow { get; set; }
 
         public BundleType BundleType { get; set; }
         public BundlePricingType BundlePricingType { get; set; }

@@ -13,6 +13,8 @@ namespace XBOL.Ticketing.Services.Bundle
 {
     public class BundleService(IBundleRepository repository,
                                IBaseSectionRepository baseSectionRepository,
+                               IBundleEventScheduleRepository bundleEventScheduleRepository,
+                               IEventScheduleRepository eventScheduleRepository,
                                MediaRepository mediaRepository,
                                MediaService mediaService,
                                IBundleLifecycleService lifecycleService)
@@ -85,7 +87,7 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<BundleDTO?> GetByIdAsync(long id)
         {
-            var bundle = await Repository.GetByIdAsync(id);
+            var bundle = await Repository.GetByIdWithVenueMapAndSchedulesAsync(id);
             if (bundle is null) { return null; }
 
             var dto = bundle.ToDto();
@@ -110,7 +112,10 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<BundleDTO> CreateAsync(BundleCreateRequest request, Guid userId)
         {
+            ValidatePricingCombination(request);
+
             var now = DateTimeOffset.UtcNow;
+            var categories = await Repository.GetCategoriesByIdsAsync(request.CategoryIds);
             var bundle = new Core.Model.Bundle
             {
                 VenueMapId = request.VenueMapId,
@@ -122,10 +127,15 @@ namespace XBOL.Ticketing.Services.Bundle
                 BannerImageUrl = request.BannerImageUrl ?? string.Empty,
                 PosterImageUrl = request.PosterImageUrl ?? string.Empty,
                 LandingUrl = request.LandingUrl ?? string.Empty,
+                AgeRestriction = request.AgeRestriction,
+                SecurityPolicies = request.SecurityPolicies,
+                AdditionalComments = request.AdditionalComments,
                 Status = EventStatus.Draft,
+                Categories = categories,
                 BundleType = request.BundleType,
                 BundlePricingType = request.BundlePricingType,
                 Code = request.Code,
+                BundleEventSchedules = [],
                 StartDate = request.StartDate.HasValue ? request.StartDate.Value.ToUniversalTime() : null,
                 EndDate = request.EndDate.HasValue ? request.EndDate.Value.ToUniversalTime() : null,
                 PublishedDate = request.PublishedDate.HasValue ? request.PublishedDate.Value.ToUniversalTime() : null,
@@ -141,15 +151,49 @@ namespace XBOL.Ticketing.Services.Bundle
                 UpdatedBy = userId
             };
 
-            if (request.BundlePricingType == BundlePricingType.Single)
+            if (request.EventScheduleIds is not { Count: > 0 })
             {
-                var baseSections = baseSectionRepository.Get(
-                    includedProperties: "BaseZone"
-                ).Where(x => x.BaseZone.VenueMapId == request.VenueMapId).ToList();
+                throw new InvalidOperationException("At least one event schedule must be selected for this Bundle.");
+            }
 
-                bundle.BundleSections = baseSections.Select(x => new Core.Model.BundleSection
+            var duplicateEventScheduleId = request.EventScheduleIds
+                .GroupBy(id => id)
+                .FirstOrDefault(group => group.Count() > 1)
+                ?.Key;
+            if (duplicateEventScheduleId is not null)
+            {
+                throw new InvalidOperationException(
+                    $"EventSchedule {duplicateEventScheduleId} is already selected for this Bundle.");
+            }
+
+            var eventSchedules = new List<Core.Model.EventSchedule>();
+            foreach (var eventScheduleId in request.EventScheduleIds)
+            {
+                var eventSchedule = await BundleEventScheduleValidator.ValidateAdditionAsync(
+                    bundle,
+                    eventScheduleId,
+                    bundleEventScheduleRepository,
+                    eventScheduleRepository);
+                eventSchedules.Add(eventSchedule);
+            }
+
+            bundle.BundleEventSchedules = eventSchedules
+                .Select((eventSchedule, index) => new Core.Model.BundleEventSchedule
                 {
-                    BaseSectionId = x.Id,
+                    EventScheduleId = eventSchedule.Id,
+                    EventSchedule = eventSchedule,
+                    SortOrder = index
+                })
+                .ToList();
+
+            if (request.BundleType == BundleType.SeasonPass &&
+                request.BundlePricingType == BundlePricingType.Single)
+            {
+                var baseSections = GetBaseSectionsForVenueMap(request.VenueMapId, includeSeats: false);
+
+                bundle.BundleSections = baseSections.Select(section => new Core.Model.BundleSection
+                {
+                    BaseSectionId = section.Id,
                     Price = 0,
                     TotalSeats = 0,
                     AvailableSeats = 0,
@@ -157,15 +201,94 @@ namespace XBOL.Ticketing.Services.Bundle
                 }).ToList();
             }
 
+            if (request.BundleType == BundleType.Basic &&
+                request.BundlePricingType == BundlePricingType.Composite)
+            {
+                var baseSections = GetBaseSectionsForVenueMap(request.VenueMapId, includeSeats: true);
+                bundle.BundleSections = baseSections
+                    .Select(CreateBasicBundleSection)
+                    .ToList();
+            }
+
             await Repository.InsertAsync(bundle);
             await Repository.CommitAsync();
             return bundle.ToDto();
+        }
+
+        private List<Core.Model.BaseSection> GetBaseSectionsForVenueMap(long venueMapId, bool includeSeats)
+        {
+            var includedProperties = includeSeats
+                ? new[] { "BaseZone", "BaseRows.BaseSeats" }
+                : ["BaseZone"];
+
+            return baseSectionRepository.Get(includedProperties: includedProperties)
+                .Where(section => section.BaseZone.VenueMapId == venueMapId)
+                .OrderBy(section => section.Id)
+                .ToList();
+        }
+
+        private static Core.Model.BundleSection CreateBasicBundleSection(Core.Model.BaseSection baseSection)
+        {
+            var bundleSeats = baseSection.BaseRows
+                .OrderBy(row => row.Id)
+                .SelectMany(row => row.BaseSeats
+                    .OrderBy(seat => seat.Id)
+                    .Select(seat => new Core.Model.BundleSeat
+                    {
+                        BaseSeatId = seat.Id,
+                        ExternalSeatObjectKey = BuildExternalSeatObjectKey(baseSection, row, seat),
+                        ForSale = true
+                    }))
+                .ToList();
+
+            return new Core.Model.BundleSection
+            {
+                BaseSectionId = baseSection.Id,
+                Price = 0,
+                TotalSeats = bundleSeats.Count,
+                AvailableSeats = bundleSeats.Count,
+                DisplayName = baseSection.Name,
+                BundleSeats = bundleSeats
+            };
+        }
+
+        private static string BuildExternalSeatObjectKey(
+            Core.Model.BaseSection baseSection,
+            Core.Model.BaseRow baseRow,
+            Core.Model.BaseSeat baseSeat)
+        {
+            var keyParts = new[] { baseSection.Name, baseRow.RowLabel, baseSeat.SeatNumber }
+                .Where(value => !string.IsNullOrWhiteSpace(value));
+
+            return string.Join("-", keyParts);
+        }
+
+        private static void ValidatePricingCombination(BundleCreateRequest request)
+        {
+            if (request.BundleType is not (BundleType.Basic or BundleType.SeasonPass))
+            {
+                throw new InvalidOperationException("Bundle type must be Basic or Season Pass.");
+            }
+
+            if (request.BundleType == BundleType.Basic &&
+                request.BundlePricingType != BundlePricingType.Composite)
+            {
+                throw new InvalidOperationException("Basic bundles must use Composite pricing.");
+            }
+
+            if (request.BundleType == BundleType.SeasonPass &&
+                request.BundlePricingType != BundlePricingType.Single)
+            {
+                throw new InvalidOperationException("SeasonPass bundles must use Single pricing.");
+            }
         }
 
         public async Task<BundleDTO?> UpdateAsync(long id, BundleUpdateRequest request, Guid userId)
         {
             var bundle = await Repository.GetByIdAsync(id);
             if (bundle is null) { return null; }
+            ValidateClassificationUpdate(bundle, request);
+
             var publishRequested = request.Status == EventStatus.Published;
             var cancelRequested = request.Status == EventStatus.Cancelled;
             var syncSeasonMetadata =
@@ -181,11 +304,24 @@ namespace XBOL.Ticketing.Services.Bundle
             if (request.BannerImageUrl is not null) { bundle.BannerImageUrl = request.BannerImageUrl; }
             if (request.PosterImageUrl is not null) { bundle.PosterImageUrl = request.PosterImageUrl; }
             if (request.LandingUrl is not null) { bundle.LandingUrl = request.LandingUrl; }
+            if (request.AgeRestriction is not null) { bundle.AgeRestriction = request.AgeRestriction; }
+            if (request.SecurityPolicies is not null) { bundle.SecurityPolicies = request.SecurityPolicies; }
+            if (request.AdditionalComments is not null) { bundle.AdditionalComments = request.AdditionalComments; }
 
             if (request.Status is not null)
             {
                 EventStatusTransitions.ValidateTransition(bundle.Status, request.Status.Value);
                 if (!publishRequested && !cancelRequested) { bundle.Status = request.Status.Value; }
+            }
+
+            if (request.CategoryIds is not null)
+            {
+                var categories = await Repository.GetCategoriesByIdsAsync(request.CategoryIds);
+                bundle.Categories.Clear();
+                foreach (var category in categories)
+                {
+                    bundle.Categories.Add(category);
+                }
             }
 
             if (request.BundleType is not null) { bundle.BundleType = request.BundleType.Value; }
@@ -226,6 +362,19 @@ namespace XBOL.Ticketing.Services.Bundle
             }
 
             return bundle.ToDto();
+        }
+
+        private static void ValidateClassificationUpdate(Core.Model.Bundle bundle, BundleUpdateRequest request)
+        {
+            if (request.BundleType is not null && request.BundleType.Value != bundle.BundleType)
+            {
+                throw new InvalidOperationException("BundleType cannot be changed after bundle creation.");
+            }
+
+            if (request.BundlePricingType is not null && request.BundlePricingType.Value != bundle.BundlePricingType)
+            {
+                throw new InvalidOperationException("BundlePricingType cannot be changed after bundle creation.");
+            }
         }
 
         public async Task<bool> DeleteAsync(long id)

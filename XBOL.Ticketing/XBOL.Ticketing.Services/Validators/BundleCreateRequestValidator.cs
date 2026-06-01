@@ -1,4 +1,5 @@
 using FluentValidation;
+using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 
 namespace XBOL.Ticketing.Services.Validators;
@@ -10,8 +11,22 @@ public class BundleCreateRequestValidator : AbstractValidator<BundleCreateReques
         RuleFor(x => x.VenueMapId).GreaterThan(0);
         RuleFor(x => x.OrganizerId).GreaterThan(0);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.BundleType).IsInEnum();
+        RuleFor(x => x.BundleType)
+            .IsInEnum()
+            .Must(type => type is BundleType.Basic or BundleType.SeasonPass)
+            .WithMessage("Bundle type must be Basic or Season Pass.");
         RuleFor(x => x.BundlePricingType).IsInEnum();
+        RuleFor(x => x.BundlePricingType)
+            .Equal(BundlePricingType.Composite)
+            .When(x => x.BundleType == BundleType.Basic)
+            .WithMessage("Basic bundles must use Composite pricing.");
+        RuleFor(x => x.BundlePricingType)
+            .Equal(BundlePricingType.Single)
+            .When(x => x.BundleType == BundleType.SeasonPass)
+            .WithMessage("SeasonPass bundles must use Single pricing.");
+        RuleFor(x => x.EventScheduleIds)
+            .NotEmpty()
+            .WithMessage("At least one event schedule must be selected.");
 
         RuleFor(x => x.EndDate)
             .GreaterThan(x => x.StartDate)

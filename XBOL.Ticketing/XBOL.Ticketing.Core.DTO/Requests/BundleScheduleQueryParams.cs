@@ -4,8 +4,10 @@ namespace XBOL.Ticketing.Core.DTO.Requests
     {
         public string SearchTerm { get; set; } = "";
         public string? Venue { get; set; }
+        public long? VenueMapId { get; set; }
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }
+        public bool? Upcoming { get; set; }
         public string? SortBy { get; set; }
         public bool Descending { get; set; } = false;
         public int Page { get; set; } = 1;

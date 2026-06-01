@@ -1402,7 +1402,7 @@ public class BookingOrchestrationServiceTests
             Name = "Basic Bundle",
             Status = EventStatus.Published,
             BundleType = BundleType.Basic,
-            BundlePricingType = BundlePricingType.Single,
+            BundlePricingType = BundlePricingType.Composite,
             CreatedAt = now,
             UpdatedAt = now,
             BundleSections =

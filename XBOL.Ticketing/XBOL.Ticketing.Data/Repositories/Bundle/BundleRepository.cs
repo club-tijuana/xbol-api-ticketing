@@ -14,7 +14,17 @@ namespace XBOL.Ticketing.Data.Repositories.Bundle
                 .Include(bundle => bundle.VenueMap)
                 .Include(bundle => bundle.BundleEventSchedules)
                 .ThenInclude(link => link.EventSchedule)
+                .ThenInclude(schedule => schedule.Sections)
                 .FirstOrDefaultAsync(bundle => bundle.Id == id);
+        }
+
+        public async Task<List<EventCategory>> GetCategoriesByIdsAsync(IReadOnlyCollection<long> categoryIds)
+        {
+            return categoryIds.Count == 0
+                ? []
+                : await dbContext.EventCategories
+                    .Where(category => categoryIds.Contains(category.Id))
+                    .ToListAsync();
         }
     }
 }

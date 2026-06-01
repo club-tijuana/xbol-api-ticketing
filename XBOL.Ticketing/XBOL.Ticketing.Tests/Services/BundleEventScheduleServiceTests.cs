@@ -8,8 +8,11 @@ using XBOL.Ticketing.Services.Bundle;
 
 namespace XBOL.Ticketing.Tests.Services;
 
-public class BundleEventScheduleServiceTests
-{
+    public class BundleEventScheduleServiceTests
+    {
+        private const long VenueMapId = 1;
+        private static readonly DateTimeOffset FutureStart = DateTimeOffset.UtcNow.AddDays(30);
+
     private readonly IBundleEventScheduleRepository _scheduleRepo = Substitute.For<IBundleEventScheduleRepository>();
     private readonly IBundleRepository _bundleRepo = Substitute.For<IBundleRepository>();
     private readonly IEventScheduleRepository _eventScheduleRepo = Substitute.For<IEventScheduleRepository>();
@@ -30,12 +33,31 @@ public class BundleEventScheduleServiceTests
         BundleType type = BundleType.Basic,
         string? externalKey = null) => new()
     {
-        Id = 1, Status = status, BundleType = type, ExternalKey = externalKey
+        Id = 1,
+        Status = status,
+        BundleType = type,
+        ExternalKey = externalKey,
+        VenueMapId = VenueMapId
     };
 
-    private static EventSchedule Schedule(long id, string? extKey = null) => new()
+    private static EventSchedule Schedule(
+        long id,
+        string? extKey = null,
+        ScheduleStatus status = ScheduleStatus.Draft,
+        EventStatus eventStatus = EventStatus.PendingReview,
+        DateTimeOffset? startDateTime = null,
+        DateTimeOffset? deletedAt = null) => new()
     {
-        Id = id, ExternalEventKey = extKey
+        Id = id,
+        ExternalEventKey = extKey,
+        Status = status,
+        StartDateTime = startDateTime ?? FutureStart,
+        DeletedAt = deletedAt,
+        Event = new Core.Model.Event
+        {
+            VenueMapId = VenueMapId,
+            Status = eventStatus
+        }
     };
 
     [Fact]
@@ -59,7 +81,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_EditableStatus_AllowsModifications(EventStatus status)
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(status));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
         _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
@@ -76,7 +98,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_PublishedSeasonPass_AddsScheduleAndInvokesLifecycle()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.SeasonPass, "season-1"));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
         _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
@@ -100,7 +122,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_PublishedBasicBundle_AddsScheduleAndInvokesLifecycle()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.Basic));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns([]);
         _scheduleRepo.GetByBundleIdWithSchedulesAsync(1).Returns(new List<BundleEventSchedule>());
@@ -123,7 +145,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_SeasonPass_RejectsScheduleWithExternalEventKey()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.SeasonPass));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10, "already-synced-event"));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10, "already-synced-event"));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
 
         var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
@@ -139,7 +161,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_SeasonPass_RejectsScheduleBelongingToAnotherSeasonPass()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.SeasonPass));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns(
         [
@@ -163,7 +185,7 @@ public class BundleEventScheduleServiceTests
     public async Task AddAsync_BasicBundle_IgnoresSeasonPassConstraints()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10, "already-synced-event"));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10, "already-synced-event", ScheduleStatus.OnSale));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns(
         [
@@ -184,10 +206,117 @@ public class BundleEventScheduleServiceTests
     }
 
     [Fact]
+    public async Task AddAsync_RejectsPastSchedule()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, startDateTime: DateTimeOffset.UtcNow.AddDays(-1)));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*past*");
+    }
+
+    [Fact]
+    public async Task AddAsync_RejectsDeletedSchedule()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, deletedAt: DateTimeOffset.UtcNow));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*deleted*");
+    }
+
+    [Theory]
+    [InlineData(ScheduleStatus.Closed)]
+    [InlineData(ScheduleStatus.Completed)]
+    public async Task AddAsync_RejectsInactiveSchedules(ScheduleStatus status)
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, status: status));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{status}*");
+    }
+
+    [Theory]
+    [InlineData(EventStatus.Draft)]
+    [InlineData(EventStatus.ChangesRequested)]
+    [InlineData(EventStatus.Cancelled)]
+    public async Task AddAsync_RejectsSchedulesWhoseParentEventIsNotSelectable(EventStatus status)
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, eventStatus: status));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage($"*{status}*");
+    }
+
+    [Fact]
+    public async Task AddAsync_BasicBundleRejectsOnSaleScheduleWithoutExternalEventKey()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.Basic));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, status: ScheduleStatus.OnSale));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*OnSale*ExternalEventKey*");
+    }
+
+    [Fact]
+    public async Task AddAsync_SeasonPassRejectsNonDraftSchedules()
+    {
+        _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.SeasonPass));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10)
+            .Returns(Schedule(10, status: ScheduleStatus.OnSale));
+        _scheduleRepo.ExistsAsync(1, 10).Returns(false);
+
+        var act = () => _sut.AddAsync(1, new BundleEventScheduleAddRequest
+        {
+            Items = [new() { EventScheduleId = 10, SortOrder = 1 }]
+        });
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*SeasonPass*Draft*");
+    }
+
+    [Fact]
     public async Task AddAsync_SeasonPass_SameBundleLink_DoesNotTrigger1SeasonConstraint()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Draft, BundleType.SeasonPass));
-        _eventScheduleRepo.GetByIdAsync(10).Returns(Schedule(10));
+        _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
         _scheduleRepo.ExistsAsync(1, 10).Returns(false);
         _scheduleRepo.GetByEventScheduleIdAsync(10).Returns(
         [

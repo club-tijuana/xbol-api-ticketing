@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
+using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Base;
 
 namespace XBOL.Ticketing.Data.Repositories.Event
@@ -12,6 +13,15 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             return await dbContext.Events
                 .Include(e => e.Schedules)
                 .FirstOrDefaultAsync(e => e.Id == id);
+        }
+
+        public async Task<List<EventCategory>> GetCategoriesByIdsAsync(IReadOnlyCollection<long> categoryIds)
+        {
+            return categoryIds.Count == 0
+                ? []
+                : await dbContext.EventCategories
+                    .Where(category => categoryIds.Contains(category.Id))
+                    .ToListAsync();
         }
 
         public async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId)

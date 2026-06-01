@@ -67,6 +67,32 @@ namespace XBOL.Ticketing.Services.Event
                 queryParams.PageSize);
         }
 
+        public async Task<PagedResponse<BundleScheduleItemDTO>> GetEventScheduleItemsAsync(
+            BundleScheduleQueryParams queryParams)
+        {
+            var venueNames = await LoadVenueNamesAsync();
+            var schedules = await dbContext.EventSchedules
+                .AsNoTracking()
+                .AsSplitQuery()
+                .Include(schedule => schedule.Event)
+                    .ThenInclude(eventItem => eventItem.VenueMap)
+                .Include(schedule => schedule.Event)
+                    .ThenInclude(eventItem => eventItem.Categories)
+                .Include(schedule => schedule.Sections)
+                .ToListAsync();
+
+            var items = schedules
+                .Where(schedule => schedule.Event is not Core.Model.Bundle)
+                .Select(schedule => MapBundleSchedule(schedule, venueNames))
+                .Where(item => MatchesBundleScheduleFilters(item, queryParams))
+                .ToList();
+
+            return Page(
+                Sort(items, queryParams.SortBy, queryParams.Descending),
+                queryParams.Page,
+                queryParams.PageSize);
+        }
+
         private async Task<List<Core.Model.Event>> LoadEventsAsync()
         {
             var events = await dbContext.Events
@@ -162,6 +188,7 @@ namespace XBOL.Ticketing.Services.Event
             IReadOnlyDictionary<long, Dictionary<MediaType, string?>> media)
         {
             var schedule = PickDisplaySchedule(eventItem.Schedules);
+            var schedules = EventSchedules(eventItem.Schedules).Select(ToScheduleDto).ToList();
             var bannerImageUrl = MediaUrl(media, eventItem.Id, MediaType.Banner);
 
             return new EventCatalogItemDTO
@@ -173,6 +200,8 @@ namespace XBOL.Ticketing.Services.Event
                 Name = eventItem.Name,
                 Categories = Categories(eventItem.Categories),
                 VenueMapId = eventItem.VenueMapId,
+                EventScheduleId = schedule?.Id,
+                Schedules = schedules,
                 VenueName = VenueName(venueNames, eventItem.VenueMapId),
                 ExternalEventKey = schedule?.ExternalEventKey,
                 AvailableSeats = schedule?.Sections.Sum(section => section.AvailableSeats) ?? 0,
@@ -204,6 +233,9 @@ namespace XBOL.Ticketing.Services.Event
                 Code = bundle.Code,
                 Categories = Categories(bundle.Categories),
                 VenueMapId = bundle.VenueMapId,
+                EventScheduleId = schedule?.Id,
+                Schedules = schedules.Select(ToScheduleDto).ToList(),
+                BundleSaleWindow = ToSaleWindowDto(bundle),
                 VenueName = VenueName(venueNames, venueMapId),
                 ExternalEventKey = bundle.ExternalKey,
                 AvailableSeats = bundle.BundleSections.Sum(section => section.AvailableSeats),
@@ -277,7 +309,19 @@ namespace XBOL.Ticketing.Services.Event
                 return false;
             }
 
-            if (!MatchesDateRange(item.ScheduledStartDate, queryParams.StartDate, queryParams.EndDate))
+            return MatchesCatalogScheduleFilters(item, queryParams);
+        }
+
+        private static bool MatchesBundleScheduleFilters(BundleScheduleItemDTO item, BundleScheduleQueryParams queryParams)
+        {
+            if (!MatchesSearch(item.Name, queryParams.SearchTerm) ||
+                !MatchesVenue(item.VenueName, queryParams.Venue) ||
+                !MatchesDateRange(item.ScheduledStartDate, queryParams.StartDate, queryParams.EndDate))
+            {
+                return false;
+            }
+
+            if (queryParams.VenueMapId is not null && item.VenueMapId != queryParams.VenueMapId)
             {
                 return false;
             }
@@ -290,13 +334,6 @@ namespace XBOL.Ticketing.Services.Event
             return queryParams.Upcoming.Value
                 ? item.ScheduledStartDate >= DateTimeOffset.UtcNow
                 : item.ScheduledStartDate < DateTimeOffset.UtcNow;
-        }
-
-        private static bool MatchesBundleScheduleFilters(BundleScheduleItemDTO item, BundleScheduleQueryParams queryParams)
-        {
-            return MatchesSearch(item.Name, queryParams.SearchTerm) &&
-                   MatchesVenue(item.VenueName, queryParams.Venue) &&
-                   MatchesDateRange(item.ScheduledStartDate, queryParams.StartDate, queryParams.EndDate);
         }
 
         private static bool MatchesSearch(string value, string? searchTerm)
@@ -330,12 +367,88 @@ namespace XBOL.Ticketing.Services.Event
             return true;
         }
 
+        private static bool MatchesCatalogScheduleFilters(EventCatalogItemDTO item, EventCatalogQueryParams queryParams)
+        {
+            var now = DateTimeOffset.UtcNow;
+
+            return CatalogScheduleDates(item).Any(date =>
+                MatchesDateRange(date, queryParams.StartDate, queryParams.EndDate) &&
+                MatchesUpcoming(date, queryParams.Upcoming, now));
+        }
+
+        private static bool MatchesUpcoming(DateTimeOffset value, bool? upcoming, DateTimeOffset now)
+        {
+            if (upcoming is null)
+            {
+                return true;
+            }
+
+            return upcoming.Value
+                ? value >= now
+                : value < now;
+        }
+
+        private static IEnumerable<DateTimeOffset> CatalogScheduleDates(EventCatalogItemDTO item)
+        {
+            return item.Schedules.Count > 0
+                ? item.Schedules.Select(schedule => schedule.StartDateTime)
+                : [item.ScheduledStartDate];
+        }
+
         private static IEnumerable<EventSchedule> BundleSchedules(Core.Model.Bundle bundle)
         {
             return bundle.BundleEventSchedules
+                .Where(link => link.EventSchedule is not null)
+                .OrderBy(link => link.SortOrder ?? int.MaxValue)
+                .ThenBy(link => link.EventSchedule.StartDateTime)
+                .ThenBy(link => link.EventScheduleId)
                 .Select(link => link.EventSchedule)
-                .Where(schedule => schedule is not null)
                 .Cast<EventSchedule>();
+        }
+
+        private static IEnumerable<EventSchedule> EventSchedules(IEnumerable<EventSchedule> schedules)
+        {
+            return schedules
+                .OrderBy(schedule => schedule.StartDateTime)
+                .ThenBy(schedule => schedule.Id);
+        }
+
+        private static EventScheduleDTO ToScheduleDto(EventSchedule schedule)
+        {
+            return new EventScheduleDTO
+            {
+                Id = schedule.Id,
+                StartDateTime = schedule.StartDateTime,
+                EndDateTime = schedule.EndDateTime,
+                PublishedDate = schedule.PublishedDate,
+                PreSaleStartDate = schedule.PreSaleStartDate,
+                PreSaleEndDate = schedule.PreSaleEndDate,
+                OnSaleDate = schedule.OnSaleDate,
+                OffSaleDate = schedule.OffSaleDate,
+                GateOpenDate = schedule.GateOpenDate,
+                ExternalEventKey = schedule.ExternalEventKey,
+                TotalSeats = schedule.Sections.Sum(section => section.TotalSeats),
+                AvailableSeats = schedule.Sections.Sum(section => section.AvailableSeats),
+                Status = schedule.Status
+            };
+        }
+
+        private static BundleSaleWindowDTO ToSaleWindowDto(Core.Model.Bundle bundle)
+        {
+            return new BundleSaleWindowDTO
+            {
+                BundleScheduleKey = $"bundle-sale-window:{bundle.Id}",
+                BundleId = bundle.Id,
+                StartDate = bundle.StartDate,
+                EndDate = bundle.EndDate,
+                PublishedDate = bundle.PublishedDate,
+                OnSaleDate = bundle.OnSaleDate,
+                PreSaleDate = bundle.PreSaleDate,
+                OffSaleDate = bundle.OffSaleDate,
+                RenewalStartDate = bundle.RenewalStartDate,
+                RenewalEndDate = bundle.RenewalEndDate,
+                ExternalKey = bundle.ExternalKey
+            };
         }
 
         private static EventSchedule? PickDisplaySchedule(IEnumerable<EventSchedule> schedules)

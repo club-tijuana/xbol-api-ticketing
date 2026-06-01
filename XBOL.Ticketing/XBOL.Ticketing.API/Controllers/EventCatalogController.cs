@@ -21,6 +21,16 @@ namespace XBOL.Ticketing.API.Controllers
             return Ok(result);
         }
 
+        [HttpGet("event-schedules")]
+        [EndpointName("GetEventScheduleItems")]
+        [ProducesResponseType(typeof(PagedResponse<BundleScheduleItemDTO>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<PagedResponse<BundleScheduleItemDTO>>> GetEventScheduleItems(
+            [FromQuery] BundleScheduleQueryParams queryParams)
+        {
+            var result = await eventCatalogService.GetEventScheduleItemsAsync(queryParams);
+            return Ok(result);
+        }
+
         [HttpGet("bundles/{bundleId:long}/schedules")]
         [EndpointName("GetBundleScheduleItems")]
         [ProducesResponseType(typeof(PagedResponse<BundleScheduleItemDTO>), StatusCodes.Status200OK)]

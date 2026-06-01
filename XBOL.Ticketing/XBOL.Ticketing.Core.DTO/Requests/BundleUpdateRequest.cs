@@ -11,7 +11,11 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public string? BannerImageUrl { get; set; }
         public string? PosterImageUrl { get; set; }
         public string? LandingUrl { get; set; }
+        public AgeRestriction? AgeRestriction { get; set; }
+        public string? SecurityPolicies { get; set; }
+        public string? AdditionalComments { get; set; }
         public EventStatus? Status { get; set; }
+        public List<long>? CategoryIds { get; set; }
 
         public BundleType? BundleType { get; set; }
         public BundlePricingType? BundlePricingType { get; set; }

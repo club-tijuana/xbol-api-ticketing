@@ -88,6 +88,16 @@ namespace XBOL.Ticketing.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+            {
+                if (typeof(BaseModel).IsAssignableFrom(entityType.ClrType))
+                {
+                    modelBuilder.Entity(entityType.ClrType)
+                        .Property(nameof(BaseModel.Id))
+                        .ValueGeneratedOnAdd();
+                }
+            }
+
             modelBuilder.RemovePluralizingTableNameConvention();
 
             modelBuilder.ApplyConfiguration(new BundleConfiguration());

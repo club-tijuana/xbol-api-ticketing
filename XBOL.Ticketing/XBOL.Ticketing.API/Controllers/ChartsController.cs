@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SeatsioDotNet.Charts;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services;
 
@@ -33,22 +34,7 @@ namespace XBOL.Ticketing.API.Controllers
                 return NotFound();
             }
 
-            return Ok(new ChartResponse
-            {
-                Id = result.Id,
-                Key = result.Key,
-                Name = result.Name,
-                Status = result.Status,
-                Archived = result.Archived,
-                PublishedVersionThumbnailUrl = result.PublishedVersionThumbnailUrl,
-                DraftVersionThumbnailUrl = result.DraftVersionThumbnailUrl,
-                VenueType = result.VenueType,
-                Validation = new ChartValidationResponse
-                {
-                    Errors = result.Validation.Errors,
-                    Warnings = result.Validation.Warnings
-                }
-            });
+            return Ok(ToChartResponse(result));
         }
 
         /// <summary>
@@ -62,22 +48,27 @@ namespace XBOL.Ticketing.API.Controllers
         {
             var result = await _seatsIoService.RetrieveMapChartsAsync();
 
-            return Ok(result.Select(c => new ChartResponse
+            return Ok(result.Select(ToChartResponse).ToList());
+        }
+
+        private static ChartResponse ToChartResponse(Chart chart)
+        {
+            return new ChartResponse
             {
-                Id = c.Id,
-                Key = c.Key,
-                Name = c.Name,
-                Status = c.Status,
-                Archived = c.Archived,
-                PublishedVersionThumbnailUrl = c.PublishedVersionThumbnailUrl,
-                DraftVersionThumbnailUrl = c.DraftVersionThumbnailUrl,
-                VenueType = c.VenueType,
+                Id = chart.Id,
+                Key = chart.Key ?? string.Empty,
+                Name = chart.Name ?? string.Empty,
+                Status = chart.Status ?? string.Empty,
+                Archived = chart.Archived,
+                PublishedVersionThumbnailUrl = chart.PublishedVersionThumbnailUrl ?? string.Empty,
+                DraftVersionThumbnailUrl = chart.DraftVersionThumbnailUrl ?? string.Empty,
+                VenueType = chart.VenueType ?? string.Empty,
                 Validation = new ChartValidationResponse
                 {
-                    Errors = c.Validation.Errors,
-                    Warnings = c.Validation.Warnings
+                    Errors = chart.Validation?.Errors?.ToList() ?? [],
+                    Warnings = chart.Validation?.Warnings?.ToList() ?? []
                 }
-            }).ToList());
+            };
         }
     }
 }

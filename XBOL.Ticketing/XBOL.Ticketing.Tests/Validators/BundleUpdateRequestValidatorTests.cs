@@ -14,7 +14,7 @@ public class BundleUpdateRequestValidatorTests
         Name = "Updated Bundle",
         Status = EventStatus.Draft,
         BundleType = BundleType.Basic,
-        BundlePricingType = BundlePricingType.Single
+        BundlePricingType = BundlePricingType.Composite
     };
 
     [Fact]
@@ -55,6 +55,15 @@ public class BundleUpdateRequestValidatorTests
         var request = new BundleUpdateRequest { BundleType = (BundleType)value };
         var result = await _sut.TestValidateAsync(request);
         result.ShouldHaveValidationErrorFor(x => x.BundleType);
+    }
+
+    [Fact]
+    public async Task BundleType_Group_WhenProvided_Fails()
+    {
+        var request = new BundleUpdateRequest { BundleType = BundleType.Group };
+        var result = await _sut.TestValidateAsync(request);
+        result.ShouldHaveValidationErrorFor(x => x.BundleType)
+            .WithErrorMessage("Bundle type must be Basic or Season Pass.");
     }
 
     [Theory]

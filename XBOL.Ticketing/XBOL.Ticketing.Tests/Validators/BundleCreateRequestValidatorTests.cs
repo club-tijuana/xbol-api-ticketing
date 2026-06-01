@@ -15,7 +15,8 @@ public class BundleCreateRequestValidatorTests
         OrganizerId = 1,
         Name = "Test Bundle",
         BundleType = BundleType.Basic,
-        BundlePricingType = BundlePricingType.Single
+        BundlePricingType = BundlePricingType.Composite,
+        EventScheduleIds = [101]
     };
 
     [Fact]
@@ -31,7 +32,7 @@ public class BundleCreateRequestValidatorTests
         var request = new BundleCreateRequest
         {
             VenueMapId = 0, OrganizerId = 1, Name = "Test",
-            BundleType = BundleType.Basic, BundlePricingType = BundlePricingType.Single
+            BundleType = BundleType.Basic, BundlePricingType = BundlePricingType.Composite
         };
         var result = await _sut.TestValidateAsync(request);
         result.ShouldHaveValidationErrorFor(x => x.VenueMapId);
@@ -43,7 +44,7 @@ public class BundleCreateRequestValidatorTests
         var request = new BundleCreateRequest
         {
             VenueMapId = 1, OrganizerId = 0, Name = "Test",
-            BundleType = BundleType.Basic, BundlePricingType = BundlePricingType.Single
+            BundleType = BundleType.Basic, BundlePricingType = BundlePricingType.Composite
         };
         var result = await _sut.TestValidateAsync(request);
         result.ShouldHaveValidationErrorFor(x => x.OrganizerId);
@@ -78,6 +79,18 @@ public class BundleCreateRequestValidatorTests
         result.ShouldHaveValidationErrorFor(x => x.BundleType);
     }
 
+    [Fact]
+    public async Task BundleType_Group_Fails()
+    {
+        var request = ValidRequest();
+        request.BundleType = BundleType.Group;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.BundleType)
+            .WithErrorMessage("Bundle type must be Basic or Season Pass.");
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(999)]
@@ -87,6 +100,51 @@ public class BundleCreateRequestValidatorTests
         request.BundlePricingType = (BundlePricingType)value;
         var result = await _sut.TestValidateAsync(request);
         result.ShouldHaveValidationErrorFor(x => x.BundlePricingType);
+    }
+
+    [Fact]
+    public async Task EventScheduleIds_Empty_Fails()
+    {
+        var request = ValidRequest();
+        request.EventScheduleIds = [];
+        var result = await _sut.TestValidateAsync(request);
+        result.ShouldHaveValidationErrorFor(x => x.EventScheduleIds);
+    }
+
+    [Fact]
+    public async Task BasicBundle_WithSinglePricing_Fails()
+    {
+        var request = ValidRequest();
+        request.BundleType = BundleType.Basic;
+        request.BundlePricingType = BundlePricingType.Single;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.BundlePricingType);
+    }
+
+    [Fact]
+    public async Task SeasonPassBundle_WithCompositePricing_Fails()
+    {
+        var request = ValidRequest();
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Composite;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.BundlePricingType);
+    }
+
+    [Fact]
+    public async Task SeasonPassBundle_WithSinglePricing_Passes()
+    {
+        var request = ValidRequest();
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Single;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldNotHaveValidationErrorFor(x => x.BundlePricingType);
     }
 
     [Fact]

@@ -32,6 +32,10 @@ public class EventCatalogServiceTests
         identities.Should().Contain((70, EventCatalogItemType.Event));
         identities.Should().Contain((30, EventCatalogItemType.Bundle));
         identities.Should().Contain((40, EventCatalogItemType.Bundle));
+        result.Items.Should().Contain(item =>
+            item.Id == 1 &&
+            item.ItemType == EventCatalogItemType.Event &&
+            item.EventScheduleId == 10);
     }
 
     [Fact]
@@ -130,6 +134,120 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetItemsAsync_ReturnsScheduleCollectionForMultiScheduleEvents()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.Context.EventSchedules.Add(CreateAdditionalSchedule(
+            15,
+            70,
+            new DateTimeOffset(2026, 12, 2, 19, 0, 0, TimeSpan.Zero),
+            12,
+            27000));
+        await database.Context.SaveChangesAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Event,
+            SearchTerm = "Standalone Event",
+            Upcoming = true,
+            Page = 1,
+            PageSize = 10,
+            SortBy = "startDate",
+            Descending = false
+        });
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.EventScheduleId.Should().Be(14);
+        item.Schedules.Select(schedule => schedule.Id).Should().Equal(14, 15);
+        item.Schedules.Select(schedule => schedule.ExternalEventKey).Should().Equal("event-14", "event-15");
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_FiltersMultiScheduleEventsByAnyScheduleDate()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.Context.EventSchedules.Add(CreateAdditionalSchedule(
+            15,
+            70,
+            new DateTimeOffset(2026, 12, 2, 19, 0, 0, TimeSpan.Zero),
+            12,
+            27000));
+        await database.Context.SaveChangesAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Event,
+            SearchTerm = "Standalone Event",
+            StartDate = new DateTimeOffset(2026, 12, 2, 0, 0, 0, TimeSpan.Zero),
+            EndDate = new DateTimeOffset(2026, 12, 2, 23, 59, 59, TimeSpan.Zero),
+            Page = 1,
+            PageSize = 10
+        });
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.EventScheduleId.Should().Be(14);
+        item.Schedules.Select(schedule => schedule.Id).Should().Equal(14, 15);
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_RequiresDateAndUpcomingFiltersToMatchSameSchedule()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var pastStart = now.AddMonths(-2);
+        var futureStart = now.AddMonths(2);
+
+        database.Context.EventSchedules.AddRange(
+            CreateAdditionalSchedule(15, 70, pastStart, 12, 27000),
+            CreateAdditionalSchedule(16, 70, futureStart, 12, 27000));
+        await database.Context.SaveChangesAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Event,
+            SearchTerm = "Standalone Event",
+            StartDate = pastStart.AddMinutes(-1),
+            EndDate = pastStart.AddMinutes(1),
+            Upcoming = true,
+            Page = 1,
+            PageSize = 10
+        });
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_ReturnsBundleSaleWindowSeparateFromIncludedSchedules()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Bundle,
+            BundleType = BundleType.SeasonPass,
+            Status = EventStatus.Published,
+            SearchTerm = "Xolopack",
+            Upcoming = true,
+            Page = 1,
+            PageSize = 10
+        });
+
+        var item = result.Items.Should().ContainSingle().Subject;
+        item.BundleSaleWindow.Should().NotBeNull();
+        item.BundleSaleWindow!.BundleScheduleKey.Should().Be($"bundle-sale-window:{item.Id}");
+        item.BundleSaleWindow.BundleId.Should().Be(item.Id);
+        item.BundleSaleWindow.StartDate.Should().Be(new DateTimeOffset(2026, 5, 26, 12, 0, 0, TimeSpan.Zero));
+        item.Schedules.Select(schedule => schedule.Id).Should().Equal(10, 11);
+        item.EventScheduleId.Should().Be(10);
+        item.BundleSaleWindow.BundleScheduleKey.Should().NotBe(item.EventScheduleId.ToString());
+    }
+
+    [Fact]
     public async Task GetBundleScheduleItemsAsync_FiltersByVenueAndDateRangeAndPaginates()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -158,6 +276,67 @@ public class EventCatalogServiceTests
             TotalSeats = 27000
         });
     }
+
+    [Fact]
+    public async Task GetEventScheduleItemsAsync_ReturnsEachScheduleForMultiScheduleEvents()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        database.Context.EventSchedules.Add(CreateAdditionalSchedule(
+            15,
+            70,
+            new DateTimeOffset(2026, 12, 2, 19, 0, 0, TimeSpan.Zero),
+            12,
+            27000));
+        await database.Context.SaveChangesAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetEventScheduleItemsAsync(new BundleScheduleQueryParams
+        {
+            SearchTerm = "Standalone Event",
+            VenueMapId = 1,
+            Upcoming = true,
+            Page = 1,
+            PageSize = 10,
+            SortBy = "startDate",
+            Descending = false
+        });
+
+        result.TotalCount.Should().Be(2);
+        result.Items.Select(item => item.EventScheduleId).Should().Equal(14, 15);
+        result.Items.Should().OnlyContain(item =>
+            item.EventId == 70 &&
+            item.Name == "Standalone Event" &&
+            item.VenueMapId == 1);
+    }
+
+    private static EventSchedule CreateAdditionalSchedule(
+        long id,
+        long eventId,
+        DateTimeOffset start,
+        int available,
+        int total) => new()
+    {
+        Id = id,
+        EventId = eventId,
+        Status = ScheduleStatus.OnSale,
+        StartDateTime = start,
+        EndDateTime = start.AddHours(3),
+        OnSaleDate = start.AddMonths(-1),
+        OffSaleDate = start.AddHours(-1),
+        ExternalEventKey = $"event-{id}",
+        CreatedAt = DateTimeOffset.UtcNow,
+        UpdatedAt = DateTimeOffset.UtcNow,
+        Sections =
+        [
+            new EventSection
+            {
+                BaseSectionId = 14,
+                DisplayName = "General",
+                AvailableSeats = available,
+                TotalSeats = total
+            }
+        ]
+    };
 
     private static Media CreateMedia(
         long referenceId,

@@ -14,6 +14,9 @@ namespace XBOL.Ticketing.Core.DTO
         public string? Code { get; set; }
         public List<EventCategoryResult> Categories { get; set; } = [];
         public long? VenueMapId { get; set; }
+        public long? EventScheduleId { get; set; }
+        public IList<EventScheduleDTO> Schedules { get; set; } = [];
+        public BundleSaleWindowDTO? BundleSaleWindow { get; set; }
         public string? VenueName { get; set; }
         public string? ExternalEventKey { get; set; }
         public required int AvailableSeats { get; set; }

@@ -11,6 +11,7 @@ public interface IBundleRepository
     Task CommitAsync();
     Task UpdateAsync(Core.Model.Bundle entity);
     Task HardDeleteAsync(Core.Model.Bundle entity);
+    Task<List<EventCategory>> GetCategoriesByIdsAsync(IReadOnlyCollection<long> categoryIds);
     IQueryable<Core.Model.Bundle> Get(
         Expression<Func<Core.Model.Bundle, bool>>? filter = null,
         Func<IQueryable<Core.Model.Bundle>, IOrderedQueryable<Core.Model.Bundle>>? orderBy = null,
