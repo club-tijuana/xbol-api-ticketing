@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using XBOL.Ticketing.Core.Model;
 
@@ -19,6 +19,10 @@ namespace XBOL.Ticketing.Data.Configurations
             builder.HasOne(x => x.SeasonPassEventTicket)
                    .WithOne(x => x.Ticket)
                    .HasForeignKey<SeasonPassEventTicket>(x => x.TicketId);
+
+            builder.HasOne(x => x.BundlePassEventTicket)
+                   .WithOne(x => x.Ticket)
+                   .HasForeignKey<BundlePassEventTicket>(x => x.TicketId);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace XBOL.Ticketing.Core.Model
+namespace XBOL.Ticketing.Core.Model
 {
     public class BaseZone : BaseModel
     {
@@ -6,6 +6,7 @@
         public VenueMap VenueMap { get; set; } = null!;
 
         public string Name { get; set; } = null!;
+        public long? ExternalZoneKey { get; set; }
 
         public IList<BaseSection> BaseSections { get; set; } = [];
     }

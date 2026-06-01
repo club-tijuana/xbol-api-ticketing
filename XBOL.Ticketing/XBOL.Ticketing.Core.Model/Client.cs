@@ -6,17 +6,13 @@ namespace XBOL.Ticketing.Core.Model
     {
         public ClientType ClientType { get; set; }
 
-        public string FirstName { get; set; } = null!;
-        public string LastName { get; set; } = null!;
+        public string? FullName { get; set; }
         public string? BusinessName { get; set; }
-        public string Email { get; set; } = null!;
+        public string? Email { get; set; }
         public long? PhoneRegionCodeId { get; set; }
         public PhoneRegionCode? PhoneRegionCode { get; set; }
-        public string PhoneNumber { get; set; } = null!;
+        public string? PhoneNumber { get; set; }
         public bool IsActive { get; set; }
-
-        public Guid? UserId { get; set; }
-        public User? User { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
         public Guid CreatedBy { get; set; }

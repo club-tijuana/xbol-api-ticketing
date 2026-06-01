@@ -7,13 +7,12 @@ using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
 using SeatsioDotNet.Util;
-using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services.Event;
 
 namespace XBOL.Ticketing.Services
 {
-    public class SeatsIoService
+    public class SeatsIoService : ISeatsIoEventLifecycleClient, ISeatsIoSeasonLifecycleClient
     {
         private readonly SeatsIoOptions _options;
         private readonly SeatsioClient _client;
@@ -42,9 +41,9 @@ namespace XBOL.Ticketing.Services
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            foreach (BookingSeatRequest seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             var response = await BookSeatsAsync(request.EventKey, seatsToBook, request.HoldToken);
@@ -57,9 +56,9 @@ namespace XBOL.Ticketing.Services
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in request.Seats)
+            foreach (BookingSeatRequest seat in request.Seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             var response = await BookSeatsAsync(request.SeasonKey, seatsToBook, request.HoldToken);
@@ -67,34 +66,33 @@ namespace XBOL.Ticketing.Services
             return response;
         }
 
-        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, Dictionary<string, decimal> seats, string holdToken)
+        public async Task<ChangeObjectStatusResult> BookSeatsAsync(string eventKey, List<BookingSeatRequest> seats, string holdToken)
         {
             List<ObjectProperties> seatsToBook = [];
 
-            foreach (KeyValuePair<string, decimal> seat in seats)
+            foreach (BookingSeatRequest seat in seats)
             {
-                seatsToBook.Add(new ObjectProperties(seat.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
+                seatsToBook.Add(new ObjectProperties(seat.SeatKey, new Dictionary<string, object> { { "salesPoint", "Admin" } }));
             }
 
             return await BookSeatsAsync(eventKey, seatsToBook, holdToken);
         }
 
-        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(
-            string eventKey,
-            Dictionary<string, decimal> seats,
-            string holdToken)
+        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(string eventKey, List<BookingSeatRequest> seats, string holdToken)
         {
             _logger.LogInformation(
                 "Booking {SeatCount} seat(s) for {EventKey} (hold token supplied: {HasHoldToken}).",
                 seats.Count, eventKey, !string.IsNullOrWhiteSpace(holdToken));
 
             var seatsToBook = seats
-                .Select(s => new ObjectProperties(s.Key, new Dictionary<string, object> { { "salesPoint", "Admin" } }))
-                .ToList();
+                                .Select(s => new ObjectProperties(
+                                    s.SeatKey,
+                                    new Dictionary<string, object> { { "salesPoint", "Admin" } }))
+                                .ToList();
 
             ChangeObjectStatusResult response = string.IsNullOrWhiteSpace(holdToken)
-                ? await _client.Events.BookAsync(eventKey, seatsToBook)
-                : await _client.Events.BookAsync(eventKey, seatsToBook, holdToken);
+                                                ? await _client.Events.BookAsync(eventKey, seatsToBook)
+                                                : await _client.Events.BookAsync(eventKey, seatsToBook, holdToken);
 
             if (!string.IsNullOrWhiteSpace(holdToken))
             {
@@ -104,9 +102,7 @@ namespace XBOL.Ticketing.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex,
-                        "Booking succeeded for {EventKey} but releasing the hold token failed.",
-                        eventKey);
+                    _logger.LogWarning(ex, "Booking succeeded for {EventKey} but releasing the hold token failed.", eventKey);
                 }
             }
 
@@ -116,13 +112,13 @@ namespace XBOL.Ticketing.Services
         public async Task<HoldToken> CreateHoldTokenAsync()
         {
             return _options.HoldExpirationInMinutes.HasValue
-                ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
-                : await _client.HoldTokens.CreateAsync();
+                    ? await _client.HoldTokens.CreateAsync(_options.HoldExpirationInMinutes.Value)
+                    : await _client.HoldTokens.CreateAsync();
         }
 
         public async Task<HoldToken> CreateHoldTokenAsync(string eventKey)
         {
-            var schedule = _eventScheduleService.GetList(x => x.ExternalEventKey == eventKey && x.Event.Status == EventStatus.Published).FirstOrDefault();
+            var schedule = _eventScheduleService.GetList(x => x.ExternalEventKey == eventKey).FirstOrDefault();
 
             int? holdExpiration = schedule?.HoldExpirationInMinutes ?? _options.HoldExpirationInMinutes;
 
@@ -332,6 +328,187 @@ namespace XBOL.Ticketing.Services
             }
 
             return response;
+        }
+
+        public async Task<SeatsioDotNet.Events.Event> CreateSeasonAsync(string chartKey, string seasonKey, string[]? eventKeys = null)
+        {
+            _logger.LogInformation("Creating season {SeasonKey} on chart {ChartKey} with {EventCount} event(s).",
+                seasonKey, chartKey, eventKeys?.Length ?? 0);
+
+            try
+            {
+                return await _client.Seasons.CreateAsync(chartKey, key: seasonKey, eventKeys: eventKeys);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to create season {SeasonKey} on chart {ChartKey}. ErrorCodes: {ErrorCodes}",
+                    seasonKey, chartKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task<SeatsioDotNet.Events.Event[]> CreateEventsInSeasonAsync(string seasonKey, string[] eventKeys)
+        {
+            _logger.LogInformation("Creating {EventCount} event(s) in season {SeasonKey}.",
+                eventKeys.Length, seasonKey);
+
+            try
+            {
+                return await _client.Seasons.CreateEventsAsync(seasonKey, eventKeys: eventKeys);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to create events in season {SeasonKey}. ErrorCodes: {ErrorCodes}",
+                    seasonKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task UpdateSeasonAsync(string seasonKey, UpdateSeasonParams p)
+        {
+            _logger.LogInformation("Updating season {SeasonKey}.", seasonKey);
+
+            try
+            {
+                await _client.Seasons.UpdateAsync(seasonKey, p);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to update season {SeasonKey}. ErrorCodes: {ErrorCodes}",
+                    seasonKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task DeleteSeasonAsync(string seasonKey)
+        {
+            _logger.LogInformation("Deleting season {SeasonKey}.", seasonKey);
+
+            try
+            {
+                await _client.Events.DeleteAsync(seasonKey);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to delete season {SeasonKey}. ErrorCodes: {ErrorCodes}",
+                    seasonKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task<SeatsioDotNet.Events.Event> CreateEventAsync(string chartKey, string eventKey)
+        {
+            _logger.LogInformation("Creating event {EventKey} on chart {ChartKey}.", eventKey, chartKey);
+
+            try
+            {
+                return await _client.Events.CreateAsync(chartKey, new CreateEventParams { Key = eventKey });
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to create event {EventKey} on chart {ChartKey}. ErrorCodes: {ErrorCodes}",
+                    eventKey, chartKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task<SeatsioDotNet.Events.Event> CreateEventAsync(
+            string chartKey,
+            string eventKey,
+            string name,
+            DateOnly date)
+        {
+            _logger.LogInformation("Creating event {EventKey} on chart {ChartKey}.", eventKey, chartKey);
+
+            try
+            {
+                return await _client.Events.CreateAsync(chartKey, new CreateEventParams
+                {
+                    Key = eventKey,
+                    Name = name,
+                    Date = date
+                });
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to create event {EventKey} on chart {ChartKey}. ErrorCodes: {ErrorCodes}",
+                    eventKey, chartKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task UpdateEventAsync(string eventKey, string name, DateOnly date)
+        {
+            _logger.LogInformation("Updating event {EventKey}.", eventKey);
+
+            try
+            {
+                await _client.Events.UpdateAsync(eventKey, new UpdateEventParams
+                {
+                    Name = name,
+                    Date = date
+                });
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to update event {EventKey}. ErrorCodes: {ErrorCodes}",
+                    eventKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task DeleteEventAsync(string eventKey)
+        {
+            _logger.LogInformation("Deleting event {EventKey}.", eventKey);
+
+            try
+            {
+                await _client.Events.DeleteAsync(eventKey);
+            }
+            catch (SeatsioException ex)
+            {
+                _logger.LogError(ex, "Failed to delete event {EventKey}. ErrorCodes: {ErrorCodes}",
+                    eventKey, string.Join(",", ex.Errors?.Select(e => e.Code) ?? []));
+                throw;
+            }
+        }
+
+        public async Task CreateSeatsIoEventAsync(string chartKey, string eventKey, string name, DateOnly date)
+        {
+            await CreateEventAsync(chartKey, eventKey, name, date);
+        }
+
+        public async Task UpdateSeatsIoEventAsync(string eventKey, string name, DateOnly date)
+        {
+            await UpdateEventAsync(eventKey, name, date);
+        }
+
+        public async Task DeleteSeatsIoEventAsync(string eventKey)
+        {
+            await DeleteEventAsync(eventKey);
+        }
+
+        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[] eventKeys)
+        {
+            await CreateSeasonAsync(chartKey, seasonKey, eventKeys);
+        }
+
+        public async Task CreateSeatsIoEventsInSeasonAsync(string seasonKey, string[] eventKeys)
+        {
+            await CreateEventsInSeasonAsync(seasonKey, eventKeys);
+        }
+
+        public async Task DeleteSeatsIoSeasonAsync(string seasonKey)
+        {
+            await DeleteSeasonAsync(seasonKey);
+        }
+
+        public async Task UpdateSeatsIoSeasonAsync(string seasonKey, string name)
+        {
+            await UpdateSeasonAsync(seasonKey, new UpdateSeasonParams
+            {
+                Name = name
+            });
         }
 
         public async Task<Page<StatusChange>> GetStatusChangesAsync(
