@@ -17,6 +17,8 @@ public static class WolverineConfiguration
 
         host.UseWolverine(opts =>
         {
+            opts.UseRuntimeCompilation();
+
             opts.PersistMessagesWithPostgresql(connectionString);
             TicketingWolverineConfiguration.ConfigureTicketingLifecycle(opts);
         });
