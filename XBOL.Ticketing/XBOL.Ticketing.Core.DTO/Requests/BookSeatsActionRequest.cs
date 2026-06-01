@@ -9,9 +9,10 @@ namespace XBOL.Ticketing.Core.DTO.Requests
 
         [Required]
         [MinLength(1, ErrorMessage = "At least one seat is required.")]
-        public required Dictionary<string, decimal> Seats { get; set; }
+        public required List<BookingSeatRequest> Seats { get; set; } = [];
 
         public string HoldToken { get; set; } = "";
+        public long? BundleId { get; set; }
         public long EventScheduleId { get; set; }
         public required ItemType TicketType { get; set; }
         public required ClientInfoRequest ClientContact { get; set; }

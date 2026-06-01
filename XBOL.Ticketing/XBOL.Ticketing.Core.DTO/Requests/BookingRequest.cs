@@ -4,7 +4,7 @@ namespace XBOL.Ticketing.Core.DTO.Requests
 {
     public class BookingRequest
     {
-        public Dictionary<string, decimal> Seats { get; set; } = [];
+        public List<BookingSeatRequest> Seats { get; set; } = [];
         public string HoldToken { get; set; } = "";
         public long EventScheduleId { get; set; }
         public required ItemType TicketType { get; set; }

@@ -1,12 +1,29 @@
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Views;
+using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Repositories.Base;
 
 namespace XBOL.Ticketing.Data.Repositories.Event
 {
     public class EventRepository(XBOLDbContext dbContext) : BaseRepository<Core.Model.Event>(dbContext)
     {
+        public async Task<Core.Model.Event?> GetByIdWithSchedulesAsync(long id)
+        {
+            return await dbContext.Events
+                .Include(e => e.Schedules)
+                .FirstOrDefaultAsync(e => e.Id == id);
+        }
+
+        public async Task<List<EventCategory>> GetCategoriesByIdsAsync(IReadOnlyCollection<long> categoryIds)
+        {
+            return categoryIds.Count == 0
+                ? []
+                : await dbContext.EventCategories
+                    .Where(category => categoryIds.Contains(category.Id))
+                    .ToListAsync();
+        }
+
         public async Task<IList<DynamicPricingEvent>> GetDynamicPricingData(long eventId)
         {
             // TODO: Implement logic to exclude EventSeats that have already been delivered to a distributor.
@@ -17,7 +34,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                   .Select(es => new DynamicPricingEvent
                                   {
                                       EventScheduleId = es.Id,
-                                      VenueCategory = es.Event.VenueMap.Venue.Category,
+                                      VenueCategory = es.Event.VenueMap!.Venue.Category,
                                       VenueLatitude = es.Event.VenueMap.Venue.Latitude,
                                       VenueLongitude = es.Event.VenueMap.Venue.Longitude,
                                       VenueCapacity = es.Event.VenueMap.Capacity,
@@ -25,7 +42,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                       EventCategory = es.Event.Categories.Select(c => c.DisplayName).FirstOrDefault() ?? "",
                                       EventDateTime = es.StartDateTime,
                                       EventPublishedDate = es.PublishedDate,
-                                      EventGameCategory = es.GameCategory,
+                                      EventGameCategory = es.GameCategory ?? default,
 
                                       EventProfitability = ProfitabilityType.Regular,
                                       FeelingOfTheMarket = FeelingOfTheMarket.Neutral,
@@ -40,8 +57,6 @@ namespace XBOL.Ticketing.Data.Repositories.Event
                                               SeatRow = seat.BaseSeat.BaseRow.RowLabel,
                                               SeatNumber = seat.BaseSeat.SeatNumber,
                                               SeatType = seat.BaseSeat.SeatType,
-
-                                              SectionBasePrice = seat.EventSection.Price,
                                               IsSold = seat.Tickets.Any(t => t.OriginalOrder != null && t.OriginalOrder.Status == OrderStatus.Paid)
                                           })
                                           .ToList()

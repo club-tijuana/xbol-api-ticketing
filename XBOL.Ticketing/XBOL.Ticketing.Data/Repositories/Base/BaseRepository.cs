@@ -13,13 +13,11 @@ namespace XBOL.Ticketing.Data.Repositories.Base
     {
         protected DbContext DbContext { get; set; }
         protected readonly DbSet<M> DbSet;
-        protected bool Disposed;
 
         public BaseRepository(DbContext dbContext)
         {
             DbContext = dbContext;
             DbSet = DbContext.Set<M>();
-            Disposed = false;
         }
 
         public void Commit()
@@ -30,12 +28,6 @@ namespace XBOL.Ticketing.Data.Repositories.Base
         public async Task CommitAsync()
         {
             await DbContext.SaveChangesAsync();
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public IQueryable<M> Get(
@@ -217,19 +209,19 @@ namespace XBOL.Ticketing.Data.Repositories.Base
         public async Task<IEnumerable<N>> ExecuteStoredProcedureValues<N>(
             string query,
             Dictionary<string, object> parameters,
-            string? connectionString = null
-        )
+            string? connectionString = null)
         {
-            using IDbConnection connection = GetConnection(connectionString);
-            connection.Open();
-            var items = await connection.QueryAsync<N>(
-                $"{query}",
+            var connection = GetConnection(connectionString);
+            if (connection.State != ConnectionState.Open)
+            {
+                connection.Open();
+            }
+
+            return await connection.QueryAsync<N>(
+                query,
                 GetDynamicParameters(parameters),
                 commandType: CommandType.StoredProcedure,
-                commandTimeout: 0
-            );
-            connection.Close();
-            return items;
+                commandTimeout: 0);
         }
 
         public IEnumerable<N> ExecuteStoredProcedureValues<N>(
@@ -250,31 +242,33 @@ namespace XBOL.Ticketing.Data.Repositories.Base
             string query,
             CommandType commandType,
             Dictionary<string, object> parameters,
-            string? connectionString = null
-        )
+            string? connectionString = null)
         {
-            using IDbConnection connection = GetConnection(connectionString);
-            connection.Open();
-            var items = connection.Query<N>(
-                $"{query}",
+            var connection = GetConnection(connectionString);
+            if (connection.State != ConnectionState.Open)
+            {
+                connection.Open();
+            }
+
+            return connection.Query<N>(
+                query,
                 GetDynamicParameters(parameters),
                 commandType: commandType,
-                commandTimeout: 0
-            );
-            connection.Close();
-            return items;
+                commandTimeout: 0);
         }
 
         public void ExecuteQuerySync(
             string query,
             string? connectionString = null,
-            int? commandTimeout = null
-        )
+            int? commandTimeout = null)
         {
-            using IDbConnection connection = GetConnection(connectionString);
-            connection.Open();
-            var items = connection.Execute($"{query}", commandTimeout: commandTimeout);
-            connection.Close();
+            var connection = GetConnection(connectionString);
+            if (connection.State != ConnectionState.Open)
+            {
+                connection.Open();
+            }
+
+            connection.Execute(query, commandTimeout: commandTimeout);
         }
 
         public async Task<IEnumerable<N>> ExecuteStoredProcedureValues<N>(
@@ -325,19 +319,10 @@ namespace XBOL.Ticketing.Data.Repositories.Base
         {
             if (string.IsNullOrEmpty(connectionString))
             {
-                var connection = DbContext.Database.GetDbConnection();
-                connectionString = connection.ConnectionString;
+                return DbContext.Database.GetDbConnection();
             }
-            return new NpgsqlConnection(connectionString);
-        }
 
-        protected void Dispose(bool disposing)
-        {
-            if (!Disposed && disposing)
-            {
-                DbContext.Dispose();
-            }
-            Disposed = true;
+            return new NpgsqlConnection(connectionString);
         }
 
         private object[] GetPrimaryKeys(M entity)

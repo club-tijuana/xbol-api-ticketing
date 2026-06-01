@@ -1,8 +1,9 @@
-﻿namespace XBOL.Ticketing.Core.Commons.Enums
+namespace XBOL.Ticketing.Core.Commons.Enums
 {
     public enum ItemType
     {
         Ticket,
-        SeasonPass
+        SeasonPass,
+        BundlePass
     }
 }

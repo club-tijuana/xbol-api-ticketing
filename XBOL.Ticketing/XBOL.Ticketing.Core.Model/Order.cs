@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -19,12 +19,15 @@ namespace XBOL.Ticketing.Core.Model
 
         public OrderStatus Status { get; set; }
         public OrderType OrderType { get; set; }
-        public PayformType PayformType { get; set; }
+        public SaleChannel SaleChannel { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
         public Guid CreatedBy { get; set; }
         public Guid UpdatedBy { get; set; }
+
+        public long? RelatedOrderId { get; set; }
+        public Order? RelatedOrder { get; set; }
 
         public IList<OrderItem> Items { get; set; } = [];
         public IList<OrderFee> Fees { get; set; } = [];
