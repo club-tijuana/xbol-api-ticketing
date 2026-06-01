@@ -7,7 +7,6 @@ using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
 using SeatsioDotNet.Util;
-using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services.Event;
 
@@ -119,7 +118,7 @@ namespace XBOL.Ticketing.Services
 
         public async Task<HoldToken> CreateHoldTokenAsync(string eventKey)
         {
-            var schedule = _eventScheduleService.GetList(x => x.ExternalEventKey == eventKey && x.Event.Status == EventStatus.Published).FirstOrDefault();
+            var schedule = _eventScheduleService.GetList(x => x.ExternalEventKey == eventKey).FirstOrDefault();
 
             int? holdExpiration = schedule?.HoldExpirationInMinutes ?? _options.HoldExpirationInMinutes;
 

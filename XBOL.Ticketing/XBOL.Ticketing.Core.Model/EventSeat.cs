@@ -6,6 +6,7 @@ namespace XBOL.Ticketing.Core.Model
         public EventSection EventSection { get; set; } = null!;
         public long BaseSeatId { get; set; }
         public BaseSeat BaseSeat { get; set; } = null!;
+        public bool ForSale { get; set; } = true;
         public string ExternalSeatObjectKey { get; set; } = null!;
 
         public IList<Ticket> Tickets { get; set; } = [];

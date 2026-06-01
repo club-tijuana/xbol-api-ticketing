@@ -55,16 +55,31 @@ namespace XBOL.Ticketing.Services.Event
                 UpdatedBy = userId
             };
 
-            newSchedule.Sections = await dbContext.BaseSections
+            List<EventSection> sections = await dbContext.BaseSections
                 .Where(x => x.BaseZone.VenueMapId == scheduleEvent.VenueMapId)
                 .Select(x => new EventSection
                 {
                     BaseSectionId = x.Id,
                     TotalSeats = 0,
                     AvailableSeats = 0,
-                    DisplayName = string.Empty
+                    DisplayName = $"{x.BaseZone.Name} {x.Name}",
                 })
                 .ToListAsync();
+
+            foreach (EventSection section in sections)
+            {
+                section.EventSeats = await dbContext.BaseSeats
+                    .Where(s => s.BaseRow.BaseSectionId == section.BaseSectionId)
+                    .Select(s => new EventSeat
+                    {
+                        BaseSeatId = s.Id,
+                        ForSale = true, // For now every seat is for sale.
+                        ExternalSeatObjectKey = $"{s.BaseRow.BaseSection.Name}-{s.BaseRow.RowLabel}-{s.SeatNumber}", // Generate SeatsIo object key
+                    })
+                    .ToListAsync();
+            }
+
+            newSchedule.Sections = sections;
 
             await Repository.InsertAsync(newSchedule);
             await Repository.CommitAsync();
