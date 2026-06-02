@@ -28,6 +28,7 @@ namespace XBOL.Ticketing.Core.Model
         public DateTimeOffset UpdatedAt { get; set; }
         public Guid CreatedBy { get; set; }
         public Guid UpdatedBy { get; set; }
+        public DateTimeOffset? DeletedAt { get; set; }
 
         public IList<EventCategory> Categories { get; set; } = new List<EventCategory>();
         public IList<EventSchedule> Schedules { get; set; } = [];

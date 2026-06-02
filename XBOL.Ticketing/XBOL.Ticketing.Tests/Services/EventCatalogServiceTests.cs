@@ -102,6 +102,28 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetItemsAsync_DoesNotReturnSoftDeletedEvents()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var deletedEvent = await database.Context.Events.SingleAsync(e => e.Id == 70);
+        deletedEvent.DeletedAt = DateTimeOffset.UtcNow;
+        await database.Context.SaveChangesAsync();
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Event,
+            SearchTerm = "Standalone Event",
+            Upcoming = true,
+            Page = 1,
+            PageSize = 10
+        });
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task GetItemsAsync_UsesAvailableBundleBlobAssetsForBundleImageUrls()
     {
         await using var database = await TestDatabase.CreateAsync();

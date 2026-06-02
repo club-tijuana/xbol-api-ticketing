@@ -98,6 +98,7 @@ namespace XBOL.Ticketing.Services.Event
             var events = await dbContext.Events
                 .AsNoTracking()
                 .AsSplitQuery()
+                .Where(eventItem => eventItem.DeletedAt == null)
                 .Include(eventItem => eventItem.VenueMap)
                 .Include(eventItem => eventItem.Categories)
                 .Include(eventItem => eventItem.Schedules)
