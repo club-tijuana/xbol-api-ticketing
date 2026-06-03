@@ -1,6 +1,5 @@
 using Wolverine;
 using XBOL.Ticketing.Core.Commons.Enums;
-using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Messages;

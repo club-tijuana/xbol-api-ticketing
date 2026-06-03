@@ -1,5 +1,4 @@
 using XBOL.Ticketing.Core.DTO.Requests;
-using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.Services.Booking
 {
