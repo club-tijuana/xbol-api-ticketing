@@ -194,7 +194,6 @@ namespace XBOL.Ticketing.Services.Bundle
                 bundle.BundleSections = baseSections.Select(section => new Core.Model.BundleSection
                 {
                     BaseSectionId = section.Id,
-                    Price = 0,
                     TotalSeats = 0,
                     AvailableSeats = 0,
                     DisplayName = string.Empty
@@ -244,7 +243,6 @@ namespace XBOL.Ticketing.Services.Bundle
             return new Core.Model.BundleSection
             {
                 BaseSectionId = baseSection.Id,
-                Price = 0,
                 TotalSeats = bundleSeats.Count,
                 AvailableSeats = bundleSeats.Count,
                 DisplayName = baseSection.Name,

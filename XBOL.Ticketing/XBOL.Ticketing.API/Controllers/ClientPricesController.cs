@@ -25,7 +25,7 @@ namespace XBOL.Ticketing.API.Controllers
         [HttpGet("seat-availability")]
         [ProducesResponseType(typeof(SeatAvailabilityResponse), StatusCodes.Status200OK)]
         [EndpointName("GetSeatAvailabilityAsync")]
-        public async Task<ActionResult<SeatAvailabilityResponse>> GetSeatAvailabilityAsync([FromBody] ReservationFiltersRequest filters)
+        public async Task<ActionResult<SeatAvailabilityResponse>> GetSeatAvailabilityAsync([FromQuery] ReservationFiltersRequest filters)
         {
             var result = await _clientPriceService.GetSeatAvailabilityAsync(filters);
 

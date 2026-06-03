@@ -72,6 +72,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
+            services.AddScoped<PriceService>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();
@@ -79,8 +80,6 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddValidatorsFromAssembly(typeof(ServiceConfiguration).Assembly);
 
             services.AddTransient<IEngine, Engine>();
-
-            services.AddScoped<PriceService>();
 
             return services;
         }

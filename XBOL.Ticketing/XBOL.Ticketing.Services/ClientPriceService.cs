@@ -60,6 +60,8 @@ namespace XBOL.Ticketing.Services
             }
 
             var priceItems = await _dbContext.PriceListItems
+                                    .Include(pli => pli.Price)
+                                        .ThenInclude(p => p.PriceType)
                                     .AsNoTracking()
                                     .Where(pli => pli.PriceList.PriceReferenceId == priceReference.Id
                                         && pli.PriceList.Status == VersionStatus.Active)
@@ -88,6 +90,9 @@ namespace XBOL.Ticketing.Services
             }
 
             var priceItems = await _dbContext.PriceListItems
+                                    .Include(pli => pli.Price)
+                                        .ThenInclude(p => p.PriceType)
+                                    .AsNoTracking()
                                     .Where(pli => pli.PriceList.PriceReferenceId == priceReference.Id
                                         && pli.PriceList.Status == VersionStatus.Active
                                         && (pli.BaseZoneId != null || pli.BaseSectionId != null)
@@ -107,6 +112,7 @@ namespace XBOL.Ticketing.Services
             }
 
             var dbSections = await _dbContext.BaseSections
+                                    .AsNoTracking()
                                     .Where(s => activeZoneIds.Contains(s.BaseZoneId)
                                         || activeSectionIds.Contains(s.Id))
                                     .ToListAsync();
@@ -200,7 +206,10 @@ namespace XBOL.Ticketing.Services
             var activeRowIds = rowPrices.Keys.ToList();
             var activeSeatIds = seatPrices.Keys.ToList();
 
-            var seatQuery = _dbContext.Set<BaseSeat>()
+            var seatQuery = _dbContext.BaseSeats
+                            .Include(bs => bs.BaseRow)
+                                .ThenInclude(br => br.BaseSection)
+                            .AsNoTracking()
                             .Where(s => activeRowIds.Contains(s.BaseRowId)
                                 || activeSeatIds.Contains(s.Id));
 
