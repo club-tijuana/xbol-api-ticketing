@@ -165,7 +165,7 @@ namespace XBOL.Ticketing.Services
                     Category = null,
                     PriceListItemId = g.First().PriceListItemId,
                     Price = g.Key.Price,
-                    OriginalPrice = g.First().OriginalPrice,
+                    OriginalPrice = null,
                     Fee = g.First().Fee,
                     TicketTypes = g.First().TicketTypes,
                     Objects = g.SelectMany(x => x.Objects!).Distinct().ToArray()
@@ -191,7 +191,7 @@ namespace XBOL.Ticketing.Services
         {
             dto.PriceListItemId = item.Id;
             dto.Price = item.FinalPrice;
-            dto.OriginalPrice = item.BasePrice;
+            dto.OriginalPrice = null;
             dto.Fee = fee;
         }
     }

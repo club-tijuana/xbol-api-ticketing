@@ -26,7 +26,7 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<EventMediaRepository>();
             services.AddScoped<EventRepository>();
             services.AddScoped<EventScheduleRepository>();
-            services.AddScoped<IEventScheduleRepository>(sp => sp.GetRequiredService<EventScheduleRepository>());
+            services.AddScoped<IEventScheduleRepository, EventScheduleRepository>();
             services.AddScoped<EventSeatRepository>();
             services.AddScoped<EventSectionRepository>();
             services.AddScoped<EventTagRepository>();
@@ -53,13 +53,13 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<SeasonRepository>();
             services.AddScoped<SeasonTagRepository>();
             services.AddScoped<TicketRepository>();
-            services.AddScoped<ITicketRepository>(sp => sp.GetRequiredService<TicketRepository>());
+            services.AddScoped<ITicketRepository, TicketRepository>();
             services.AddScoped<TicketScanLogRepository>();
             services.AddScoped<TicketTransferRepository>();
             services.AddScoped<BaseRowRepository>();
             services.AddScoped<BaseSeatRepository>();
             services.AddScoped<BaseSectionRepository>();
-            services.AddScoped<IBaseSectionRepository>(sp => sp.GetRequiredService<BaseSectionRepository>());
+            services.AddScoped<IBaseSectionRepository, BaseSectionRepository>();
             services.AddScoped<BaseZoneRepository>();
             services.AddScoped<GateAccessRuleRepository>();
             services.AddScoped<GateRepository>();

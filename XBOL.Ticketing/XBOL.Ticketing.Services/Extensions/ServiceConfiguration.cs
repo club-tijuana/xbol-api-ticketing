@@ -72,8 +72,9 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagService>();
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
-            services.AddScoped<ISeatsIoEventLifecycleClient>(sp => sp.GetRequiredService<SeatsIoService>());
-            services.AddScoped<ISeatsIoSeasonLifecycleClient>(sp => sp.GetRequiredService<SeatsIoService>());
+
+            services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
+            services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();
 
             services.AddValidatorsFromAssembly(typeof(ServiceConfiguration).Assembly);
 
