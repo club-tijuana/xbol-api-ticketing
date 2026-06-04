@@ -11,6 +11,9 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public required ClientInfoRequest ClientContact { get; set; }
         public required PaymentInfoRequest PaymentInfoRequest { get; set; }
         public required ChangeInfoRequest ChangeInfoRequest { get; set; }
+        public PaymentLinkRequest? PaymentLinkRequest { get; set; }
         public string? Localizer { get; set; }
+        public Guid? UserProfileId { get; set; }
+        public bool IsPaymentLink { get; set; }
     }
 }
