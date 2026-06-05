@@ -73,6 +73,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<TagTypeService>();
             services.AddScoped<SeatsIoService>();
             services.AddScoped<PriceService>();
+            services.AddScoped<VenueMapService>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();

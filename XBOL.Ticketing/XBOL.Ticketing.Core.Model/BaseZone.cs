@@ -8,6 +8,12 @@ namespace XBOL.Ticketing.Core.Model
         public string Name { get; set; } = null!;
         public long? ExternalZoneKey { get; set; }
 
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
+        public Guid CreatedBy { get; set; }
+        public Guid UpdatedBy { get; set; }
+        public DateTimeOffset? DeletedAt { get; set; }
+
         public IList<BaseSection> BaseSections { get; set; } = [];
     }
 }

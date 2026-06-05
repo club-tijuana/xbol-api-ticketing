@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SeatsioDotNet;
+using SeatsioDotNet.ChartReports;
 using SeatsioDotNet.Charts;
 using SeatsioDotNet.EventReports;
 using SeatsioDotNet.Events;
@@ -283,6 +284,11 @@ namespace XBOL.Ticketing.Services
         public async Task<Dictionary<string, EventReportSummaryItem>> GetSummaryByAvailabilityReasonAsync(string externalKey)
         {
             return await _client.EventReports.SummaryByAvailabilityReasonAsync(externalKey);
+        }
+
+        public async Task<Dictionary<string, IEnumerable<ChartObjectInfo>>> GetChartReportByLabel(string chartKey)
+        {
+            return await _client.ChartReports.ByLabelAsync(chartKey);
         }
 
         private async Task<ChangeObjectStatusResult> BookSeatsAsync(string key, List<ObjectProperties> seats, string token)

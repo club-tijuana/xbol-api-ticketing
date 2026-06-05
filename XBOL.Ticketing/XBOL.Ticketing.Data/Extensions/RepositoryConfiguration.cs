@@ -70,6 +70,7 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<InventoryBatchRepository>();
             services.AddScoped<TagRepository>();
             services.AddScoped<TagTypeRepository>();
+            services.AddScoped<VenueMapRepository>();
 
             return services;
         }
