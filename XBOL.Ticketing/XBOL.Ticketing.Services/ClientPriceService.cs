@@ -1,4 +1,3 @@
-using JasperFx.Core.Filters;
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
@@ -130,7 +129,7 @@ namespace XBOL.Ticketing.Services
                         Price = matchedPriceItem?.FinalPrice
                     };
                 })
-                .Where(x => x.Price.HasValue) 
+                .Where(x => x.Price.HasValue)
                 .GroupBy(x => x.Price!.Value)
                 .Select(group => new SectionPriceResponse
                 {
@@ -148,7 +147,7 @@ namespace XBOL.Ticketing.Services
         {
             // We should only bring for now the base prices, since the current structure can't handle multiple price types
             var zonePrices = priceItems.Where(p => p.BaseZoneId != null && p.BaseSectionId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseZoneId!.Value);
-            var sectionPrices = priceItems.Where(p => p.BaseSectionId != null && p.BaseRowId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseSectionId!.Value);
+            //var sectionPrices = priceItems.Where(p => p.BaseSectionId != null && p.BaseRowId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseSectionId!.Value);
             var rowPrices = priceItems.Where(p => p.BaseRowId != null && p.BaseSeatId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseRowId!.Value);
             var seatPrices = priceItems.Where(p => p.BaseSeatId != null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseSeatId!.Value);
 
@@ -156,32 +155,27 @@ namespace XBOL.Ticketing.Services
             decimal? max = filters.MaximumPrice;
 
             var activeZoneIds = zonePrices.Keys.ToList();
-            var activeSectionIds = sectionPrices.Keys.ToList();
+            //var activeSectionIds = sectionPrices.Keys.ToList();
 
-            var sectionQuery = _dbContext.Set<BaseSection>()
-                                .Where(s => activeZoneIds.Contains(s.BaseZoneId)
-                                    || activeSectionIds.Contains(s.Id));
+            var zoneQuery = _dbContext.Set<BaseZone>()
+                                .Where(s => activeZoneIds.Contains(s.Id));
 
             if (filters.ZoneId.HasValue)
             {
-                sectionQuery = sectionQuery.Where(s => s.BaseZoneId == filters.ZoneId.Value);
+                zoneQuery = zoneQuery.Where(s => s.Id == filters.ZoneId.Value);
             }
-            if (filters.SectionId.HasValue)
-            {
-                sectionQuery = sectionQuery.Where(s => s.Id == filters.SectionId.Value);
-            }
+            //if (filters.SectionId.HasValue)
+            //{
+            //    zoneQuery = zoneQuery.Where(s => s.Id == filters.SectionId.Value);
+            //}
 
-            var dbSections = await sectionQuery.ToListAsync();
-            var sections = new List<SectionResponse>();
+            var dbZones = await zoneQuery.ToListAsync();
+            var zones = new List<ZoneResponse>();
 
-            foreach (var section in dbSections)
+            foreach (var zone in dbZones)
             {
                 PriceListItem? matchedPriceItem = null;
-                if (sectionPrices.TryGetValue(section.Id, out var sPli))
-                {
-                    matchedPriceItem = sPli;
-                }
-                else if (zonePrices.TryGetValue(section.BaseZoneId, out var zPli))
+                if (zonePrices.TryGetValue(zone.Id, out var zPli))
                 {
                     matchedPriceItem = zPli;
                 }
@@ -191,11 +185,11 @@ namespace XBOL.Ticketing.Services
                     decimal price = matchedPriceItem.FinalPrice;
                     if (price >= min && (max == null || price <= max.Value))
                     {
-                        sections.Add(new SectionResponse
+                        zones.Add(new ZoneResponse
                         {
-                            Id = section.Id,
-                            Name = section.Name,
-                            DisplayName = section.Name,
+                            Id = zone.Id,
+                            Name = zone.Name,
+                            DisplayName = zone.Name,
                             Price = price,
                             PriceListItemId = matchedPriceItem.Id
                         });
@@ -217,10 +211,10 @@ namespace XBOL.Ticketing.Services
             {
                 seatQuery = seatQuery.Where(s => s.BaseRow.BaseSection.BaseZoneId == filters.ZoneId.Value);
             }
-            if (filters.SectionId.HasValue)
-            {
-                seatQuery = seatQuery.Where(s => s.BaseRow.BaseSectionId == filters.SectionId.Value);
-            }
+            //if (filters.SectionId.HasValue)
+            //{
+            //    seatQuery = seatQuery.Where(s => s.BaseRow.BaseSectionId == filters.SectionId.Value);
+            //}
 
             var dbSeats = await seatQuery.ToListAsync();
             var seatOverrides = new List<SeatResponse>();
@@ -255,7 +249,7 @@ namespace XBOL.Ticketing.Services
 
             return new SeatAvailabilityResponse
             {
-                Sections = sections,
+                Zones = zones,
                 SeatOverrides = seatOverrides
             };
         }
