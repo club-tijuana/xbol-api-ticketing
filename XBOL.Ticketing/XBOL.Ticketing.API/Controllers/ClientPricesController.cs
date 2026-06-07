@@ -46,5 +46,20 @@ namespace XBOL.Ticketing.API.Controllers
 
             return Ok(result);
         }
+
+        /// <summary>
+        /// Gets the prices for the specified zones based on their sale type and reference ID.
+        /// </summary>
+        /// <param name="saleType"></param>
+        /// <param name="referenceId"></param>
+        [HttpGet("zone-prices")]
+        [ProducesResponseType(typeof(List<ZonePriceResponse>), StatusCodes.Status200OK)]
+        [EndpointName("GetZonePricesAsync")]
+        public async Task<ActionResult<List<ZonePriceResponse>>> GetZonePricesAsync([FromQuery] SaleType saleType, [FromQuery] long referenceId)
+        {
+            var result = await _clientPriceService.GetZonePricesAsync(saleType, referenceId);
+
+            return Ok(result);
+        }
     }
 }

@@ -143,6 +143,74 @@ namespace XBOL.Ticketing.Services
             return groupedSectionPrices;
         }
 
+        public async Task<List<ZonePriceResponse>> GetZonePricesAsync(SaleType saleType, long referenceId)
+        {
+            var priceReference = await _dbContext.PriceReferences
+                                            .AsNoTracking()
+                                            .Where(x => x.ReferenceType == saleType
+                                                && x.ReferenceId == referenceId
+                                                && x.IsActive)
+                                            .SingleOrDefaultAsync();
+
+            if (priceReference == null)
+            {
+                return new List<ZonePriceResponse>();
+            }
+
+            var priceItems = await _dbContext.PriceListItems
+                                    .Include(pli => pli.Price)
+                                        .ThenInclude(p => p.PriceType)
+                                    .AsNoTracking()
+                                    .Where(pli => pli.PriceList.PriceReferenceId == priceReference.Id
+                                        && pli.PriceList.Status == VersionStatus.Active
+                                        && (pli.BaseZoneId != null || pli.BaseSectionId != null)
+                                        && pli.BaseRowId == null
+                                        && pli.BaseSeatId == null)
+                                    .ToListAsync();
+
+            var zonePrices = priceItems.Where(p => p.BaseZoneId != null && p.BaseSectionId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseZoneId!.Value);
+
+            var activeZoneIds = zonePrices.Keys.ToList();
+
+            if (!activeZoneIds.Any())
+            {
+                return new List<ZonePriceResponse>();
+            }
+
+            var dbZones = await _dbContext.BaseZones
+                                    .AsNoTracking()
+                                    .Where(s => activeZoneIds.Contains(s.Id))
+                                    .ToListAsync();
+
+            var groupedZonesPrices = dbZones
+                .Select(zone =>
+                {
+                    PriceListItem? matchedPriceItem = null;
+                    if (zonePrices.TryGetValue(zone.Id, out var zPli))
+                    {
+                        matchedPriceItem = zPli;
+                    }
+
+                    return new
+                    {
+                        ZoneName = zone.Name,
+                        Price = matchedPriceItem?.FinalPrice
+                    };
+                })
+                .Where(x => x.Price.HasValue)
+                .GroupBy(x => x.Price!.Value)
+                .Select(group => new ZonePriceResponse
+                {
+                    Price = group.Key,
+                    Objects = group.Select(x => x.ZoneName).Distinct().OrderBy(name => name).ToList(),
+                    Currency = "MXN", // TODO: Add currency support for totals
+                })
+                .OrderByDescending(dto => dto.Price) // Optional: order highest price to lowest
+                .ToList();
+
+            return groupedZonesPrices;
+        }
+
         private async Task<SeatAvailabilityResponse> GenerateSeatAvailabilityAsync(List<PriceListItem> priceItems, ReservationFiltersRequest filters)
         {
             // We should only bring for now the base prices, since the current structure can't handle multiple price types
