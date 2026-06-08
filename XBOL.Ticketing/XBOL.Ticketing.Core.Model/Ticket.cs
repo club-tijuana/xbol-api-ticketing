@@ -18,8 +18,8 @@ namespace XBOL.Ticketing.Core.Model
         public long EventSeatId { get; set; }
         public EventSeat EventSeat { get; set; } = null!;
 
-        public long InventoryBatchId { get; set; }
-        public InventoryBatch InventoryBatch { get; set; } = null!;
+        public long? InventoryBatchId { get; set; }
+        public InventoryBatch? InventoryBatch { get; set; } = null!;
 
         public long? OriginalClientId { get; set; }
         public Client? OriginalClient { get; set; }

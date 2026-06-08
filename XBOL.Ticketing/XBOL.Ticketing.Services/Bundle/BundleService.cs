@@ -186,28 +186,11 @@ namespace XBOL.Ticketing.Services.Bundle
                 })
                 .ToList();
 
-            if (request.BundleType == BundleType.SeasonPass &&
-                request.BundlePricingType == BundlePricingType.Single)
-            {
-                var baseSections = GetBaseSectionsForVenueMap(request.VenueMapId, includeSeats: false);
-
-                bundle.BundleSections = baseSections.Select(section => new Core.Model.BundleSection
-                {
-                    BaseSectionId = section.Id,
-                    TotalSeats = 0,
-                    AvailableSeats = 0,
-                    DisplayName = string.Empty
-                }).ToList();
-            }
-
-            if (request.BundleType == BundleType.Basic &&
-                request.BundlePricingType == BundlePricingType.Composite)
-            {
-                var baseSections = GetBaseSectionsForVenueMap(request.VenueMapId, includeSeats: true);
-                bundle.BundleSections = baseSections
-                    .Select(CreateBasicBundleSection)
-                    .ToList();
-            }
+            var baseSections = GetBaseSectionsForVenueMap(request.VenueMapId, includeSeats: true);
+            bundle.BundleSections = baseSections
+                .Where(section => section.DeletedAt == null)
+                .Select(CreateBasicBundleSection)
+                .ToList();
 
             await Repository.InsertAsync(bundle);
             await Repository.CommitAsync();
@@ -229,8 +212,10 @@ namespace XBOL.Ticketing.Services.Bundle
         private static Core.Model.BundleSection CreateBasicBundleSection(Core.Model.BaseSection baseSection)
         {
             var bundleSeats = baseSection.BaseRows
+                .Where(row => row.DeletedAt == null)
                 .OrderBy(row => row.Id)
                 .SelectMany(row => row.BaseSeats
+                    .Where(seat => seat.DeletedAt == null)
                     .OrderBy(seat => seat.Id)
                     .Select(seat => new Core.Model.BundleSeat
                     {

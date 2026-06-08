@@ -311,7 +311,7 @@ namespace XBOL.Ticketing.Services.Booking
                     EventScheduleId = eventSeat.EventSection.EventScheduleId,
                     EventSectionId = eventSeat.EventSectionId,
                     EventSeatId = eventSeat.Id,
-                    InventoryBatchId = inventoryBatchIds[eventSeat.EventSection.EventScheduleId],
+                    InventoryBatchId = inventoryBatchIds.TryGetValue(eventSeat.EventSection.EventScheduleId, out long value) ? value : null,
                     OriginalClient = client,
                     CurrentClient = client,
                     OriginalOrder = order,
@@ -370,7 +370,7 @@ namespace XBOL.Ticketing.Services.Booking
             };
         }
 
-        private async Task<long> GetInventoryBatchIdAsync(
+        private async Task<long?> GetInventoryBatchIdAsync(
             long eventScheduleId,
             CancellationToken cancellationToken)
         {
@@ -381,12 +381,12 @@ namespace XBOL.Ticketing.Services.Booking
                 .OrderBy(b => b.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            if (inventoryBatch is null)
-            {
-                throw new InvalidOperationException("No active inventory batch exists for this event schedule.");
-            }
+            //if (inventoryBatch is null)
+            //{
+            //    throw new InvalidOperationException("No active inventory batch exists for this event schedule.");
+            //}
 
-            return inventoryBatch.Id;
+            return inventoryBatch?.Id;
         }
 
         private async Task<Dictionary<long, long>> LoadInventoryBatchIdsAsync(
@@ -404,12 +404,12 @@ namespace XBOL.Ticketing.Services.Booking
                     item => item.InventoryBatchId,
                     cancellationToken);
 
-            var missingScheduleId = eventScheduleIds.FirstOrDefault(id => !batches.ContainsKey(id));
-            if (missingScheduleId != 0)
-            {
-                throw new InvalidOperationException(
-                    $"No active inventory batch exists for event schedule {missingScheduleId}.");
-            }
+            //var missingScheduleId = eventScheduleIds.FirstOrDefault(id => !batches.ContainsKey(id));
+            //if (missingScheduleId != 0)
+            //{
+            //    throw new InvalidOperationException(
+            //        $"No active inventory batch exists for event schedule {missingScheduleId}.");
+            //}
 
             return batches;
         }
