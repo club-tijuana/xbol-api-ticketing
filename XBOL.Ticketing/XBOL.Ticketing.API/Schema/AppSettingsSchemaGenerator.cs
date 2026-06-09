@@ -280,5 +280,6 @@ public static class AppSettingsSchemaGenerator
     {
         [Description("Seats.io API configuration")]
         public SeatsIoOptions? SeatsIoApi { get; set; }
+
     }
 }

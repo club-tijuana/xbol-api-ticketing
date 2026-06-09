@@ -34,18 +34,18 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
+app.UseSwagger(c =>
+{
+    c.RouteTemplate = "swagger/{documentName}/ticketing-api.json";
+});
+
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/ticketing-api.json", "Ticketing API");
+});
+
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger(c =>
-    {
-        c.RouteTemplate = "swagger/{documentName}/ticketing-api.json";
-    });
-
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/ticketing-api.json", "Ticketing API");
-    });
-
     app.MapGet(
         "/",
         context =>
