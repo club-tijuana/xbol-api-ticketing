@@ -10,6 +10,7 @@ using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.Media;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 using XBOL.Ticketing.Services.Order;
+using XBOL.Ticketing.Services.RulesEngine;
 using XBOL.Ticketing.Services.Season;
 using XBOL.Ticketing.Services.Ticket;
 using XBOL.Ticketing.Services.Venue;
@@ -76,6 +77,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<PriceService>();
             services.AddScoped<VenueMapService>();
             services.AddScoped<SequenceTrackerService>();
+            services.AddScoped<RulesEngineService>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();
