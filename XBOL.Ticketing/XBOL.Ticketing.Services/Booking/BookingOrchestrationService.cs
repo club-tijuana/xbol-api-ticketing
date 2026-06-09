@@ -4,6 +4,7 @@ using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
+using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 using ModelBundle = XBOL.Ticketing.Core.Model.Bundle;
 using ModelBundlePass = XBOL.Ticketing.Core.Model.BundlePass;
 using ModelClient = XBOL.Ticketing.Core.Model.Client;
@@ -15,7 +16,8 @@ namespace XBOL.Ticketing.Services.Booking
 {
     public class BookingOrchestrationService(
         XBOLDbContext dbContext,
-        ISeatsIoBookingClient seatsIoBookingClient) : IBookingOrchestrationService
+        ISeatsIoBookingClient seatsIoBookingClient,
+        SequenceTrackerService sequenceTrackerService) : IBookingOrchestrationService
     {
         public async Task<BookingResultResponse> BookAsync(
             BookSeatsActionRequest request,
@@ -171,7 +173,7 @@ namespace XBOL.Ticketing.Services.Booking
             {
                 Client = client,
                 UserId = null,
-                Reference = ResolveReference(request, "ORD-E", request.EventScheduleId),
+                Reference = await ResolveReference(request, "ORD", request.EventScheduleId),
                 SubTotal = total,
                 TotalFees = 0,
                 TotalTaxes = 0,
@@ -260,7 +262,7 @@ namespace XBOL.Ticketing.Services.Booking
             {
                 Client = client,
                 UserId = null,
-                Reference = ResolveReference(request, "ORD-B", bundle.Id),
+                Reference = await ResolveReference(request, "ORD", bundle.Id),
                 SubTotal = total,
                 TotalFees = 0,
                 TotalTaxes = 0,
@@ -680,14 +682,14 @@ namespace XBOL.Ticketing.Services.Booking
             return client;
         }
 
-        private static string ResolveReference(BookSeatsActionRequest request, string prefix, long referenceId)
+        private async Task<string> ResolveReference(BookSeatsActionRequest request, string prefix, long referenceId)
         {
             if (!string.IsNullOrWhiteSpace(request.Localizer))
             {
                 return request.Localizer;
             }
 
-            return $"{prefix}-{referenceId}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}";
+            return await sequenceTrackerService.GenerateLocalizerAsync(prefix);
         }
 
         private static string? ResolveFullName(ClientInfoRequest contact, string? fallback = null)
