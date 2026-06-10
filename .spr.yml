@@ -1,0 +1,6 @@
+requireChecks: true
+requireApproval: true
+githubRemote: origin
+githubBranch: develop
+mergeMethod: rebase
+createDraftPRs: true

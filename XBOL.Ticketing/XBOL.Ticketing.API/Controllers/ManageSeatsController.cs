@@ -8,12 +8,15 @@ using XBOL.Ticketing.API.Models;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Services;
+using XBOL.Ticketing.Services.Booking;
 
 namespace XBOL.Ticketing.API.Controllers
 {
     [Route("api/manage-seats")]
     [ApiController]
-    public class ManageSeatsController(SeatsIoService seatsIoService) : ControllerBase
+    public class ManageSeatsController(
+        SeatsIoService seatsIoService,
+        IBookingOrchestrationService bookingOrchestrationService) : ControllerBase
     {
         /// <summary>
         /// Retrieves the current status, forSale flag, and extraData for the specified seats.
@@ -205,10 +208,10 @@ namespace XBOL.Ticketing.API.Controllers
         /// Books the specified seats, optionally consuming a hold token.
         /// </summary>
         /// <param name="request">The event key, seats with prices, hold token, and booking details.</param>
-        /// <returns>The keys of the successfully booked seats.</returns>
+        /// <returns>The created order and ticket identifiers plus the booked seat keys.</returns>
         [HttpPost("book")]
         [EndpointName("BookSeatsActionAsync")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<string>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(BookingResultResponse))]
         [ProducesResponseType(StatusCodes.Status400BadRequest, Type = typeof(SeatsIoProblemDetails))]
         [ProducesResponseType(StatusCodes.Status404NotFound, Type = typeof(SeatsIoProblemDetails))]
         [ProducesResponseType(StatusCodes.Status409Conflict, Type = typeof(SeatsIoProblemDetails))]
@@ -216,9 +219,8 @@ namespace XBOL.Ticketing.API.Controllers
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoProblemDetails))]
         public async Task<IActionResult> BookSeatsActionAsync([FromBody] BookSeatsActionRequest request)
         {
-            var result = await seatsIoService.BookSeatsWithDetailsAsync(
-                request.EventKey, request.Seats, request.HoldToken);
-            return Ok(result.Objects.Select(x => x.Key));
+            var result = await bookingOrchestrationService.BookAsync(request, GetUserId());
+            return Ok(result);
         }
 
         /// <summary>
@@ -317,6 +319,14 @@ namespace XBOL.Ticketing.API.Controllers
             }
 
             return StatusCode(StatusCodes.Status502BadGateway, response);
+        }
+
+        private Guid GetUserId()
+        {
+            var user = HttpContext?.User;
+            var claim = user?.FindFirst("sub")?.Value
+                ?? user?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            return claim is not null ? Guid.Parse(claim) : Guid.Empty;
         }
     }
 }

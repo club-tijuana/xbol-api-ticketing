@@ -1,5 +1,3 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
-
 namespace XBOL.Ticketing.Core.Model
 {
     public class VenueMap : BaseModel
@@ -9,7 +7,6 @@ namespace XBOL.Ticketing.Core.Model
 
         public string Name { get; set; } = null!;
         public string ExternalMapKey { get; set; } = null!;
-        public MapType MapType { get; set; }
         public int? Capacity { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }

@@ -17,6 +17,6 @@ namespace XBOL.Ticketing.Core.Model
         public Guid UpdatedBy { get; set; }
 
         public IList<Event> Events { get; set; } = [];
-        public IList<OrganizerMember> OrganizerMembers { get; set; } = [];
+        public IList<User> OrganizerMembers { get; set; } = [];
     }
 }

@@ -4,6 +4,6 @@ namespace XBOL.Ticketing.Core.Commons.Enums
     {
         Event,
         SeasonPass,
-        EventGroup
+        Bundle
     }
 }

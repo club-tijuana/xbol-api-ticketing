@@ -7,8 +7,8 @@ namespace XBOL.Ticketing.Core.Model
         public long? ClientId { get; set; }
         public Client? Client { get; set; }
 
-        public long? OrganizerMemberId { get; set; }
-        public OrganizerMember? OrganizerMember { get; set; }
+        public long? OrganizerId { get; set; }
+        public Organizer? Organizer { get; set; }
 
         public long? PhoneRegionCodeId { get; set; }
         public PhoneRegionCode? PhoneRegionCode { get; set; }

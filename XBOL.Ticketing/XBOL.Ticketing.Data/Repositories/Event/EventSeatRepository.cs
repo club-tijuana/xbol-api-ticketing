@@ -10,7 +10,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
         public async Task UpdatePricesFromList(List<(long Id, decimal PriceOverride)> eventSeats)
         {
             ArgumentNullException.ThrowIfNull(eventSeats);
-            var rows = eventSeats.ConvertAll(x => new EventSeat { Id = x.Id, PriceOverride = x.PriceOverride });
+            var rows = eventSeats.ConvertAll(x => new EventSeat { Id = x.Id });
 
             if (rows.Count == 0)
             {
@@ -22,7 +22,7 @@ namespace XBOL.Ticketing.Data.Repositories.Event
             var config = new BulkConfig
             {
                 UpdateByProperties = [nameof(EventSeat.Id)],
-                PropertiesToInclude = [nameof(EventSeat.PriceOverride)],
+                //PropertiesToInclude = [nameof(EventSeat.PriceOverride)],
 
                 BatchSize = 5000,
                 SetOutputIdentity = false,

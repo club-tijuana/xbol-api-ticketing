@@ -1,0 +1,135 @@
+using FluentAssertions;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Model;
+using XBOL.Ticketing.Data;
+using XBOL.Ticketing.Data.Repositories.Bundle;
+
+namespace XBOL.Ticketing.Tests.Data;
+
+public sealed class BundleRepositoryTests
+{
+    [Fact]
+    public async Task GetByIdWithVenueMapAndSchedulesAsync_DoesNotMaterializeVenue()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        long bundleId;
+
+        await using (var context = new XBOLDbContext(options))
+        {
+            await context.Database.EnsureCreatedAsync();
+            var now = DateTimeOffset.UtcNow;
+            var venue = new Venue
+            {
+                Id = 1,
+                Name = "Venue",
+                AddressLine = "Street",
+                City = "Tijuana",
+                State = "BC",
+                Country = "Mexico",
+                ShortDescription = "Venue",
+                LongDescription = "Venue",
+                LogoImageUrl = "",
+                BannerImageUrl = "",
+                LandingUrl = "",
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            var venueMap = new VenueMap
+            {
+                Id = 2,
+                Venue = venue,
+                Name = "Map",
+                ExternalMapKey = "chart-key",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            var baseZone = new BaseZone
+            {
+                Id = 3,
+                VenueMap = venueMap,
+                Name = "Zone"
+            };
+            var baseSection = new BaseSection
+            {
+                Id = 4,
+                BaseZone = baseZone,
+                Name = "B",
+                SectionType = SectionType.General
+            };
+            var eventItem = new Event
+            {
+                Id = 5,
+                VenueMap = venueMap,
+                Name = "Event",
+                Status = EventStatus.Published,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            var schedule = new EventSchedule
+            {
+                Id = 6,
+                Event = eventItem,
+                StartDateTime = now.AddDays(3),
+                EndDateTime = now.AddDays(3).AddHours(2),
+                OnSaleDate = now,
+                OffSaleDate = now.AddDays(2),
+                Status = ScheduleStatus.OnSale,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Sections =
+                [
+                    new EventSection
+                    {
+                        BaseSection = baseSection,
+                        DisplayName = "B",
+                        TotalSeats = 1,
+                        AvailableSeats = 1
+                    }
+                ]
+            };
+            var bundle = new Bundle
+            {
+                Id = 7,
+                VenueMap = venueMap,
+                Name = "Basic Bundle",
+                Status = EventStatus.Draft,
+                BundleType = BundleType.Basic,
+                BundlePricingType = BundlePricingType.Composite,
+                CreatedAt = now,
+                UpdatedAt = now,
+                BundleEventSchedules =
+                [
+                    new BundleEventSchedule
+                    {
+                        EventSchedule = schedule,
+                        SortOrder = 0
+                    }
+                ]
+            };
+
+            context.Bundles.Add(bundle);
+            await context.SaveChangesAsync();
+            bundleId = bundle.Id;
+        }
+
+        await using var readContext = new XBOLDbContext(options);
+        var repository = new BundleRepository(readContext);
+
+        var result = await repository.GetByIdWithVenueMapAndSchedulesAsync(bundleId);
+
+        result.Should().NotBeNull();
+        result!.VenueMap.Should().NotBeNull();
+        result.VenueMap!.ExternalMapKey.Should().Be("chart-key");
+        result.VenueMap.Venue.Should().BeNull();
+        result.BundleEventSchedules.Should().ContainSingle();
+        result.BundleEventSchedules.Single().EventSchedule.Sections.Should().ContainSingle();
+    }
+}
