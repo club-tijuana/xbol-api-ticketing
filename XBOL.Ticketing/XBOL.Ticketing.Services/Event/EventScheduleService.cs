@@ -77,6 +77,8 @@ namespace XBOL.Ticketing.Services.Event
                         ExternalSeatObjectKey = $"{s.BaseRow.BaseSection.Name}-{s.BaseRow.RowLabel}-{s.SeatNumber}", // Generate SeatsIo object key
                     })
                     .ToListAsync();
+                section.TotalSeats = section.EventSeats.Count;
+                section.AvailableSeats = section.EventSeats.Count(s => s.ForSale);
             }
 
             newSchedule.Sections = sections;

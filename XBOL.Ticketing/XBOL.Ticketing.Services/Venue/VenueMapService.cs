@@ -33,7 +33,7 @@ namespace XBOL.Ticketing.Services.Venue
             try
             {
                 var dbZones = await dbContext.BaseZones.IgnoreQueryFilters().Where(c => c.VenueMapId == venueMapId).ToListAsync();
-                var dbSections = await dbContext.BaseSections.IgnoreQueryFilters().Include(s => s.BaseZone).Where(s => s.BaseZone.Id == venueMapId).ToListAsync();
+                var dbSections = await dbContext.BaseSections.IgnoreQueryFilters().Include(s => s.BaseZone).Where(s => s.BaseZone.VenueMapId == venueMapId).ToListAsync();
                 var dbRows = await dbContext.BaseRows.IgnoreQueryFilters().Include(r => r.BaseSection).ThenInclude(s => s.BaseZone).Where(r => r.BaseSection.BaseZone.VenueMapId == venueMapId).ToListAsync();
                 var dbSeats = await dbContext.BaseSeats.IgnoreQueryFilters().Include(s => s.BaseRow).ThenInclude(r => r.BaseSection).ThenInclude(s => s.BaseZone).Where(s => s.BaseRow.BaseSection.BaseZone.VenueMapId == venueMapId).ToListAsync();
 
@@ -203,6 +203,28 @@ namespace XBOL.Ticketing.Services.Venue
                     sec.DeletedAt = DateTimeOffset.UtcNow;
                     sec.UpdatedAt = DateTimeOffset.UtcNow;
                     sec.UpdatedBy = userId;
+                }
+
+                // Soft delete any duplicate sections that may have been created due to the upsert logic (same section name under the same category)
+                var groupedSections = dbSections
+                    .Where(s => !s.DeletedAt.HasValue)
+                    .GroupBy(s => new
+                    {
+                        CategoryKey = s.BaseZone.ExternalZoneKey.GetValueOrDefault().ToString(),
+                        SectionName = s.Name
+                    })
+                    .Where(g => g.Count() > 1);
+
+                foreach (var group in groupedSections)
+                {
+                    var duplicatesToSoftDelete = group.Skip(1);
+
+                    foreach (var sec in duplicatesToSoftDelete)
+                    {
+                        sec.DeletedAt = DateTimeOffset.UtcNow;
+                        sec.UpdatedAt = DateTimeOffset.UtcNow;
+                        sec.UpdatedBy = userId;
+                    }
                 }
 
                 // Clean Categories
