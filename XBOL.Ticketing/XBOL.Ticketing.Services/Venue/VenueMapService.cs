@@ -138,17 +138,6 @@ namespace XBOL.Ticketing.Services.Venue
                 await dbContext.SaveChangesAsync();
                 dbRows = await dbContext.BaseRows.IgnoreQueryFilters().Include(r => r.BaseSection).ThenInclude(s => s.BaseZone).Where(r => r.BaseSection.BaseZone.VenueMapId == venueMapId).ToListAsync();
 
-                // Seats upsert
-                var seatsIoIds = seatsIoList.Select(s => s.IDs.Own).ToHashSet();
-
-                // Soft-delete missing seats
-                foreach (var seat in dbSeats.Where(s => !seatsIoIds.Contains(s.SeatNumber) && !s.DeletedAt.HasValue))
-                {
-                    seat.DeletedAt = DateTimeOffset.UtcNow;
-                    seat.UpdatedAt = DateTimeOffset.UtcNow;
-                    seat.UpdatedBy = userId;
-                }
-
                 // Insert or restore seats
                 foreach (var item in seatsIoList)
                 {
@@ -157,7 +146,7 @@ namespace XBOL.Ticketing.Services.Venue
                         r.BaseSection.Name == item.IDs.Section &&
                         r.BaseSection.BaseZone.ExternalZoneKey == long.Parse(item.CategoryKey));
 
-                    var existingSeat = dbSeats.FirstOrDefault(s => s.SeatNumber == item.IDs.Own);
+                    var existingSeat = dbSeats.FirstOrDefault(s => s.SeatNumber == item.IDs.Own && s.BaseRowId == matchedRow.Id);
 
                     if (existingSeat == null)
                     {
@@ -188,6 +177,15 @@ namespace XBOL.Ticketing.Services.Venue
                 var activeCategories = seatsIoCategories.Select(c => c.Key).ToHashSet();
                 var activeSections = seatsIoSections.Select(s => new { s.CategoryKey, s.SectionName }).ToHashSet();
                 var activeRows = seatsIoRows.Select(r => new { r.CategoryKey, r.SectionName, r.RowName }).ToHashSet();
+                var activeSeats = seatsIoList.Select(s => new { s.CategoryKey, s.IDs.Section, s.IDs.Parent, s.IDs.Own });
+
+                // Clean Seats
+                foreach (var seat in dbSeats.Where(s => !s.DeletedAt.HasValue && !activeSeats.Contains(new { CategoryKey = s.BaseRow.BaseSection.BaseZone.ExternalZoneKey.GetValueOrDefault().ToString(), Section = s.BaseRow.BaseSection.Name, Parent = s.BaseRow.RowLabel, Own = s.SeatNumber })))
+                {
+                    seat.DeletedAt = DateTimeOffset.UtcNow;
+                    seat.UpdatedAt = DateTimeOffset.UtcNow;
+                    seat.UpdatedBy = userId;
+                }
 
                 // Clean Rows
                 foreach (var row in dbRows.Where(r => !r.DeletedAt.HasValue && !activeRows.Contains(new { CategoryKey = r.BaseSection.BaseZone.ExternalZoneKey.GetValueOrDefault().ToString(), SectionName = r.BaseSection.Name, RowName = r.RowLabel })))
