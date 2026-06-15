@@ -22,6 +22,8 @@ namespace XBOL.Ticketing.Core.Model
         public long? PreviousBundleId { get; set; }
         public Bundle? PreviousBundle { get; set; }
 
+        public int? HoldExpirationInMinutes { get; set; }
+
         public IList<BundleEventSchedule> BundleEventSchedules { get; set; } = [];
         public IList<BundleSection> BundleSections { get; set; } = [];
         public IList<BundleTag> BundleTags { get; set; } = [];

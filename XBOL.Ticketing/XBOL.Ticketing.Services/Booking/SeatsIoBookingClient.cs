@@ -18,6 +18,20 @@ namespace XBOL.Ticketing.Services.Booking
             return result.Objects.Select(x => x.Key).ToList();
         }
 
+        public async Task<IReadOnlyList<string>> BookSeatsAsync(
+            string[] eventKeys,
+            List<BookingSeatRequest> seats,
+            string holdToken,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await seatsIoService.BookSeatsWithDetailsAsync(
+                eventKeys,
+                seats,
+                holdToken);
+
+            return result.Objects.Select(x => x.Key).ToList();
+        }
+
         public async Task ReleaseBookedSeatsAsync(
             string eventKey,
             IReadOnlyCollection<string> seats,

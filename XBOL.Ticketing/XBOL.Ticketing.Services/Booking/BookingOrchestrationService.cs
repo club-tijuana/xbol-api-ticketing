@@ -80,7 +80,8 @@ namespace XBOL.Ticketing.Services.Booking
             var bundle = await LoadBundleAsync(request.BundleId.Value, cancellationToken);
             var schedules = ResolveBundleSchedules(bundle, request);
             var now = DateTimeOffset.UtcNow;
-            ValidateBundleBookingWindow(bundle, now);
+            // TODO: Refactor this validation
+            //ValidateBundleBookingWindow(bundle, now);
             var bundleSeats = ResolveRequestedBundleSeats(bundle, request.Seats.Select(s => s.SeatKey));
             var requestedSeatKeys = bundleSeats.Keys.ToHashSet(StringComparer.Ordinal);
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
@@ -121,12 +122,22 @@ namespace XBOL.Ticketing.Services.Booking
                                 $"Bundle schedule {schedule.Id} has no Seats.io event key.");
                         }
 
-                        var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
-                            schedule.ExternalEventKey,
-                            request.Seats,
-                            request.HoldToken,
-                            cancellationToken);
-                        remoteBookings.Add(new RemoteBooking(schedule.ExternalEventKey, bookedSeatKeys));
+                    }
+
+                    string[] eventKeys = schedules
+                        .Where(s => !string.IsNullOrWhiteSpace(s.ExternalEventKey))
+                        .Select(s => s.ExternalEventKey)
+                        .ToArray();
+
+                    var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
+                        eventKeys,
+                        request.Seats,
+                        request.HoldToken,
+                        cancellationToken);
+
+                    foreach (var eventKey in eventKeys)
+                    {
+                        remoteBookings.Add(new RemoteBooking(eventKey, bookedSeatKeys));
                     }
                 }
 

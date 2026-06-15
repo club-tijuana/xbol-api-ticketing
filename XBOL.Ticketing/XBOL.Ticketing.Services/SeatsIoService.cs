@@ -110,6 +110,37 @@ namespace XBOL.Ticketing.Services
             return response;
         }
 
+        public async Task<ChangeObjectStatusResult> BookSeatsWithDetailsAsync(string[] eventKeys, List<BookingSeatRequest> seats, string holdToken)
+        {
+            _logger.LogInformation(
+                "Booking {SeatCount} seat(s) for {EventKey} (hold token supplied: {HasHoldToken}).",
+                seats.Count, string.Join(", ", eventKeys), !string.IsNullOrWhiteSpace(holdToken));
+
+            var seatsToBook = seats
+                                .Select(s => new ObjectProperties(
+                                    s.SeatKey,
+                                    new Dictionary<string, object> { { "salesPoint", "Admin" } }))
+                                .ToList();
+
+            ChangeObjectStatusResult response = string.IsNullOrWhiteSpace(holdToken)
+                                                ? await _client.Events.BookAsync(eventKeys, seatsToBook)
+                                                : await _client.Events.BookAsync(eventKeys, seatsToBook, holdToken);
+
+            if (!string.IsNullOrWhiteSpace(holdToken))
+            {
+                try
+                {
+                    await _client.HoldTokens.ExpiresInMinutesAsync(holdToken, 0);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Booking succeeded for {EventKey} but releasing the hold token failed.", string.Join(", ", eventKeys));
+                }
+            }
+
+            return response;
+        }
+
         public async Task<HoldToken> CreateHoldTokenAsync()
         {
             return _options.HoldExpirationInMinutes.HasValue
@@ -128,9 +159,21 @@ namespace XBOL.Ticketing.Services
                 : await _client.HoldTokens.CreateAsync();
         }
 
+        public async Task<HoldToken> CreateHoldTokenAsync(int? holdExpirationInMinutes = null)
+        {
+            return holdExpirationInMinutes.HasValue
+                ? await _client.HoldTokens.CreateAsync(holdExpirationInMinutes.Value)
+                : await _client.HoldTokens.CreateAsync();
+        }
+
         public async Task<ChangeObjectStatusResult> HoldSeatsAsync(string eventKey, string[] seats, string holdToken)
         {
             return await _client.Events.HoldAsync(eventKey, seats, holdToken);
+        }
+
+        public async Task<ChangeObjectStatusResult> HoldSeatsAsync(string[] eventKeys, string[] seats, string holdToken)
+        {
+            return await _client.Events.HoldAsync(eventKeys, seats, holdToken);
         }
 
         public async Task<HoldToken> GetHoldTokenAsync(string holdToken)
@@ -183,6 +226,17 @@ namespace XBOL.Ticketing.Services
             string[]? channelKeys = null)
         {
             return await _client.Events.ReleaseAsync(eventKey, seats, holdToken: holdToken, keepExtraData: keepExtraData, ignoreChannels: ignoreChannels, channelKeys: channelKeys);
+        }
+
+        public async Task<ChangeObjectStatusResult> ReleaseSeatsAsync(
+            string[] eventKeys,
+            string[] seats,
+            string? holdToken = null,
+            bool? keepExtraData = null,
+            bool? ignoreChannels = null,
+            string[]? channelKeys = null)
+        {
+            return await _client.Events.ReleaseAsync(eventKeys, seats, holdToken: holdToken, keepExtraData: keepExtraData, ignoreChannels: ignoreChannels, channelKeys: channelKeys);
         }
 
         public async Task<Chart?> RetrieveMapChartAsync(string chartKey)

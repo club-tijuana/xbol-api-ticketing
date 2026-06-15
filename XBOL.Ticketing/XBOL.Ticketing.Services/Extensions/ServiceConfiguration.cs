@@ -78,6 +78,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<VenueMapService>();
             services.AddScoped<SequenceTrackerService>();
             services.AddScoped<RulesEngineService>();
+            services.AddScoped<BookingHoldService>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();

@@ -10,6 +10,12 @@ namespace XBOL.Ticketing.Services.Booking
             string holdToken,
             CancellationToken cancellationToken = default);
 
+        Task<IReadOnlyList<string>> BookSeatsAsync(
+            string[] eventKeys,
+            List<BookingSeatRequest> seats,
+            string holdToken,
+            CancellationToken cancellationToken = default);
+
         Task ReleaseBookedSeatsAsync(
             string eventKey,
             IReadOnlyCollection<string> seats,

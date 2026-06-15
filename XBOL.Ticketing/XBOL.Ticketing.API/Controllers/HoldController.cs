@@ -1,18 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using SeatsioDotNet.HoldTokens;
-using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
-using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Services;
+using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Event;
-using XBOL.Ticketing.Services.Season;
 
 namespace XBOL.Ticketing.API.Controllers
 {
     [Obsolete("Use ManageSeatsController hold endpoints instead.")]
     [Route("api/hold-seats")]
     [ApiController]
-    public class HoldController(SeatsIoService seatsIoService, EventService eventService, SeasonService seasonService, IBundleRepository bundleRepository) : ControllerBase
+    public class HoldController(SeatsIoService seatsIoService, EventService eventService, BookingHoldService bookingHoldService) : ControllerBase
     {
         /// <summary>
         /// Asynchronously holds the specified seats for an event and returns a token representing the hold.
@@ -30,36 +28,7 @@ namespace XBOL.Ticketing.API.Controllers
         {
             // TODO: Handle exceptions, not found, and errors
 
-            string? eventKey;
-            switch (request.SaleType)
-            {
-                case SaleType.SeasonPass:
-                    {
-                        var season = await seasonService.GetByIdAsync(request.EventScheduleId);
-                        eventKey = season?.ExternalSeasonKey ?? string.Empty;
-                        break;
-                    }
-
-                case SaleType.Bundle:
-                    {
-                        var bundle = await bundleRepository.GetByIdAsync(request.EventScheduleId);
-                        eventKey = bundle?.ExternalKey ?? string.Empty;
-                        break;
-                    }
-
-                case SaleType.Event:
-                    {
-                        eventKey = await eventService.GetEventKeyAsync(request.EventScheduleId) ?? string.Empty;
-                        break;
-                    }
-                default:
-                    eventKey = string.Empty;
-                    break;
-            }
-
-            var token = await seatsIoService.CreateHoldTokenAsync(eventKey);
-
-            await seatsIoService.HoldSeatsAsync(eventKey, request.Seats.ToArray(), token.Token);
+            var token = await bookingHoldService.ProcessSeatHoldAsync(request);
 
             return Ok(token);
         }
