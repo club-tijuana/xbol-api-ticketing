@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
+using XBOL.Ticketing.API.Options;
 using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.API.Schema;
@@ -281,5 +282,7 @@ public static class AppSettingsSchemaGenerator
         [Description("Seats.io API configuration")]
         public SeatsIoOptions? SeatsIoApi { get; set; }
 
+        [Description("Cross-origin policy registered in the HTTP pipeline")]
+        public CorsOptions? Cors { get; set; }
     }
 }

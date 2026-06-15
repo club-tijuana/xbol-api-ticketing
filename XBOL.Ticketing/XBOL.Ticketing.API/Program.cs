@@ -12,10 +12,12 @@ if (args.Contains("--generate-schema"))
 }
 
 var builder = WebApplication.CreateBuilder(args);
+var corsOptions = builder.Configuration.GetCorsOptions();
 
 // Infrastructure
 builder.Services.ConfigureOptions(builder.Configuration);
 builder.Services.ConfigureDatabase(builder.Configuration);
+builder.Services.ConfigureCorsPolicy(corsOptions);
 
 // Security
 builder.Services.ConfigureIdentity();
@@ -33,6 +35,7 @@ builder.Services.ConfigureSwagger();
 var app = builder.Build();
 
 app.UseExceptionHandler();
+app.UseConfiguredCors(corsOptions);
 
 app.UseSwagger(c =>
 {
