@@ -47,6 +47,7 @@ namespace XBOL.Ticketing.Core.Mappers
                 BundlePricingType = entity.BundlePricingType,
                 Code = entity.Code,
                 ExternalKey = entity.ExternalKey,
+                IsBookable = BundleBookability.IsBookable(entity),
                 StartDate = entity.StartDate,
                 EndDate = entity.EndDate,
                 PublishedDate = entity.PublishedDate,

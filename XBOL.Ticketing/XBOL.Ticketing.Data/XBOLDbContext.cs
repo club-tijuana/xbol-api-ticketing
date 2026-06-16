@@ -49,6 +49,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<Season> Seasons => Set<Season>();
         public DbSet<SeasonPass> SeasonPasses => Set<SeasonPass>();
         public DbSet<SeasonPassEventTicket> SeasonPassEventTickets => Set<SeasonPassEventTicket>();
+        public DbSet<SequenceTracker> SequenceTrackers => Set<SequenceTracker>();
         public DbSet<SeasonTag> SeasonTags => Set<SeasonTag>();
         public DbSet<SeatHold> SeatHolds => Set<SeatHold>();
         public DbSet<Tag> Tags => Set<Tag>();

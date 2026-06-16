@@ -270,6 +270,45 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetItemsAsync_SetsSeasonPassBookabilityFromLinkedSchedulesAndForSaleSeats()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var bookable = await database.Context.Bundles.SingleAsync(bundle => bundle.Id == 30);
+        bookable.ExternalKey = "season-30";
+        await database.AddForSaleBundleSeatAsync(30, 3000, now);
+
+        database.Context.BaseSections.Add(TestDatabase.BaseSection(90, 1));
+        var source = TestDatabase.Bundle(
+            90,
+            "Source Season",
+            1,
+            BundleType.SeasonPass,
+            EventStatus.Published,
+            now,
+            1,
+            1);
+        source.ExternalKey = "source-90";
+        database.Context.Bundles.Add(source);
+        await database.Context.SaveChangesAsync();
+        await database.AddForSaleBundleSeatAsync(90, 9000, now);
+
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Bundle,
+            BundleType = BundleType.SeasonPass,
+            Status = EventStatus.Published,
+            Page = 1,
+            PageSize = 20
+        });
+
+        result.Items.Single(item => item.Id == 30).IsBookable.Should().BeTrue();
+        result.Items.Single(item => item.Id == 90).IsBookable.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task GetBundleScheduleItemsAsync_FiltersByVenueAndDateRangeAndPaginates()
     {
         await using var database = await TestDatabase.CreateAsync();
@@ -431,6 +470,36 @@ public class EventCatalogServiceTests
             await _connection.DisposeAsync();
         }
 
+        public async Task AddForSaleBundleSeatAsync(long bundleId, long baseSeatId, DateTimeOffset now)
+        {
+            var bundleSection = await Context.BundleSections.SingleAsync(section => section.BundleId == bundleId);
+            var baseSection = await Context.BaseSections.SingleAsync(section => section.Id == bundleSection.BaseSectionId);
+            var baseRow = new BaseRow
+            {
+                BaseSection = baseSection,
+                RowLabel = $"R{baseSeatId}",
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            Context.BundleSeats.Add(new BundleSeat
+            {
+                BundleSection = bundleSection,
+                BaseSeat = new BaseSeat
+                {
+                    Id = baseSeatId,
+                    BaseRow = baseRow,
+                    SeatNumber = "1",
+                    SeatType = SeatType.Standard,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                ExternalSeatObjectKey = $"A-{baseSeatId}",
+                ForSale = true
+            });
+            await Context.SaveChangesAsync();
+        }
+
         private static void Seed(XBOLDbContext context)
         {
             var now = new DateTimeOffset(2026, 5, 26, 12, 0, 0, TimeSpan.Zero);
@@ -522,7 +591,7 @@ public class EventCatalogServiceTests
             Name = $"Zone {id}"
         };
 
-        private static BaseSection BaseSection(long id, long baseZoneId) => new()
+        public static BaseSection BaseSection(long id, long baseZoneId) => new()
         {
             Id = id,
             BaseZoneId = baseZoneId,
@@ -568,7 +637,7 @@ public class EventCatalogServiceTests
             ]
         };
 
-        private static Bundle Bundle(
+        public static Bundle Bundle(
             long id,
             string name,
             long venueMapId,

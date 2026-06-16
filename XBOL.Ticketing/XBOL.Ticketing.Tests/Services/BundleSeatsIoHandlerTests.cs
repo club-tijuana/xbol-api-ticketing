@@ -55,21 +55,19 @@ public class BundleSeatsIoHandlerTests
     }
 
     [Fact]
-    public async Task CreateSeatsIoSeasonHandler_EmptySeason_CreatesSeasonWithNoEvents()
+    public async Task CreateSeatsIoSeasonHandler_WithoutLinkedSchedules_RejectsPublish()
     {
         var bundle = SeasonPassBundle(20, []);
         _bundleRepository.GetByIdWithVenueMapAndSchedulesAsync(20).Returns(bundle);
 
         var sut = Handler();
 
-        await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
+        var act = () => sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
 
-        await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
-            "chart-main",
-            "season-20",
-            Arg.Is<string[]>(eventKeys => eventKeys.Length == 0));
-        bundle.ExternalKey.Should().Be("season-20");
-        await _bundleRepository.Received(1).UpdateAsync(bundle);
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*has no linked event schedules*");
+        await _seatsIo.DidNotReceiveWithAnyArgs().CreateSeatsIoSeasonAsync(default!, default!, default!);
+        await _bundleRepository.DidNotReceive().UpdateAsync(bundle);
     }
 
     [Fact]
@@ -94,17 +92,23 @@ public class BundleSeatsIoHandlerTests
     }
 
     [Fact]
-    public async Task CreateSeatsIoSeasonHandler_ExistingExternalKey_DoesNotCreateRemoteSeason()
+    public async Task CreateSeatsIoSeasonHandler_ExistingExternalKey_CreatesRemoteSeasonWithExistingKey()
     {
         var bundle = SeasonPassBundle(20, [ScheduleLink(20, 10)]);
-        bundle.ExternalKey = "season-20";
+        bundle.ExternalKey = "xcl2027-abridged-renewal";
         _bundleRepository.GetByIdWithVenueMapAndSchedulesAsync(20).Returns(bundle);
 
         var sut = Handler();
 
         await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
 
-        await _seatsIo.DidNotReceiveWithAnyArgs().CreateSeatsIoSeasonAsync(default!, default!, default!);
+        await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
+            "chart-main",
+            "xcl2027-abridged-renewal",
+            Arg.Is<string[]>(eventKeys => eventKeys.SequenceEqual(new[] { "xcl2027-abridged-renewal-schedule-10" })));
+        bundle.ExternalKey.Should().Be("xcl2027-abridged-renewal");
+        bundle.BundleEventSchedules[0].EventSchedule.ExternalEventKey.Should()
+            .Be("xcl2027-abridged-renewal-schedule-10");
         bundle.Status.Should().Be(EventStatus.Published);
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }

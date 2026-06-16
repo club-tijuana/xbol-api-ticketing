@@ -11,6 +11,9 @@ public class BundleCreateRequestValidator : AbstractValidator<BundleCreateReques
         RuleFor(x => x.VenueMapId).GreaterThan(0);
         RuleFor(x => x.OrganizerId).GreaterThan(0);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+        RuleFor(x => x.CategoryIds)
+            .NotEmpty()
+            .WithMessage("At least one category must be selected.");
         RuleFor(x => x.BundleType)
             .IsInEnum()
             .Must(type => type is BundleType.Basic or BundleType.SeasonPass)
@@ -37,6 +40,14 @@ public class BundleCreateRequestValidator : AbstractValidator<BundleCreateReques
             .When(x => x.PreSaleDate.HasValue && x.PublishedDate.HasValue);
 
         RuleFor(x => x.OnSaleDate)
+            .NotNull()
+            .WithMessage("On sale date is required.");
+
+        RuleFor(x => x.OffSaleDate)
+            .NotNull()
+            .WithMessage("Off sale date is required.");
+
+        RuleFor(x => x.OnSaleDate)
             .GreaterThan(x => x.PreSaleDate)
             .When(x => x.OnSaleDate.HasValue && x.PreSaleDate.HasValue);
 
@@ -47,5 +58,15 @@ public class BundleCreateRequestValidator : AbstractValidator<BundleCreateReques
         RuleFor(x => x.RenewalEndDate)
             .GreaterThan(x => x.RenewalStartDate)
             .When(x => x.RenewalEndDate.HasValue && x.RenewalStartDate.HasValue);
+
+        RuleFor(x => x.RenewalStartDate)
+            .NotNull()
+            .When(x => x.PreviousBundleId.HasValue)
+            .WithMessage("Renewal start date is required for renewal bundles.");
+
+        RuleFor(x => x.RenewalEndDate)
+            .NotNull()
+            .When(x => x.PreviousBundleId.HasValue)
+            .WithMessage("Renewal end date is required for renewal bundles.");
     }
 }

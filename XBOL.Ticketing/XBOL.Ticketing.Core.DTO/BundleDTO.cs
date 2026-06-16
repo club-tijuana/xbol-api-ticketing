@@ -33,6 +33,7 @@ namespace XBOL.Ticketing.Core.DTO
         public BundlePricingType BundlePricingType { get; set; }
         public string? Code { get; set; }
         public string? ExternalKey { get; set; }
+        public bool IsBookable { get; set; }
 
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }

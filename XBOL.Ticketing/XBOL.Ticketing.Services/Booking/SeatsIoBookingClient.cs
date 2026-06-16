@@ -39,5 +39,20 @@ namespace XBOL.Ticketing.Services.Booking
         {
             await seatsIoService.ReleaseSeatsAsync(eventKey, seats.ToArray());
         }
+
+        public async Task<bool> EventOrSeasonExistsAsync(
+            string eventKey,
+            CancellationToken cancellationToken = default)
+        {
+            return await seatsIoService.EventOrSeasonExistsAsync(eventKey);
+        }
+
+        public async Task<bool> ValidateSeatsExistAsync(
+            string eventKey,
+            IReadOnlyCollection<string> seats,
+            CancellationToken cancellationToken = default)
+        {
+            return await seatsIoService.ValidateAllSeatsExistAsync(eventKey, seats.ToList());
+        }
     }
 }

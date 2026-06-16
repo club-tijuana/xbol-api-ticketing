@@ -20,6 +20,14 @@ namespace XBOL.Ticketing.Services.Booking
             string eventKey,
             IReadOnlyCollection<string> seats,
             CancellationToken cancellationToken = default);
+
+        Task<bool> EventOrSeasonExistsAsync(
+            string eventKey,
+            CancellationToken cancellationToken = default);
+
+        Task<bool> ValidateSeatsExistAsync(
+            string eventKey,
+            IReadOnlyCollection<string> seats,
+            CancellationToken cancellationToken = default);
     }
 }
-

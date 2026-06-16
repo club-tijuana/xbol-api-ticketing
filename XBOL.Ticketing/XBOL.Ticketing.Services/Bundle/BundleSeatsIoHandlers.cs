@@ -25,22 +25,22 @@ public class CreateSeatsIoSeasonHandler(
                 $"Bundle {bundle.Id} is {bundle.BundleType}; only SeasonPass bundles create Seats.io seasons.");
         }
 
-        if (!string.IsNullOrWhiteSpace(bundle.ExternalKey))
-        {
-            bundle.Status = EventStatus.Published;
-            bundle.PublishedDate ??= DateTimeOffset.UtcNow;
-            await bundleRepository.UpdateAsync(bundle);
-            return;
-        }
-
         var chartKey = ResolveChartKey(bundle);
-        var seasonKey = $"season-{bundle.Id}";
+        var seasonKey = string.IsNullOrWhiteSpace(bundle.ExternalKey)
+            ? $"season-{bundle.Id}"
+            : bundle.ExternalKey;
         var links = bundle.BundleEventSchedules
             .OrderBy(link => link.SortOrder ?? int.MaxValue)
             .ThenBy(link => link.EventScheduleId)
             .ToList();
+        if (links.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Bundle {bundle.Id} cannot be published because it has no linked event schedules.");
+        }
+
         var eventKeys = links
-            .Select(link => $"season-{bundle.Id}-schedule-{link.EventScheduleId}")
+            .Select(link => $"{seasonKey}-schedule-{link.EventScheduleId}")
             .ToArray();
 
         await seatsIo.CreateSeatsIoSeasonAsync(chartKey, seasonKey, eventKeys);
@@ -118,7 +118,7 @@ public class AddEventsToSeasonHandler(
         }
 
         var eventKeys = links
-            .Select(link => $"season-{bundle.Id}-schedule-{link.EventScheduleId}")
+            .Select(link => $"{seasonKey}-schedule-{link.EventScheduleId}")
             .ToArray();
 
         await seatsIo.CreateSeatsIoEventsInSeasonAsync(seasonKey, eventKeys);
@@ -205,7 +205,7 @@ public class DeleteSeatsIoSeasonHandler(
             }
         }
 
-        var ownedEventKeyPrefix = $"season-{bundle.Id}-schedule-";
+        var ownedEventKeyPrefix = $"{seasonKey}-schedule-";
         foreach (var link in bundle.BundleEventSchedules)
         {
             if (link.EventSchedule.ExternalEventKey?.StartsWith(

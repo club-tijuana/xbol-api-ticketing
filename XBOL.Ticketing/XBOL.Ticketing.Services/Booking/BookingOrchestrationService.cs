@@ -1,3 +1,4 @@
+using System.Data;
 using Microsoft.EntityFrameworkCore;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
@@ -80,8 +81,9 @@ namespace XBOL.Ticketing.Services.Booking
             var bundle = await LoadBundleAsync(request.BundleId.Value, cancellationToken);
             var schedules = ResolveBundleSchedules(bundle, request);
             var now = DateTimeOffset.UtcNow;
-            // TODO: Refactor this validation
-            //ValidateBundleBookingWindow(bundle, now);
+
+            ValidateBundleBookingWindow(bundle, now);
+            
             var bundleSeats = ResolveRequestedBundleSeats(bundle, request.Seats.Select(s => s.SeatKey));
             var requestedSeatKeys = bundleSeats.Keys.ToHashSet(StringComparer.Ordinal);
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
@@ -90,6 +92,7 @@ namespace XBOL.Ticketing.Services.Booking
                 bundle,
                 client,
                 requestedSeatKeys,
+                now,
                 cancellationToken);
             var scheduleIds = schedules.Select(s => s.Id).ToArray();
             var eventSeats = await LoadBundleEventSeatsAsync(scheduleIds, requestedSeatKeys, cancellationToken);
@@ -100,17 +103,18 @@ namespace XBOL.Ticketing.Services.Booking
             {
                 if (bundle.BundleType == BundleType.SeasonPass)
                 {
-                    if (string.IsNullOrWhiteSpace(bundle.ExternalKey))
-                    {
-                        throw new InvalidOperationException("SeasonPass bundle has no Seats.io season key.");
-                    }
+                    var seasonKey = await ValidateSeasonPassRemoteReadinessAsync(
+                        bundle,
+                        schedules,
+                        request,
+                        cancellationToken);
 
                     var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
-                        bundle.ExternalKey,
+                        seasonKey,
                         request.Seats,
                         request.HoldToken,
                         cancellationToken);
-                    remoteBookings.Add(new RemoteBooking(bundle.ExternalKey, bookedSeatKeys));
+                    remoteBookings.Add(new RemoteBooking(seasonKey, bookedSeatKeys));
                 }
                 else
                 {
@@ -167,6 +171,58 @@ namespace XBOL.Ticketing.Services.Booking
 
                 throw;
             }
+        }
+
+        private async Task<string> ValidateSeasonPassRemoteReadinessAsync(
+            ModelBundle bundle,
+            IReadOnlyCollection<EventSchedule> schedules,
+            BookSeatsActionRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(bundle.ExternalKey))
+            {
+                throw new InvalidOperationException("SeasonPass bundle has no Seats.io season key.");
+            }
+
+            if (!await seatsIoBookingClient.EventOrSeasonExistsAsync(
+                    bundle.ExternalKey,
+                    cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    $"Seats.io season {bundle.ExternalKey} does not exist for bundle {bundle.Id}.");
+            }
+
+            foreach (var schedule in schedules)
+            {
+                if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+                {
+                    throw new InvalidOperationException(
+                        $"Bundle schedule {schedule.Id} has no Seats.io event key.");
+                }
+
+                if (!await seatsIoBookingClient.EventOrSeasonExistsAsync(
+                        schedule.ExternalEventKey,
+                        cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"Seats.io season event {schedule.ExternalEventKey} does not exist for bundle {bundle.Id}.");
+                }
+            }
+
+            var requestedSeatKeys = request.Seats
+                .Select(seat => seat.SeatKey)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            if (!await seatsIoBookingClient.ValidateSeatsExistAsync(
+                    bundle.ExternalKey,
+                    requestedSeatKeys,
+                    cancellationToken))
+            {
+                throw new InvalidOperationException(
+                    $"Seats.io season {bundle.ExternalKey} does not contain one or more requested seats.");
+            }
+
+            return bundle.ExternalKey;
         }
 
         private async Task<BookingResultResponse> PersistEventBookingAsync(
@@ -266,7 +322,8 @@ namespace XBOL.Ticketing.Services.Booking
             IReadOnlyList<RemoteBooking> remoteBookings,
             CancellationToken cancellationToken)
         {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            await EnsureSourceOrderHasNotBeenRenewedAsync(request, bundle, cancellationToken);
             var now = DateTimeOffset.UtcNow;
             var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.SeatPrice);
             var order = new ModelOrder
@@ -494,14 +551,17 @@ namespace XBOL.Ticketing.Services.Booking
             return bundle;
         }
 
-        private static void ValidateBundleBookingWindow(ModelBundle bundle, DateTimeOffset now)
+        private static void ValidateBundleBookingWindow(
+            ModelBundle bundle,
+            BookSeatsActionRequest request,
+            DateTimeOffset now)
         {
-            if (bundle.OnSaleDate.HasValue && now < bundle.OnSaleDate.Value)
+            if (!bundle.OnSaleDate.HasValue || !bundle.OffSaleDate.HasValue)
             {
-                throw new InvalidOperationException("Bundle is not on sale.");
+                throw new InvalidOperationException("Bundle sale window is not configured.");
             }
 
-            if (bundle.OffSaleDate.HasValue && now > bundle.OffSaleDate.Value)
+            if (now < bundle.OnSaleDate.Value || now >= bundle.OffSaleDate.Value)
             {
                 throw new InvalidOperationException("Bundle is not on sale.");
             }
@@ -511,14 +571,24 @@ namespace XBOL.Ticketing.Services.Booking
                 return;
             }
 
-            if (bundle.RenewalStartDate.HasValue && now < bundle.RenewalStartDate.Value)
+            if (!bundle.RenewalStartDate.HasValue || !bundle.RenewalEndDate.HasValue)
             {
-                throw new InvalidOperationException("Bundle renewal window is not open.");
+                throw new InvalidOperationException("Bundle renewal window is not configured.");
             }
 
-            if (bundle.RenewalEndDate.HasValue && now > bundle.RenewalEndDate.Value)
+            if (request.ReferenceOrderId.HasValue)
             {
-                throw new InvalidOperationException("Bundle renewal window is not open.");
+                if (now < bundle.RenewalStartDate.Value)
+                {
+                    throw new InvalidOperationException("Bundle renewal window is not open.");
+                }
+
+                return;
+            }
+
+            if (now < bundle.RenewalEndDate.Value)
+            {
+                throw new InvalidOperationException("Bundle is reserved for renewals until the renewal window closes.");
             }
         }
 
@@ -562,16 +632,12 @@ namespace XBOL.Ticketing.Services.Booking
             ModelBundle bundle,
             ModelClient client,
             HashSet<string> requestedSeatKeys,
+            DateTimeOffset now,
             CancellationToken cancellationToken)
         {
-            if (!bundle.PreviousBundleId.HasValue)
+            if (!bundle.PreviousBundleId.HasValue || !request.ReferenceOrderId.HasValue)
             {
                 return;
-            }
-
-            if (!request.ReferenceOrderId.HasValue)
-            {
-                throw new InvalidOperationException("ReferenceOrderId is required for renewal bundle booking.");
             }
 
             var sourceSeatKeys = await (
@@ -586,28 +652,68 @@ namespace XBOL.Ticketing.Services.Booking
                           && item.ItemType == ItemType.BundlePass
                           && pass.BundleId == bundle.PreviousBundleId.Value
                           && pass.Status == BundlePassStatus.Active
-                          && requestedSeatKeys.Contains(pass.TrackingCode)
                     select pass.TrackingCode)
                 .Distinct()
                 .ToListAsync(cancellationToken);
 
-            if (sourceSeatKeys.Count != requestedSeatKeys.Count)
+            if (sourceSeatKeys.Count == 0)
             {
                 throw new InvalidOperationException(
                     "Referenced source order does not own the requested bundle seats.");
             }
 
-            var alreadyRenewed = await dbContext.BundlePasses
+            await EnsureSourceOrderHasNotBeenRenewedAsync(request, bundle, cancellationToken);
+
+            var isProtectedRenewalWindow = bundle.RenewalEndDate.HasValue && now < bundle.RenewalEndDate.Value;
+            if (isProtectedRenewalWindow)
+            {
+                var ownedRequestedSeatCount = sourceSeatKeys
+                    .Count(requestedSeatKeys.Contains);
+
+                if (ownedRequestedSeatCount != requestedSeatKeys.Count)
+                {
+                    throw new InvalidOperationException(
+                        "Referenced source order does not own the requested bundle seats.");
+                }
+
+                return;
+            }
+
+            if (requestedSeatKeys.Count > sourceSeatKeys.Count)
+            {
+                throw new InvalidOperationException(
+                    "Requested bundle seat count exceeds referenced source order entitlement.");
+            }
+
+            await EnsureSourceOrderHasNotBeenRenewedAsync(request, bundle, cancellationToken);
+        }
+
+        private async Task EnsureSourceOrderHasNotBeenRenewedAsync(
+            BookSeatsActionRequest request,
+            ModelBundle bundle,
+            CancellationToken cancellationToken)
+        {
+            if (!bundle.PreviousBundleId.HasValue || !request.ReferenceOrderId.HasValue)
+            {
+                return;
+            }
+
+            var sourceOrderAlreadyRenewed = await dbContext.Orders
                 .AsNoTracking()
-                .AnyAsync(pass =>
-                    pass.BundleId == bundle.Id &&
-                    pass.ClientId == client.Id &&
-                    requestedSeatKeys.Contains(pass.TrackingCode),
+                .AnyAsync(order =>
+                    order.RelatedOrderId == request.ReferenceOrderId.Value &&
+                    order.OrderType == OrderType.Bundle &&
+                    order.Status == OrderStatus.Paid &&
+                    order.Items.Any(item =>
+                        item.ItemType == ItemType.BundlePass &&
+                        dbContext.BundlePasses.Any(pass =>
+                            pass.Id == item.ItemReferenceId &&
+                            pass.BundleId == bundle.Id)),
                     cancellationToken);
 
-            if (alreadyRenewed)
+            if (sourceOrderAlreadyRenewed)
             {
-                throw new InvalidOperationException("One or more requested bundle seats have already been renewed.");
+                throw new InvalidOperationException("Referenced source order has already been renewed.");
             }
         }
 

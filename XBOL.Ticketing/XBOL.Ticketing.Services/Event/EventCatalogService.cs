@@ -4,6 +4,7 @@ using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.DTO.Results;
+using XBOL.Ticketing.Core.Mappers;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
 using XBOL.Ticketing.Data.Queries;
@@ -118,6 +119,7 @@ namespace XBOL.Ticketing.Services.Event
                 .Include(bundle => bundle.VenueMap)
                 .Include(bundle => bundle.Categories)
                 .Include(bundle => bundle.BundleSections)
+                    .ThenInclude(section => section.BundleSeats)
                 .Include(bundle => bundle.BundleEventSchedules)
                     .ThenInclude(link => link.EventSchedule)
                     .ThenInclude(schedule => schedule.Event)
@@ -243,7 +245,8 @@ namespace XBOL.Ticketing.Services.Event
                 TotalSeats = bundle.BundleSections.Sum(section => section.TotalSeats),
                 PosterImageUrl = posterImageUrl ?? bundle.PosterImageUrl,
                 BannerImageUrl = bannerImageUrl ?? bundle.BannerImageUrl,
-                IsSeason = bundle.BundleType == BundleType.SeasonPass
+                IsSeason = bundle.BundleType == BundleType.SeasonPass,
+                IsBookable = BundleBookability.IsBookable(bundle)
             };
         }
 

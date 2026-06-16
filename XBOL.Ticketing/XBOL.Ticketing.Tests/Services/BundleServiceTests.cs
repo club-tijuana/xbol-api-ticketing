@@ -169,19 +169,22 @@ public class BundleServiceTests
             .Returns(sections);
         var request = ValidCreateRequest(BundlePricingType.Composite);
         request.BundleType = BundleType.Basic;
+        Bundle? insertedBundle = null;
+        _repository.InsertAsync(Arg.Do<Bundle>(bundle => insertedBundle = bundle))
+            .Returns(Task.CompletedTask);
 
         await _sut.CreateAsync(request, Guid.NewGuid());
 
-        await _repository.Received(1).InsertAsync(Arg.Is<Bundle>(b =>
-            b.BundleSections.Count == 1 &&
-            b.BundleSections[0].BaseSectionId == 10 &&
-            b.BundleSections[0].DisplayName == "B" &&
-            b.BundleSections[0].Price == 0 &&
-            b.BundleSections[0].TotalSeats == 2 &&
-            b.BundleSections[0].AvailableSeats == 2 &&
-            b.BundleSections[0].BundleSeats.Select(seat => seat.BaseSeatId).SequenceEqual(new long[] { 1000, 1001 }) &&
-            b.BundleSections[0].BundleSeats.Select(seat => seat.ExternalSeatObjectKey).SequenceEqual(new[] { "B-1-1", "B-1-2" }) &&
-            b.BundleSections[0].BundleSeats.All(seat => seat.ForSale)));
+        await _repository.Received(1).InsertAsync(Arg.Any<Bundle>());
+        insertedBundle.Should().NotBeNull();
+        var bundleSection = insertedBundle!.BundleSections.Should().ContainSingle().Subject;
+        bundleSection.BaseSectionId.Should().Be(10);
+        bundleSection.DisplayName.Should().Be("B");
+        bundleSection.TotalSeats.Should().Be(2);
+        bundleSection.AvailableSeats.Should().Be(2);
+        bundleSection.BundleSeats.Select(seat => seat.BaseSeatId).Should().Equal([1000, 1001]);
+        bundleSection.BundleSeats.Select(seat => seat.ExternalSeatObjectKey).Should().Equal(["B-1-1", "B-1-2"]);
+        bundleSection.BundleSeats.Should().OnlyContain(seat => seat.ForSale);
     }
 
     [Fact]

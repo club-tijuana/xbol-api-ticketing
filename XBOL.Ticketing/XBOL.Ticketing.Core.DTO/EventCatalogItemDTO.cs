@@ -24,5 +24,6 @@ namespace XBOL.Ticketing.Core.DTO
         public string? PosterImageUrl { get; set; }
         public string? BannerImageUrl { get; set; }
         public bool IsSeason { get; set; }
+        public bool IsBookable { get; set; }
     }
 }
