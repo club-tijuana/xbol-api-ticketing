@@ -31,11 +31,21 @@ public class CreateSeatsIoEventHandler(
         var eventKey = $"schedule-{schedule.Id}";
         var eventDate = ToSeatsIoDate(schedule.StartDateTime);
 
-        await seatsIo.CreateSeatsIoEventAsync(chartKey, eventKey, schedule.Event.Name, eventDate);
-        logger.LogInformation(
-            "Created Seats.io event {EventKey} for EventSchedule {EventScheduleId}.",
-            eventKey,
-            schedule.Id);
+        try
+        {
+            await seatsIo.CreateSeatsIoEventAsync(chartKey, eventKey, schedule.Event.Name, eventDate);
+            logger.LogInformation(
+                "Created Seats.io event {EventKey} for EventSchedule {EventScheduleId}.",
+                eventKey,
+                schedule.Id);
+        }
+        catch (SeatsioException ex) when (SeatsIoErrorCodes.IsEventKeyAlreadyExists(ex))
+        {
+            logger.LogInformation(ex,
+                "Seats.io event {EventKey} for EventSchedule {EventScheduleId} already exists; linking to existing event.",
+                eventKey,
+                schedule.Id);
+        }
 
         schedule.ExternalEventKey = eventKey;
         schedule.Status = ScheduleStatus.OnSale;
