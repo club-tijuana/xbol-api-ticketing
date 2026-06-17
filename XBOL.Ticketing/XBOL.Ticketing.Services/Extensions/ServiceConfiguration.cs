@@ -5,6 +5,7 @@ using XBOL.Ticketing.Services.Accreditation;
 using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Bundle;
 using XBOL.Ticketing.Services.Client;
+using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Event;
 using XBOL.Ticketing.Services.Identity;
 using XBOL.Ticketing.Services.Media;
@@ -19,6 +20,7 @@ namespace XBOL.Ticketing.Services.Extensions
 {
     public static class ServiceConfiguration
     {
+        [Obsolete]
         public static IServiceCollection ConfigureServices(this IServiceCollection services)
         {
             services.AddScoped<AccreditationService>();
@@ -79,6 +81,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<SequenceTrackerService>();
             services.AddScoped<RulesEngineService>();
             services.AddScoped<BookingHoldService>();
+            services.AddScoped<BookingEmailModelBuilder>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();

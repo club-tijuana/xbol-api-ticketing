@@ -1,10 +1,14 @@
 using System.Data;
+using Hangfire;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Odasoft.XBOL.Commons.Email;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
+using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 using ModelBundle = XBOL.Ticketing.Core.Model.Bundle;
 using ModelBundlePass = XBOL.Ticketing.Core.Model.BundlePass;
@@ -18,7 +22,10 @@ namespace XBOL.Ticketing.Services.Booking
     public class BookingOrchestrationService(
         XBOLDbContext dbContext,
         ISeatsIoBookingClient seatsIoBookingClient,
-        SequenceTrackerService sequenceTrackerService) : IBookingOrchestrationService
+        SequenceTrackerService sequenceTrackerService,
+        IBackgroundJobClient backgroundJobClient,
+        BookingEmailModelBuilder emailModelBuilder,
+        ILogger<BookingOrchestrationService> logger) : IBookingOrchestrationService
     {
         public async Task<BookingResultResponse> BookAsync(
             BookSeatsActionRequest request,
@@ -82,8 +89,8 @@ namespace XBOL.Ticketing.Services.Booking
             var schedules = ResolveBundleSchedules(bundle, request);
             var now = DateTimeOffset.UtcNow;
 
-            ValidateBundleBookingWindow(bundle, now);
-            
+            ValidateBundleBookingWindow(bundle, request, now);
+
             var bundleSeats = ResolveRequestedBundleSeats(bundle, request.Seats.Select(s => s.SeatKey));
             var requestedSeatKeys = bundleSeats.Keys.ToHashSet(StringComparer.Ordinal);
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
@@ -300,6 +307,8 @@ namespace XBOL.Ticketing.Services.Booking
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
+            await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
+
             return new BookingResultResponse
             {
                 OrderId = order.Id,
@@ -424,6 +433,8 @@ namespace XBOL.Ticketing.Services.Booking
 
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+
+            await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
 
             return new BookingResultResponse
             {
@@ -823,6 +834,30 @@ namespace XBOL.Ticketing.Services.Booking
         private static string NormalizePhoneNumber(string phoneNumber)
         {
             return new string(phoneNumber.Where(char.IsAsciiDigit).ToArray());
+        }
+
+        private async Task EnqueueConfirmationEmailsAsync(
+            long orderId,
+            ModelClient client,
+            CancellationToken cancellationToken)
+        {
+            var buyerEmail = client.Email ?? "";
+            var buyerName = client.FullName ?? "";
+
+            try
+            {
+                var buyerModel = await emailModelBuilder.BuildAsync(
+                    orderId, buyerEmail, buyerName, "es-MX", cancellationToken);
+                backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(buyerModel));
+
+                var sellerModel = await emailModelBuilder.BuildAsync(
+                    orderId, "support@xbol.com", "Seller", "es-MX", cancellationToken);
+                backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(sellerModel));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to enqueue confirmation email for order {OrderId}", orderId);
+            }
         }
 
         private sealed record RemoteBooking(string EventKey, IReadOnlyList<string> SeatKeys);

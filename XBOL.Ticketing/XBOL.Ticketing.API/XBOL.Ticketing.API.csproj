@@ -22,6 +22,7 @@
 
     <ItemGroup>
         <PackageReference Include="SeatsioDotNet" Version="107.7.0" />
+        <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.1" />
         <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.2.1" />
         <PackageReference Include="WolverineFx" Version="6.3.2" />
@@ -33,6 +34,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Odasoft.XBOL.Commons\Odasoft.XBOL.Commons.csproj" />
         <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
         <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
         <ProjectReference Include="..\XBOL.Ticketing.Data\XBOL.Ticketing.Data.csproj" />

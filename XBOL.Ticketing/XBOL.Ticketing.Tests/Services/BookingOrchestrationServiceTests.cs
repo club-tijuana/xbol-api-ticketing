@@ -1,6 +1,8 @@
 using FluentAssertions;
+using Hangfire;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
@@ -8,6 +10,7 @@ using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
 using XBOL.Ticketing.Data.Repositories;
 using XBOL.Ticketing.Services.Booking;
+using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 
 namespace XBOL.Ticketing.Tests.Services;
@@ -1523,7 +1526,10 @@ public class BookingOrchestrationServiceTests
         return new BookingOrchestrationService(
             context,
             bookingClient,
-            new SequenceTrackerService(new SequenceTrackerRepository(context)));
+            new SequenceTrackerService(new SequenceTrackerRepository(context)),
+            Substitute.For<IBackgroundJobClient>(),
+            new BookingEmailModelBuilder(context),
+            Substitute.For<ILogger<BookingOrchestrationService>>());
     }
 
     private static void AllowSeasonPassRemoteReadiness(ISeatsIoBookingClient bookingClient)

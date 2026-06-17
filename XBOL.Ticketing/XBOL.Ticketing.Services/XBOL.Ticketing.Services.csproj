@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Odasoft.XBOL.Commons\Odasoft.XBOL.Commons.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.Commons\XBOL.Ticketing.Core.Commons.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.DTO\XBOL.Ticketing.Core.DTO.csproj" />
     <ProjectReference Include="..\XBOL.Ticketing.Core.Mappers\XBOL.Ticketing.Core.Mappers.csproj" />

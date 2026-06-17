@@ -17,6 +17,7 @@ var corsOptions = builder.Configuration.GetCorsOptions();
 // Infrastructure
 builder.Services.ConfigureOptions(builder.Configuration);
 builder.Services.ConfigureDatabase(builder.Configuration);
+builder.Services.ConfigureBackgroundJobs(builder.Configuration);
 builder.Services.ConfigureCorsPolicy(corsOptions);
 
 // Security
