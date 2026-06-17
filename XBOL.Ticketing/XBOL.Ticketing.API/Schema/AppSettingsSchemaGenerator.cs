@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
+using Odasoft.XBOL.Commons.Options;
 using XBOL.Ticketing.API.Options;
 using XBOL.Ticketing.Services;
 
@@ -284,5 +285,8 @@ public static class AppSettingsSchemaGenerator
 
         [Description("Cross-origin policy registered in the HTTP pipeline")]
         public CorsOptions? Cors { get; set; }
+
+        [Description("Hangfire background-job storage configuration")]
+        public BackgroundJobsOptions? BackgroundJobs { get; set; }
     }
 }

@@ -1,3 +1,4 @@
+using Odasoft.XBOL.Commons.Options;
 using XBOL.Ticketing.Services;
 
 namespace XBOL.Ticketing.API.Extensions;
@@ -9,6 +10,11 @@ public static class OptionsConfiguration
     {
         services.AddOptions<SeatsIoOptions>()
             .BindConfiguration("SeatsIoApi")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<BackgroundJobsOptions>()
+            .BindConfiguration("BackgroundJobs")
             .ValidateDataAnnotations()
             .ValidateOnStart();
 

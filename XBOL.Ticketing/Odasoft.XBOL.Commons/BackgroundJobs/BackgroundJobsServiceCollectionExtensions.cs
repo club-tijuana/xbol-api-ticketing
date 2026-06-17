@@ -1,18 +1,10 @@
 using Hangfire;
 using Hangfire.PostgreSql;
-using Odasoft.XBOL.Commons.Options;
 
 namespace Odasoft.XBOL.Commons.BackgroundJobs;
 
 public static class BackgroundJobsServiceCollectionExtensions
 {
-    public static IGlobalConfiguration UseDefaultStorage(this IGlobalConfiguration config, BackgroundJobsOptions options)
-    {
-        return config.UseDefaultStorage(
-            options.ConnectionString,
-            options.PrepareSchemaIfNecessary);
-    }
-
     public static IGlobalConfiguration UseDefaultStorage(
         this IGlobalConfiguration config,
         string connectionString,

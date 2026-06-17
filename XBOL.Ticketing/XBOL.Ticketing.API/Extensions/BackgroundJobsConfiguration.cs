@@ -1,5 +1,6 @@
 using Hangfire;
 using Odasoft.XBOL.Commons.BackgroundJobs;
+using Odasoft.XBOL.Commons.Options;
 
 namespace XBOL.Ticketing.API.Extensions;
 
@@ -8,9 +9,11 @@ public static class BackgroundJobsConfiguration
     public static IServiceCollection ConfigureBackgroundJobs(
         this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetRequiredSection("BackgroundJobs:ConnectionString").Value!;
+        var options = new BackgroundJobsOptions();
+        configuration.GetRequiredSection("BackgroundJobs").Bind(options);
 
-        services.AddHangfire(config => config.UseDefaultStorage(connectionString, prepareSchemaIfNecessary: false));
+        services.AddHangfire(config => config.UseDefaultStorage(
+            options.ConnectionString, prepareSchemaIfNecessary: false));
 
         return services;
     }
