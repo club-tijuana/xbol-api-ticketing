@@ -27,10 +27,6 @@ public class BundleCreateRequestValidator : AbstractValidator<BundleCreateReques
             .Equal(BundlePricingType.Single)
             .When(x => x.BundleType == BundleType.SeasonPass)
             .WithMessage("SeasonPass bundles must use Single pricing.");
-        RuleFor(x => x.EventScheduleIds)
-            .NotEmpty()
-            .WithMessage("At least one event schedule must be selected.");
-
         RuleFor(x => x.EndDate)
             .GreaterThan(x => x.StartDate)
             .When(x => x.EndDate.HasValue && x.StartDate.HasValue);

@@ -151,30 +151,28 @@ namespace XBOL.Ticketing.Services.Bundle
                 UpdatedBy = userId
             };
 
-            if (request.EventScheduleIds is not { Count: > 0 })
-            {
-                throw new InvalidOperationException("At least one event schedule must be selected for this Bundle.");
-            }
-
-            var duplicateEventScheduleId = request.EventScheduleIds
-                .GroupBy(id => id)
-                .FirstOrDefault(group => group.Count() > 1)
-                ?.Key;
-            if (duplicateEventScheduleId is not null)
-            {
-                throw new InvalidOperationException(
-                    $"EventSchedule {duplicateEventScheduleId} is already selected for this Bundle.");
-            }
-
             var eventSchedules = new List<Core.Model.EventSchedule>();
-            foreach (var eventScheduleId in request.EventScheduleIds)
+            if (request.EventScheduleIds is { Count: > 0 })
             {
-                var eventSchedule = await BundleEventScheduleValidator.ValidateAdditionAsync(
-                    bundle,
-                    eventScheduleId,
-                    bundleEventScheduleRepository,
-                    eventScheduleRepository);
-                eventSchedules.Add(eventSchedule);
+                var duplicateEventScheduleId = request.EventScheduleIds
+                    .GroupBy(id => id)
+                    .FirstOrDefault(group => group.Count() > 1)
+                    ?.Key;
+                if (duplicateEventScheduleId is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"EventSchedule {duplicateEventScheduleId} is already selected for this Bundle.");
+                }
+
+                foreach (var eventScheduleId in request.EventScheduleIds)
+                {
+                    var eventSchedule = await BundleEventScheduleValidator.ValidateAdditionAsync(
+                        bundle,
+                        eventScheduleId,
+                        bundleEventScheduleRepository,
+                        eventScheduleRepository);
+                    eventSchedules.Add(eventSchedule);
+                }
             }
 
             bundle.BundleEventSchedules = eventSchedules
