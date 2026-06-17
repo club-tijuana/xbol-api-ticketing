@@ -20,6 +20,7 @@ namespace XBOL.Ticketing.Core.Model
         public OrderStatus Status { get; set; }
         public OrderType OrderType { get; set; }
         public SaleChannel SaleChannel { get; set; }
+        public DateTimeOffset PaidAt { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
@@ -28,12 +29,17 @@ namespace XBOL.Ticketing.Core.Model
 
         public long? RelatedOrderId { get; set; }
         public Order? RelatedOrder { get; set; }
+        public long? EventScheduleId { get; set; }
+        public string? HoldToken { get; set; }
 
         public IList<OrderItem> Items { get; set; } = [];
         public IList<OrderFee> Fees { get; set; } = [];
         public IList<OrderTax> Taxes { get; set; } = [];
         public IList<Payment> Payments { get; set; } = [];
+        public IList<PaymentChangeDetail> PaymentChangeDetails { get; set; } = [];
         public IList<Ticket> Tickets { get; set; } = [];
         public IList<PromoCodeRedemption> PromoRedemptions { get; set; } = [];
+        public IList<OrderActionLog> ActionLogs { get; set; } = [];
+        public IList<OrderTag> OrderTags { get; set; } = [];
     }
 }

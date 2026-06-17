@@ -8,6 +8,8 @@ namespace XBOL.Ticketing.Data.Configurations
     {
         public void Configure(EntityTypeBuilder<Ticket> builder)
         {
+            builder.Property(t => t.PrivateToken).IsRequired(false);
+
             builder.HasOne(a => a.OriginalClient)
                    .WithMany(b => b.Tickets)
                    .HasForeignKey(b => b.OriginalClientId);

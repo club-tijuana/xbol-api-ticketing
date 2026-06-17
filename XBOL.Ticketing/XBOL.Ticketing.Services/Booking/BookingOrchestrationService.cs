@@ -132,7 +132,6 @@ namespace XBOL.Ticketing.Services.Booking
                             throw new InvalidOperationException(
                                 $"Bundle schedule {schedule.Id} has no Seats.io event key.");
                         }
-
                     }
 
                     string[] eventKeys = schedules
