@@ -7,7 +7,7 @@ namespace XBOL.Ticketing.Core.DTO.EvoPayment
         [Required]
         public required string ReturnUrl { get; init; }
 
-        [Range(0.01, double.MaxValue, ErrorMessage = "The amount must be greater than zero.")]
+        [Range(0.01, 999999999999, ErrorMessage = "The amount must be greater than zero.")]
         public decimal Amount { get; init; }
 
         public string Currency { get; init; } = "MXN";
