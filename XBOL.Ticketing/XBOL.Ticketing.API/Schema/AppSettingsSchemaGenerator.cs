@@ -8,6 +8,7 @@ using System.Text.Json.Schema;
 using Odasoft.XBOL.Commons.Options;
 using XBOL.Ticketing.API.Options;
 using XBOL.Ticketing.Services;
+using XBOL.Ticketing.Services.EvoPayment;
 
 namespace XBOL.Ticketing.API.Schema;
 
@@ -288,5 +289,8 @@ public static class AppSettingsSchemaGenerator
 
         [Description("Hangfire background-job storage configuration")]
         public BackgroundJobsOptions? BackgroundJobs { get; set; }
+
+        [Description("EVO Payments gateway configuration")]
+        public EvoSettings? EvoSettings { get; set; }
     }
 }

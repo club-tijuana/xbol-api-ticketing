@@ -16,4 +16,21 @@ public sealed class AppSettingsSchemaGeneratorTests
         cors!["properties"]?["PolicyName"].Should().NotBeNull();
         cors["properties"]?["AcceptedOrigins"].Should().NotBeNull();
     }
+
+    [Fact]
+    public void Generate_includes_evo_settings_with_required_fields()
+    {
+        var schema = AppSettingsSchemaGenerator.Generate();
+
+        var evo = schema["properties"]?["EvoSettings"] as JsonObject;
+        evo.Should().NotBeNull();
+        evo!["properties"]?["APIPassword"].Should().NotBeNull();
+        evo["properties"]?["MerchantId"].Should().NotBeNull();
+        evo["properties"]?["Version"].Should().NotBeNull();
+
+        var required = evo["required"]?.AsArray();
+        required.Should().ContainEquivalentOf("APIPassword")
+            .And.ContainEquivalentOf("MerchantId")
+            .And.ContainEquivalentOf("Version");
+    }
 }
