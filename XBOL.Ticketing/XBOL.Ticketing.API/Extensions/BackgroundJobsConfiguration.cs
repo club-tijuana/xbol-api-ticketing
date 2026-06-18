@@ -1,6 +1,4 @@
 using Hangfire;
-using Odasoft.XBOL.Commons.BackgroundJobs;
-using Odasoft.XBOL.Commons.Options;
 
 namespace XBOL.Ticketing.API.Extensions;
 

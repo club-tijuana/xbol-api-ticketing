@@ -19,7 +19,9 @@ namespace XBOL.Ticketing.API.Controllers
             CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
+            {
                 return BadRequest(ModelState);
+            }
 
             try
             {
@@ -43,7 +45,9 @@ namespace XBOL.Ticketing.API.Controllers
             CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
+            {
                 return BadRequest(ModelState);
+            }
 
             try
             {
@@ -79,7 +83,9 @@ namespace XBOL.Ticketing.API.Controllers
             CancellationToken cancellationToken)
         {
             if (!ModelState.IsValid)
+            {
                 return BadRequest(ModelState);
+            }
 
             try
             {
@@ -114,7 +120,9 @@ namespace XBOL.Ticketing.API.Controllers
             CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(orderRefId))
+            {
                 return BadRequest(new { error = "orderRefId es requerido." });
+            }
 
             try
             {

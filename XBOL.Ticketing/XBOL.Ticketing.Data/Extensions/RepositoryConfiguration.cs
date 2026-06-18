@@ -72,6 +72,8 @@ namespace XBOL.Ticketing.Data.Extensions
             services.AddScoped<TagTypeRepository>();
             services.AddScoped<VenueMapRepository>();
             services.AddScoped<SequenceTrackerRepository>();
+            services.AddScoped<PriceListItemRepository>();
+            services.AddScoped<ExchangeRateRepository>();
 
             return services;
         }

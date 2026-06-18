@@ -20,5 +20,9 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public required ChangeInfoRequest ChangeInfoRequest { get; set; }
         public string? Localizer { get; set; }
         public long? ReferenceOrderId { get; set; }
+
+        public bool IsPaymentLink { get; set; }
+        public PaymentLinkRequest? PaymentLinkRequest { get; set; }
+        public Guid TransactionRefId { get; set; }
     }
 }

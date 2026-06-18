@@ -1,10 +1,12 @@
-﻿namespace XBOL.Ticketing.Core.Commons.Enums
+namespace XBOL.Ticketing.Core.Commons.Enums
 {
     public enum PaymentType
     {
         Cash,
-        CreditCard,
-        DebitCard,
-        Spei
+        Card,
+        WireTransfer,
+        ClientCredit,
+        Other,
+        Courtesy
     }
 }

@@ -1,13 +1,15 @@
 using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Odasoft.XBOL.Commons.Email;
+using Microsoft.Extensions.Options;
 using System.Data;
+using XBOL.Ticketing.Core.Commons.Email;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
+using XBOL.Ticketing.Data.Repositories;
 using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 using ModelBundle = XBOL.Ticketing.Core.Model.Bundle;
@@ -20,13 +22,25 @@ using ModelTicket = XBOL.Ticketing.Core.Model.Ticket;
 namespace XBOL.Ticketing.Services.Booking
 {
     public class BookingOrchestrationService(
-        XBOLDbContext dbContext,
-        ISeatsIoBookingClient seatsIoBookingClient,
-        SequenceTrackerService sequenceTrackerService,
-        IBackgroundJobClient backgroundJobClient,
-        BookingEmailModelBuilder emailModelBuilder,
-        ILogger<BookingOrchestrationService> logger) : IBookingOrchestrationService
+    XBOLDbContext dbContext,
+    ISeatsIoBookingClient seatsIoBookingClient,
+    SequenceTrackerService sequenceTrackerService,
+    IBackgroundJobClient backgroundJobClient,
+    BookingEmailModelBuilder emailModelBuilder,
+    ILogger<BookingOrchestrationService> logger,
+    IOptions<DefaultExchangeRateOptions> defaultExchangeRateOptions,
+        IOptions<PaymentLinkOptions> paymentLinkOptions) : IBookingOrchestrationService
     {
+        private readonly XBOLDbContext _dbContext = dbContext;
+        private readonly ISeatsIoBookingClient _seatsIoBookingClient = seatsIoBookingClient;
+        private readonly SequenceTrackerService _sequenceTrackerService = sequenceTrackerService;
+        private readonly IBackgroundJobClient _backgroundJobClient = backgroundJobClient;
+        private readonly BookingEmailModelBuilder _emailModelBuilder = emailModelBuilder;
+        private readonly ILogger<BookingOrchestrationService> _logger = logger;
+        private readonly DefaultExchangeRateOptions _defaultExchangeRateOptions = defaultExchangeRateOptions.Value;
+        private readonly PaymentLinkOptions _paymentLinkOptions = paymentLinkOptions.Value;
+        private readonly ExchangeRateRepository _exchangeRateRepository;
+
         public async Task<BookingResultResponse> BookAsync(
             BookSeatsActionRequest request,
             Guid actorUserId,
@@ -46,7 +60,7 @@ namespace XBOL.Ticketing.Services.Booking
             CancellationToken cancellationToken)
         {
             var eventSeats = await LoadRequestedEventSeatsAsync(request, cancellationToken);
-            var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
+            var bookedSeatKeys = await _seatsIoBookingClient.BookSeatsAsync(
                 request.EventKey,
                 request.Seats,
                 request.HoldToken,
@@ -65,7 +79,7 @@ namespace XBOL.Ticketing.Services.Booking
             {
                 if (bookedSeatKeys.Count > 0)
                 {
-                    await seatsIoBookingClient.ReleaseBookedSeatsAsync(
+                    await _seatsIoBookingClient.ReleaseBookedSeatsAsync(
                         request.EventKey,
                         bookedSeatKeys,
                         cancellationToken);
@@ -116,7 +130,7 @@ namespace XBOL.Ticketing.Services.Booking
                         request,
                         cancellationToken);
 
-                    var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
+                    var bookedSeatKeys = await _seatsIoBookingClient.BookSeatsAsync(
                         seasonKey,
                         request.Seats,
                         request.HoldToken,
@@ -139,7 +153,7 @@ namespace XBOL.Ticketing.Services.Booking
                         .Select(s => s.ExternalEventKey)
                         .ToArray();
 
-                    var bookedSeatKeys = await seatsIoBookingClient.BookSeatsAsync(
+                    var bookedSeatKeys = await _seatsIoBookingClient.BookSeatsAsync(
                         eventKeys,
                         request.Seats,
                         request.HoldToken,
@@ -168,7 +182,7 @@ namespace XBOL.Ticketing.Services.Booking
                 {
                     if (remoteBooking.SeatKeys.Count > 0)
                     {
-                        await seatsIoBookingClient.ReleaseBookedSeatsAsync(
+                        await _seatsIoBookingClient.ReleaseBookedSeatsAsync(
                             remoteBooking.EventKey,
                             remoteBooking.SeatKeys,
                             cancellationToken);
@@ -190,7 +204,7 @@ namespace XBOL.Ticketing.Services.Booking
                 throw new InvalidOperationException("SeasonPass bundle has no Seats.io season key.");
             }
 
-            if (!await seatsIoBookingClient.EventOrSeasonExistsAsync(
+            if (!await _seatsIoBookingClient.EventOrSeasonExistsAsync(
                     bundle.ExternalKey,
                     cancellationToken))
             {
@@ -206,7 +220,7 @@ namespace XBOL.Ticketing.Services.Booking
                         $"Bundle schedule {schedule.Id} has no Seats.io event key.");
                 }
 
-                if (!await seatsIoBookingClient.EventOrSeasonExistsAsync(
+                if (!await _seatsIoBookingClient.EventOrSeasonExistsAsync(
                         schedule.ExternalEventKey,
                         cancellationToken))
                 {
@@ -219,7 +233,8 @@ namespace XBOL.Ticketing.Services.Booking
                 .Select(seat => seat.SeatKey)
                 .Distinct(StringComparer.Ordinal)
                 .ToArray();
-            if (!await seatsIoBookingClient.ValidateSeatsExistAsync(
+
+            if (!await _seatsIoBookingClient.ValidateSeatsExistAsync(
                     bundle.ExternalKey,
                     requestedSeatKeys,
                     cancellationToken))
@@ -238,27 +253,40 @@ namespace XBOL.Ticketing.Services.Booking
             List<EventSeat> eventSeats,
             CancellationToken cancellationToken)
         {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
             var now = DateTimeOffset.UtcNow;
+            bool isCourtesy = request.PaymentInfoRequest.IsCourtesy;
+            bool isPaymentLink = request.IsPaymentLink;
+
             var client = await ResolveBuyerAsync(request.ClientContact, actorUserId, now, cancellationToken);
-            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.SeatPrice);
+
+            EventSeat firstSeat = eventSeats.First();
+
+            OrderTotalBreakDown breakDown = await OrderTotalBreakDownAsync(request, firstSeat.EventSection.EventSchedule.Event.OrganizerId, actorUserId);
+
             var order = new ModelOrder
             {
                 Client = client,
                 UserId = null,
                 Reference = await ResolveReference(request, "ORD", request.EventScheduleId),
-                SubTotal = total,
-                TotalFees = 0,
-                TotalTaxes = 0,
-                Total = total,
-                Status = OrderStatus.Paid,
+                SubTotal = breakDown.SubTotal,
+                TotalFees = breakDown.Fee,
+                TotalTaxes = breakDown.Tax,
+                Discount = breakDown.Discount,
+                Total = breakDown.Total,
+                Status = isPaymentLink ? OrderStatus.Pending : OrderStatus.Paid,
+                PaidAt = isPaymentLink ? DateTimeOffset.MaxValue : now,
                 OrderType = OrderType.Ticket,
                 SaleChannel = SaleChannel.BoxOffice,
                 CreatedAt = now,
                 UpdatedAt = now,
                 CreatedBy = actorUserId,
-                UpdatedBy = actorUserId
+                UpdatedBy = actorUserId,
+                Fees = breakDown.Fees,
+                Payments = breakDown.Payments,
+                OrderTags = isPaymentLink ? [OrderTag.PaymentLink] : []
             };
+
             var inventoryBatchId = await GetInventoryBatchIdAsync(
                 request.EventScheduleId,
                 cancellationToken);
@@ -289,8 +317,8 @@ namespace XBOL.Ticketing.Services.Booking
                 });
             }
 
-            dbContext.Orders.Add(order);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            _dbContext.Orders.Add(order);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
             foreach (var ticket in order.Tickets)
             {
@@ -299,11 +327,12 @@ namespace XBOL.Ticketing.Services.Booking
                     ItemType = ItemType.Ticket,
                     ItemReferenceId = ticket.Id,
                     IsCourtesy = request.PaymentInfoRequest.IsCourtesy,
-                    Price = ticket.PricePaid
+                    Price = ticket.PricePaid,
+                    PriceListItemId = request.Seats.FirstOrDefault(s => s.SeatKey == ticket.TicketCode)?.PriceListItemId ?? 0
                 });
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
@@ -330,27 +359,35 @@ namespace XBOL.Ticketing.Services.Booking
             IReadOnlyList<RemoteBooking> remoteBookings,
             CancellationToken cancellationToken)
         {
-            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
             await EnsureSourceOrderHasNotBeenRenewedAsync(request, bundle, cancellationToken);
             var now = DateTimeOffset.UtcNow;
-            var total = request.PaymentInfoRequest.IsCourtesy ? 0 : request.Seats.Sum(x => x.SeatPrice);
+            bool isCourtesy = request.PaymentInfoRequest.IsCourtesy;
+            bool isPaymentLink = request.IsPaymentLink;
+
+            OrderTotalBreakDown breakDown = await OrderTotalBreakDownAsync(request, bundle.OrganizerId, actorUserId);
+
             var order = new ModelOrder
             {
                 Client = client,
                 UserId = null,
                 Reference = await ResolveReference(request, "ORD", bundle.Id),
-                SubTotal = total,
-                TotalFees = 0,
-                TotalTaxes = 0,
-                Total = total,
-                Status = OrderStatus.Paid,
+                SubTotal = breakDown.SubTotal,
+                TotalFees = breakDown.Fee,
+                TotalTaxes = breakDown.Tax,
+                Discount = breakDown.Discount,
+                Total = breakDown.Total,
+                Status = isPaymentLink ? OrderStatus.Pending : OrderStatus.Paid,
+                PaidAt = isPaymentLink ? DateTimeOffset.MaxValue : now,
                 OrderType = OrderType.Bundle,
                 SaleChannel = SaleChannel.BoxOffice,
                 CreatedAt = now,
                 UpdatedAt = now,
                 CreatedBy = actorUserId,
                 UpdatedBy = actorUserId,
-                RelatedOrderId = request.ReferenceOrderId
+                RelatedOrderId = request.ReferenceOrderId,
+                Payments = breakDown.Payments,
+                OrderTags = isPaymentLink ? [OrderTag.PaymentLink] : []
             };
 
             var passesBySeatKey = new Dictionary<string, ModelBundlePass>(StringComparer.Ordinal);
@@ -377,7 +414,7 @@ namespace XBOL.Ticketing.Services.Booking
                     UpdatedBy = actorUserId
                 };
                 passesBySeatKey[seat.SeatKey] = pass;
-                dbContext.BundlePasses.Add(pass);
+                _dbContext.BundlePasses.Add(pass);
             }
 
             var joins = new List<BundlePassEventTicket>();
@@ -415,9 +452,9 @@ namespace XBOL.Ticketing.Services.Booking
                 });
             }
 
-            dbContext.Orders.Add(order);
-            dbContext.BundlePassEventTickets.AddRange(joins);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            _dbContext.Orders.Add(order);
+            _dbContext.BundlePassEventTickets.AddRange(joins);
+            await _dbContext.SaveChangesAsync(cancellationToken);
 
             foreach (var pass in passesBySeatKey.Values)
             {
@@ -426,11 +463,12 @@ namespace XBOL.Ticketing.Services.Booking
                     ItemType = ItemType.BundlePass,
                     ItemReferenceId = pass.Id,
                     IsCourtesy = request.PaymentInfoRequest.IsCourtesy,
-                    Price = pass.Price
+                    Price = pass.Price,
+                    PriceListItemId = request.Seats.FirstOrDefault(s => s.SeatKey == pass.TrackingCode)?.PriceListItemId ?? 0
                 });
             }
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
@@ -454,7 +492,7 @@ namespace XBOL.Ticketing.Services.Booking
             long eventScheduleId,
             CancellationToken cancellationToken)
         {
-            var inventoryBatch = await dbContext.InventoryBatches
+            var inventoryBatch = await _dbContext.InventoryBatches
                 .Where(b =>
                     b.EventScheduleId == eventScheduleId &&
                     b.Status == InventoryBatchStatus.Active)
@@ -468,7 +506,7 @@ namespace XBOL.Ticketing.Services.Booking
             IReadOnlyCollection<long> eventScheduleIds,
             CancellationToken cancellationToken)
         {
-            var batches = await dbContext.InventoryBatches
+            var batches = await _dbContext.InventoryBatches
                 .Where(batch =>
                     eventScheduleIds.Contains(batch.EventScheduleId) &&
                     batch.Status == InventoryBatchStatus.Active)
@@ -487,9 +525,10 @@ namespace XBOL.Ticketing.Services.Booking
             CancellationToken cancellationToken)
         {
             var seatKeys = request.Seats.Select(s => s.SeatKey).ToHashSet(StringComparer.Ordinal);
-            var query = dbContext.EventSeats
+            var query = _dbContext.EventSeats
                 .Include(s => s.EventSection)
-                .ThenInclude(s => s.EventSchedule)
+                    .ThenInclude(s => s.EventSchedule)
+                        .ThenInclude(es => es.Event)
                 .Where(s =>
                     s.EventSection.EventScheduleId == request.EventScheduleId &&
                     s.EventSection.EventSchedule.ExternalEventKey == request.EventKey &&
@@ -509,7 +548,7 @@ namespace XBOL.Ticketing.Services.Booking
             HashSet<string> seatKeys,
             CancellationToken cancellationToken)
         {
-            var eventSeats = await dbContext.EventSeats
+            var eventSeats = await _dbContext.EventSeats
                 .Include(seat => seat.EventSection)
                 .Where(seat =>
                     eventScheduleIds.Contains(seat.EventSection.EventScheduleId) &&
@@ -529,7 +568,7 @@ namespace XBOL.Ticketing.Services.Booking
             long bundleId,
             CancellationToken cancellationToken)
         {
-            var bundle = await dbContext.Bundles
+            var bundle = await _dbContext.Bundles
                 .Include(b => b.BundleSections)
                 .ThenInclude(section => section.BundleSeats)
                 .Include(b => b.BundleEventSchedules)
@@ -559,37 +598,34 @@ namespace XBOL.Ticketing.Services.Booking
                 throw new InvalidOperationException("Bundle sale window is not configured.");
             }
 
-            if (now >= bundle.OffSaleDate.Value)
-            {
-                throw new InvalidOperationException("Bundle is no longer on sale.");
-            }
-
-            if (bundle.PreviousBundleId.HasValue)
-            {
-                if (!bundle.RenewalStartDate.HasValue || !bundle.RenewalEndDate.HasValue)
-                {
-                    throw new InvalidOperationException("Bundle renewal window is not configured.");
-                }
-
-                if (request.ReferenceOrderId.HasValue)
-                {
-                    if (now < bundle.RenewalStartDate.Value)
-                    {
-                        throw new InvalidOperationException("Bundle renewal window is not open.");
-                    }
-
-                    return;
-                }
-
-                if (now < bundle.RenewalEndDate.Value)
-                {
-                    throw new InvalidOperationException("Bundle is reserved for renewals until the renewal window closes.");
-                }
-            }
-
-            if (now < bundle.OnSaleDate.Value)
+            if (now < bundle.OnSaleDate.Value || now >= bundle.OffSaleDate.Value)
             {
                 throw new InvalidOperationException("Bundle is not on sale.");
+            }
+
+            if (!bundle.PreviousBundleId.HasValue)
+            {
+                return;
+            }
+
+            if (!bundle.RenewalStartDate.HasValue || !bundle.RenewalEndDate.HasValue)
+            {
+                throw new InvalidOperationException("Bundle renewal window is not configured.");
+            }
+
+            if (request.ReferenceOrderId.HasValue)
+            {
+                if (now < bundle.RenewalStartDate.Value)
+                {
+                    throw new InvalidOperationException("Bundle renewal window is not open.");
+                }
+
+                return;
+            }
+
+            if (now < bundle.RenewalEndDate.Value)
+            {
+                throw new InvalidOperationException("Bundle is reserved for renewals until the renewal window closes.");
             }
         }
 
@@ -642,9 +678,9 @@ namespace XBOL.Ticketing.Services.Booking
             }
 
             var sourceSeatKeys = await (
-                    from order in dbContext.Orders.AsNoTracking()
+                    from order in _dbContext.Orders.AsNoTracking()
                     from item in order.Items
-                    join pass in dbContext.BundlePasses.AsNoTracking()
+                    join pass in _dbContext.BundlePasses.AsNoTracking()
                         on item.ItemReferenceId equals pass.Id
                     where order.Id == request.ReferenceOrderId.Value
                           && order.OrderType == OrderType.Bundle
@@ -699,7 +735,7 @@ namespace XBOL.Ticketing.Services.Booking
                 return;
             }
 
-            var sourceOrderAlreadyRenewed = await dbContext.Orders
+            var sourceOrderAlreadyRenewed = await _dbContext.Orders
                 .AsNoTracking()
                 .AnyAsync(order =>
                     order.RelatedOrderId == request.ReferenceOrderId.Value &&
@@ -707,7 +743,7 @@ namespace XBOL.Ticketing.Services.Booking
                     order.Status == OrderStatus.Paid &&
                     order.Items.Any(item =>
                         item.ItemType == ItemType.BundlePass &&
-                        dbContext.BundlePasses.Any(pass =>
+                        _dbContext.BundlePasses.Any(pass =>
                             pass.Id == item.ItemReferenceId &&
                             pass.BundleId == bundle.Id)),
                     cancellationToken);
@@ -729,10 +765,10 @@ namespace XBOL.Ticketing.Services.Booking
                 .Where(schedule => request.EventScheduleId == 0 || schedule.Id == request.EventScheduleId)
                 .ToList();
 
-            //if (schedules.Count == 0)
-            //{
-            //    throw new InvalidOperationException("Bundle has no matching event schedules to book.");
-            //}
+            if (schedules.Count == 0)
+            {
+                throw new InvalidOperationException("Bundle has no matching event schedules to book.");
+            }
 
             return schedules;
         }
@@ -746,7 +782,7 @@ namespace XBOL.Ticketing.Services.Booking
             ModelClient? client = null;
             if (contact.Id.HasValue)
             {
-                client = await dbContext.Clients.FindAsync([contact.Id.Value], cancellationToken);
+                client = await _dbContext.Clients.FindAsync([contact.Id.Value], cancellationToken);
                 if (client is null)
                 {
                     throw new KeyNotFoundException($"Client {contact.Id.Value} was not found.");
@@ -755,7 +791,7 @@ namespace XBOL.Ticketing.Services.Booking
             else if (!string.IsNullOrWhiteSpace(contact.Email))
             {
                 var email = contact.Email.Trim();
-                client = await dbContext.Clients.FirstOrDefaultAsync(
+                client = await _dbContext.Clients.FirstOrDefaultAsync(
                     c => c.Email == email,
                     cancellationToken);
             }
@@ -775,7 +811,7 @@ namespace XBOL.Ticketing.Services.Booking
                     CreatedBy = actorUserId,
                     UpdatedBy = actorUserId
                 };
-                dbContext.Clients.Add(client);
+                _dbContext.Clients.Add(client);
                 return client;
             }
 
@@ -807,7 +843,7 @@ namespace XBOL.Ticketing.Services.Booking
                 return request.Localizer;
             }
 
-            return await sequenceTrackerService.GenerateLocalizerAsync(prefix);
+            return await _sequenceTrackerService.GenerateLocalizerAsync(prefix);
         }
 
         private static string? ResolveFullName(ClientInfoRequest contact, string? fallback = null)
@@ -836,20 +872,270 @@ namespace XBOL.Ticketing.Services.Booking
 
             try
             {
-                var buyerModel = await emailModelBuilder.BuildAsync(
+                var buyerModel = await _emailModelBuilder.BuildAsync(
                     orderId, buyerEmail, buyerName, "es-MX", cancellationToken);
-                backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(buyerModel));
+                _backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(buyerModel));
 
-                var sellerModel = await emailModelBuilder.BuildAsync(
+                var sellerModel = await _emailModelBuilder.BuildAsync(
                     orderId, "support@xbol.com", "Seller", "es-MX", cancellationToken);
-                backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(sellerModel));
+                _backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(sellerModel));
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to enqueue confirmation email for order {OrderId}", orderId);
+                _logger.LogError(ex, "Failed to enqueue confirmation email for order {OrderId}", orderId);
             }
         }
 
         private sealed record RemoteBooking(string EventKey, IReadOnlyList<string> SeatKeys);
+
+        private async Task<OrderTotalBreakDown> OrderTotalBreakDownAsync(BookSeatsActionRequest request, long? organizerId, Guid actorUserId)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            bool isCourtesy = request.PaymentInfoRequest.IsCourtesy;
+            bool isPaymentLink = request.IsPaymentLink;
+
+            ExchangeRateResponse defaultRate = new()
+            {
+                Id = 0,
+                Rate = _defaultExchangeRateOptions.Value
+            };
+
+            ExchangeRateResponse currentExchangeRate = defaultRate;
+
+            List<long> priceListIds = request.Seats.Select(s => s.PriceListItemId).Distinct().ToList();
+
+            Dictionary<long, PriceListItem> itemPriceDictionary = await _dbContext.PriceListItems
+                                                                        .Include(p => p.FeeList)
+                                                                        .AsNoTracking()
+                                                                        .Where(p => priceListIds.Contains(p.Id))
+                                                                        .ToDictionaryAsync(p => p.Id);
+
+            decimal subTotal = request.Seats.Sum(seat => itemPriceDictionary[seat.PriceListItemId].BasePrice);
+
+            decimal fee = request.Seats
+                            .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
+                            .Sum(f => f.FeeAmount);
+
+            decimal tax = 0;
+            decimal discount = isCourtesy ? (subTotal + fee + tax) : 0;
+            decimal total = (subTotal + fee + tax) - discount;
+
+            PaymentInfoRequest paymentInfo = request.PaymentInfoRequest;
+
+            List<Payment> payments = [];
+
+            if (!isPaymentLink)
+            {
+                bool hasPayments = paymentInfo == null ? false :
+                    (
+                        paymentInfo.CardAmount > 0
+                        || paymentInfo.CreditAmount > 0
+                        || paymentInfo.CashAmount > 0
+                        || paymentInfo.DolarAmount > 0
+                        || paymentInfo.OtherAmount > 0
+                    );
+
+                if (!isCourtesy && hasPayments)
+                {
+                    (payments, currentExchangeRate) = await PaymentInfoToPaymentsAsync(
+                        request.PaymentInfoRequest,
+                        total,
+                        organizerId,
+                        CurrencyType.MXN,
+                        defaultRate
+                    );
+                }
+                else if (!isCourtesy && !hasPayments)
+                {
+                    throw new Exception("No payments have been specified.");
+                }
+                else if (isCourtesy)
+                {
+                    payments.Add(new Payment
+                    {
+                        Currency = CurrencyType.MXN,
+                        Amount = 0,
+                        AmountMXN = 0,
+                        ReceivedAmount = 0,
+                        ReceivedAmountMXN = 0,
+                        ExchangeRateId = 0,
+                        ExchangeRate = 0,
+                        PaymentType = PaymentType.Courtesy,
+                        Provider = "",
+                        ProviderReference = "",
+                        TransactionReference = Guid.Empty,
+                        AppliedAt = now,
+                        CreatedAt = now,
+                        CreatedBy = actorUserId,
+                        UpdatedBy = actorUserId,
+                    });
+                }
+            }
+
+            return new OrderTotalBreakDown(
+                SubTotal: subTotal,
+                Fee: fee,
+                Tax: tax,
+                Discount: discount,
+                Total: total,
+                Fees: [.. request.Seats
+                                .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
+                                .GroupBy(f => f.FeeName)
+                                .Select(g => new OrderFee
+                                {
+                                    FeeType = g.Key,
+                                Amount = g.Sum(f => f.FeeAmount)
+                            })],
+                Payments: payments
+            );
+        }
+
+        public async Task<(List<Payment> Payments, ExchangeRateResponse CurrentExchangeRate)> PaymentInfoToPaymentsAsync(
+            PaymentInfoRequest paymentInfo,
+            decimal Total,
+            long? organizerId,
+            CurrencyType currencyType,
+            ExchangeRateResponse defaultExchangeRate)
+        {
+            List<Payment> payments = [];
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            decimal cardAmount = paymentInfo.CardAmount;
+            decimal creditAmount = paymentInfo.CreditAmount;
+            decimal cashAmount = paymentInfo.CashAmount;
+            decimal dolarAmount = paymentInfo.DolarAmount;
+            decimal otherAmount = paymentInfo.OtherAmount;
+            decimal _total = Total;
+
+            var currentExchangeRate = await _exchangeRateRepository.Get(
+                    filter: er => er.OrganizerId == organizerId
+                    && er.StartedAt <= now
+                )
+                .OrderByDescending(er => er.StartedAt)
+                .Select(er => new ExchangeRateResponse
+                {
+                    Id = er.Id,
+                    Rate = er.Rate
+                })
+                .FirstOrDefaultAsync();
+
+            currentExchangeRate ??= defaultExchangeRate;
+
+            decimal dolarAmountToMXN = dolarAmount * currentExchangeRate.Rate;
+            decimal totalPaid = cardAmount + creditAmount + cashAmount + dolarAmountToMXN + otherAmount;
+
+            if (totalPaid < Total)
+            {
+                throw new Exception("The payment amount is insufficient to pay for the order.");
+            }
+
+            if (cardAmount > 0)
+            {
+                payments.Add(new Payment
+                {
+                    Currency = currencyType,
+                    Amount = Total,
+                    AmountMXN = currencyType == CurrencyType.MXN ? Total : (Total * currentExchangeRate.Rate),
+                    ReceivedAmount = cardAmount,
+                    ReceivedAmountMXN = currencyType == CurrencyType.MXN ? cardAmount : (cardAmount * currentExchangeRate.Rate),
+                    ExchangeRateId = currentExchangeRate.Id,
+                    ExchangeRate = currentExchangeRate.Rate,
+                    PaymentType = PaymentType.Card,
+                    Provider = "",
+                    ProviderReference = "",
+                    TransactionReference = Guid.NewGuid(),
+                    AppliedAt = now,
+                    CreatedAt = now,
+                });
+
+                _total = Total - cardAmount;
+            }
+            if (creditAmount > 0)
+            {
+                payments.Add(new Payment
+                {
+                    Currency = currencyType,
+                    Amount = _total,
+                    AmountMXN = currencyType == CurrencyType.MXN ? _total : (_total * currentExchangeRate.Rate),
+                    ReceivedAmount = creditAmount,
+                    ReceivedAmountMXN = currencyType == CurrencyType.MXN ? creditAmount : (creditAmount * currentExchangeRate.Rate),
+                    ExchangeRateId = currentExchangeRate.Id,
+                    ExchangeRate = currentExchangeRate.Rate,
+                    PaymentType = PaymentType.ClientCredit,
+                    Provider = "",
+                    ProviderReference = "",
+                    TransactionReference = Guid.NewGuid(),
+                    AppliedAt = now,
+                    CreatedAt = now,
+                });
+
+                _total -= creditAmount;
+            }
+            if (cashAmount > 0)
+            {
+                payments.Add(new Payment
+                {
+                    Currency = currencyType,
+                    Amount = _total,
+                    AmountMXN = currencyType == CurrencyType.MXN ? _total : (_total * currentExchangeRate.Rate),
+                    ReceivedAmount = cashAmount,
+                    ReceivedAmountMXN = currencyType == CurrencyType.MXN ? cashAmount : (cashAmount * currentExchangeRate.Rate),
+                    ExchangeRateId = currentExchangeRate.Id,
+                    ExchangeRate = currentExchangeRate.Rate,
+                    PaymentType = PaymentType.Cash,
+                    Provider = "",
+                    ProviderReference = "",
+                    TransactionReference = Guid.NewGuid(),
+                    AppliedAt = now,
+                    CreatedAt = now,
+                });
+
+                _total -= cashAmount;
+            }
+            if (dolarAmount > 0)
+            {
+                payments.Add(new Payment
+                {
+                    Currency = CurrencyType.USD,
+                    Amount = _total,
+                    AmountMXN = currencyType == CurrencyType.MXN ? _total : (_total * currentExchangeRate.Rate),
+                    ReceivedAmount = dolarAmount,
+                    ReceivedAmountMXN = dolarAmountToMXN,
+                    ExchangeRateId = currentExchangeRate.Id,
+                    ExchangeRate = currentExchangeRate.Rate,
+                    PaymentType = PaymentType.Cash,
+                    Provider = "",
+                    ProviderReference = "",
+                    TransactionReference = Guid.NewGuid(),
+                    AppliedAt = now,
+                    CreatedAt = now,
+                });
+
+                _total -= dolarAmountToMXN;
+            }
+            if (otherAmount > 0)
+            {
+                payments.Add(new Payment
+                {
+                    Currency = currencyType,
+                    Amount = _total,
+                    AmountMXN = currencyType == CurrencyType.MXN ? _total : (_total * currentExchangeRate.Rate),
+                    ReceivedAmount = otherAmount,
+                    ReceivedAmountMXN = currencyType == CurrencyType.MXN ? otherAmount : (otherAmount * currentExchangeRate.Rate),
+                    ExchangeRateId = currentExchangeRate.Id,
+                    ExchangeRate = currentExchangeRate.Rate,
+                    PaymentType = PaymentType.Other,
+                    Provider = "",
+                    ProviderReference = "",
+                    TransactionReference = Guid.NewGuid(),
+                    AppliedAt = now,
+                    CreatedAt = now,
+                });
+            }
+
+            return (payments, currentExchangeRate);
+        }
+
+        private sealed record OrderTotalBreakDown(decimal SubTotal, decimal Fee, decimal Tax, decimal Discount, decimal Total, List<OrderFee> Fees, List<Payment> Payments);
     }
 }

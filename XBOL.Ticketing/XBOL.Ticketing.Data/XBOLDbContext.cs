@@ -68,6 +68,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<PriceReference> PriceReferences => Set<PriceReference>();
         public DbSet<PriceSegment> PriceSegments => Set<PriceSegment>();
         public DbSet<PriceType> PriceTypes => Set<PriceType>();
+        public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
 
         public XBOLDbContext() : base()
         {

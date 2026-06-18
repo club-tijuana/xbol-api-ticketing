@@ -14,8 +14,8 @@ using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
 using ModelClient = XBOL.Ticketing.Core.Model.Client;
 using ModelOrder = XBOL.Ticketing.Core.Model.Order;
-using ModelTicket = XBOL.Ticketing.Core.Model.Ticket;
 using ModelOrderItem = XBOL.Ticketing.Core.Model.OrderItem;
+using ModelTicket = XBOL.Ticketing.Core.Model.Ticket;
 
 namespace XBOL.Ticketing.Services.EvoPayment
 {
@@ -108,7 +108,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
         {
             var order = await _orderRepository.GetByIdAsync(request.OrderId);
             if (order == null)
+            {
                 throw new InvalidOperationException("Order not found.");
+            }
 
             var evoRequest = new
             {
@@ -144,8 +146,10 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     var payment = order.Payments
                         .FirstOrDefault(p => p.TransactionReference == request.TransactionRefId);
                     if (payment == null)
+                    {
                         throw new InvalidOperationException(
                             $"Payment with transaction reference {request.TransactionRefId} not found for order {request.OrderId}.");
+                    }
 
                     order.Status = Core.Commons.Enums.OrderStatus.Paid;
                     order.PaidAt = DateTimeOffset.UtcNow;
@@ -201,7 +205,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
             CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(orderRefId))
+            {
                 throw new ArgumentException("orderRefId is required.", nameof(orderRefId));
+            }
 
             _logger.LogInformation(
                 "Querying order in EVO (Retrieve Order). orderRefId={OrderRefId}", orderRefId);
@@ -229,22 +235,34 @@ namespace XBOL.Ticketing.Services.EvoPayment
             status = GetStringProp(root, "status");
             currency = GetStringProp(root, "currency");
             if (root.TryGetProperty("totalCapturedAmount", out var tc) && tc.TryGetDecimal(out var tcVal))
+            {
                 totalCaptured = tcVal;
+            }
+
             if (root.TryGetProperty("totalAuthorizedAmount", out var ta) && ta.TryGetDecimal(out var taVal))
+            {
                 totalAuthorized = taVal;
+            }
 
             if (root.TryGetProperty("order", out var orderEl))
             {
                 status ??= GetStringProp(orderEl, "status");
                 currency ??= GetStringProp(orderEl, "currency");
                 if (totalCaptured == null && orderEl.TryGetProperty("totalCapturedAmount", out var tc2) && tc2.TryGetDecimal(out var tcVal2))
+                {
                     totalCaptured = tcVal2;
+                }
+
                 if (totalAuthorized == null && orderEl.TryGetProperty("totalAuthorizedAmount", out var ta2) && ta2.TryGetDecimal(out var taVal2))
+                {
                     totalAuthorized = taVal2;
+                }
             }
 
             if (root.TryGetProperty("response", out var resp))
+            {
                 gatewayCode = GetStringProp(resp, "gatewayCode");
+            }
 
             string? cardMasked = null, cardBrand = null;
             if (root.TryGetProperty("sourceOfFunds", out var sof)
@@ -278,7 +296,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
             CancellationToken ct = default)
         {
             if (request.Seats.Count == 0)
+            {
                 throw new ArgumentException("At least one seat is required.", nameof(request));
+            }
 
             var duplicateSeatKeys = request.Seats
                 .GroupBy(s => s.SeatKey, StringComparer.Ordinal)
@@ -286,25 +306,39 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 .Select(g => g.Key)
                 .ToList();
             if (duplicateSeatKeys.Count > 0)
+            {
                 throw new ArgumentException($"Duplicate SeatKeys: {string.Join(", ", duplicateSeatKeys)}");
+            }
 
             if (string.IsNullOrWhiteSpace(request.ClientContact.Email))
+            {
                 throw new ArgumentException("Buyer email is required.", nameof(request));
+            }
 
             if (!Uri.TryCreate(request.ReturnUrl, UriKind.Absolute, out _))
+            {
                 throw new ArgumentException("ReturnUrl must be a valid absolute URI.", nameof(request));
+            }
 
             var schedule = await _dbContext.EventSchedules
                 .FindAsync([request.EventScheduleId], ct);
             if (schedule is null)
+            {
                 throw new KeyNotFoundException(
                     $"EventSchedule {request.EventScheduleId} not found.");
+            }
+
             if (schedule.Status != ScheduleStatus.OnSale)
+            {
                 throw new InvalidOperationException(
                     $"The event is not available for sale (status: {schedule.Status}).");
+            }
+
             if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+            {
                 throw new InvalidOperationException(
                     $"EventSchedule {request.EventScheduleId} does not have a published event in Seats.io.");
+            }
 
             var requestedItemIds = request.Seats
                 .Select(s => s.PriceListItemId)
@@ -322,12 +356,13 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             var invalidItemIds = requestedItemIds.Where(id => !validPriceItems.ContainsKey(id)).ToList();
             if (invalidItemIds.Count > 0)
+            {
                 throw new KeyNotFoundException(
                     $"Invalid PriceListItem(s) or not belonging to this event: {string.Join(", ", invalidItemIds)}");
+            }
 
             var total = request.Seats.Sum(s => validPriceItems[s.PriceListItemId].FinalPrice);
             var amountStr = total.ToString("F2", CultureInfo.InvariantCulture);
-
 
             var requestedSeatKeys = request.Seats.Select(s => s.SeatKey).ToList();
             var eventSeats = await _dbContext.EventSeats
@@ -339,9 +374,10 @@ namespace XBOL.Ticketing.Services.EvoPayment
             var foundSeatKeys = eventSeats.Select(es => es.ExternalSeatObjectKey).ToHashSet(StringComparer.Ordinal);
             var missingSeatKeys = requestedSeatKeys.Where(k => !foundSeatKeys.Contains(k)).ToList();
             if (missingSeatKeys.Count > 0)
+            {
                 throw new KeyNotFoundException(
                     $"SeatKeys not found for this event: {string.Join(", ", missingSeatKeys)}");
-
+            }
 
             var inventoryBatchId = await _dbContext.InventoryBatches
                 .Where(b => b.EventScheduleId == request.EventScheduleId
@@ -354,12 +390,10 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 "Initiating checkout. EventScheduleId={EventScheduleId} Seats={SeatCount} Total={Total} Currency={Currency}",
                 request.EventScheduleId, request.Seats.Count, amountStr, request.Currency);
 
-
             var orderRefId = Guid.NewGuid().ToString("N");
             var (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
                 orderRefId, total, request.Currency, request.ReturnUrl,
                 $"XBOL — {request.Seats.Count} ticket(s)", ct);
-
 
             var bookingSeats = request.Seats
                 .Select(s => new BookingSeatRequest
@@ -384,7 +418,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 throw new InvalidOperationException(
                     "Could not confirm seat reservation. Please try again.", ex);
             }
-
 
             var now = DateTimeOffset.UtcNow;
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
@@ -417,7 +450,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 {
                     Order = order,
                     Amount = total,
-                    PaymentType = PaymentType.CreditCard,
+                    PaymentType = PaymentType.Card,
                     Provider = "EVOPayments",
                     ProviderReference = orderRefId,
                     ProviderSessionReference = successIndicator,
@@ -428,7 +461,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     CreatedBy = Guid.Empty,
                     UpdatedBy = Guid.Empty
                 };
-
 
                 var eventSeatByKey = eventSeats.ToDictionary(es => es.ExternalSeatObjectKey, StringComparer.Ordinal);
                 foreach (var seatReq in request.Seats)
@@ -501,7 +533,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
             {
                 await transaction.RollbackAsync(ct);
 
-
                 try
                 {
                     await _seatsIoBookingClient.ReleaseBookedSeatsAsync(
@@ -531,16 +562,19 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 .FirstOrDefaultAsync(o => o.Id == request.LocalOrderId, ct);
 
             if (order is null)
+            {
                 throw new KeyNotFoundException($"Order {request.LocalOrderId} not found.");
+            }
 
             var payment = await _dbContext.Payments
                 .FirstOrDefaultAsync(
                     p => p.OrderId == order.Id && p.ProviderReference == request.OrderRefId, ct);
 
             if (payment is null)
+            {
                 throw new KeyNotFoundException(
                     $"Payment not found for OrderId={order.Id} with ProviderReference={request.OrderRefId}.");
-
+            }
 
             if (payment.PaymentStatus == PaymentStatus.Captured
                 && order.Status == OrderStatus.Paid
@@ -558,7 +592,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 };
             }
 
-
             if (!string.IsNullOrWhiteSpace(request.ResultIndicator)
                 && !string.Equals(request.ResultIndicator, payment.ProviderSessionReference, StringComparison.Ordinal))
             {
@@ -567,9 +600,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     order.Id, request.ResultIndicator, payment.ProviderSessionReference);
             }
 
-
             var evoResult = await RetrieveOrderAsync(request.OrderRefId, ct);
-
 
             var isSuccess =
                 string.Equals(evoResult.Result, "SUCCESS", StringComparison.OrdinalIgnoreCase)
@@ -579,7 +610,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             if (isSuccess)
             {
-
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
@@ -624,7 +654,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
             else
             {
-
                 var newPaymentStatus = DetermineFailedPaymentStatus(evoResult);
                 var newTicketStatus = newPaymentStatus == PaymentStatus.Expired
                     ? TicketStatus.Expired
@@ -644,7 +673,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                         ticket.Status = newTicketStatus;
                         ticket.UpdatedAt = now;
                         ticket.UpdatedBy = Guid.Empty;
-
                     }
 
                     await _dbContext.SaveChangesAsync(ct);
@@ -655,7 +683,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     await transaction.RollbackAsync(ct);
                     throw;
                 }
-
 
                 var seatKeys = order.Tickets.Select(t => t.TicketCode).ToList();
                 if (seatKeys.Count > 0 && !string.IsNullOrWhiteSpace(order.EventScheduleId.ToString()))
@@ -702,9 +729,15 @@ namespace XBOL.Ticketing.Services.EvoPayment
         private static PaymentStatus DetermineFailedPaymentStatus(RetrieveOrderResponse evoResult)
         {
             if (string.Equals(evoResult.Status, "CANCELLED", StringComparison.OrdinalIgnoreCase))
+            {
                 return PaymentStatus.Cancelled;
+            }
+
             if (string.Equals(evoResult.Status, "EXPIRED", StringComparison.OrdinalIgnoreCase))
+            {
                 return PaymentStatus.Expired;
+            }
+
             return PaymentStatus.Failed;
         }
 
@@ -771,11 +804,16 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 : null;
 
             if (string.IsNullOrWhiteSpace(sessionId))
+            {
                 throw new InvalidOperationException(
                     "EVO did not return session.id in the INITIATE_CHECKOUT response.");
+            }
+
             if (string.IsNullOrWhiteSpace(successIndicator))
+            {
                 throw new InvalidOperationException(
                     "EVO did not return successIndicator in the INITIATE_CHECKOUT response.");
+            }
 
             _logger.LogInformation(
                 "INITIATE_CHECKOUT successful. orderRefId={OrderRefId} sessionId={SessionId} successIndicator={SI}",
@@ -795,7 +833,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
             {
                 client = await _dbContext.Clients.FindAsync([contact.Id.Value], ct);
                 if (client is null)
+                {
                     throw new KeyNotFoundException($"Client {contact.Id.Value} not found.");
+                }
             }
             else if (!string.IsNullOrWhiteSpace(contact.Email))
             {
@@ -823,11 +863,19 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
 
             if (!string.IsNullOrWhiteSpace(contact.Email))
+            {
                 client.Email = contact.Email.Trim();
+            }
+
             if (contact.PhoneRegionCodeId.HasValue)
+            {
                 client.PhoneRegionCodeId = contact.PhoneRegionCodeId;
+            }
+
             if (!string.IsNullOrWhiteSpace(contact.PhoneNumber))
+            {
                 client.PhoneNumber = NormalizePhoneNumber(contact.PhoneNumber);
+            }
 
             client.FullName = ResolveFullName(contact, client.FullName);
             client.UpdatedAt = now;
@@ -838,7 +886,10 @@ namespace XBOL.Ticketing.Services.EvoPayment
         private static string? ResolveFullName(ClientInfoRequest contact, string? fallback = null)
         {
             if (!string.IsNullOrWhiteSpace(contact.FullName))
+            {
                 return contact.FullName.Trim();
+            }
+
             var composed = $"{contact.FirstName} {contact.LastName}".Trim();
             return string.IsNullOrWhiteSpace(composed) ? fallback : composed;
         }
@@ -853,13 +904,21 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
         private static string Redact(string? value)
         {
-            if (string.IsNullOrEmpty(value) || value.Length <= 8) return "***";
+            if (string.IsNullOrEmpty(value) || value.Length <= 8)
+            {
+                return "***";
+            }
+
             return $"{value[..6]}…{value[^4..]}";
         }
 
         private static string SanitizeBody(string body)
         {
-            if (string.IsNullOrEmpty(body)) return "(empty)";
+            if (string.IsNullOrEmpty(body))
+            {
+                return "(empty)";
+            }
+
             var trimmed = body.Length > 800 ? body[..800] + "…(truncated)" : body;
             return trimmed.Replace(Environment.NewLine, " ").Replace("\n", " ");
         }

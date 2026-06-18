@@ -1,12 +1,9 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
-using Odasoft.XBOL.Commons.Requests;
+using System.Globalization;
 using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Request;
 using XBOL.Ticketing.Data;
-using XBOL.Ticketing.Core.Model;
 using ModelOrder = XBOL.Ticketing.Core.Model.Order;
-using ModelTicket = XBOL.Ticketing.Core.Model.Ticket;
-using ModelBundlePass = XBOL.Ticketing.Core.Model.BundlePass;
 
 namespace XBOL.Ticketing.Services.Email;
 

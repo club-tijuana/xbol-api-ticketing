@@ -1,3 +1,4 @@
+using Hangfire;
 using Microsoft.Extensions.Options;
 using System.Text;
 using XBOL.Ticketing.API.Extensions;
@@ -99,6 +100,22 @@ var localizationOptions = new RequestLocalizationOptions()
     .SetDefaultCulture("es")
     .AddSupportedCultures(supportedCultures)
     .AddSupportedUICultures(supportedCultures);
+
+var connectionString = builder.Configuration.GetConnectionString("Database");
+
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(
+        opts => opts.UseNpgsqlConnection(connectionString),
+        new PostgreSqlStorageOptions
+        {
+            // Como API 2 es solo cliente, le decimos que NO intente crear/modificar tablas.
+            // Le dejamos esa responsabilidad al API 1 o a tus migraciones.
+            PrepareSchemaIfNecessary = false,
+            DistributedLockTimeout = TimeSpan.FromMinutes(1)
+        }));
 
 app.UseRequestLocalization(localizationOptions);
 

@@ -5,9 +5,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
-using Odasoft.XBOL.Commons.Options;
 using XBOL.Ticketing.API.Options;
-using XBOL.Ticketing.Services;
 using XBOL.Ticketing.Services.EvoPayment;
 
 namespace XBOL.Ticketing.API.Schema;

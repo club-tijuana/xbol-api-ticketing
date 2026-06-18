@@ -120,8 +120,14 @@ namespace XBOL.Ticketing.Services
                 .Select(section =>
                 {
                     PriceListItem? matchedPriceItem = null;
-                    if (sectionPrices.TryGetValue(section.Id, out var sPli)) matchedPriceItem = sPli;
-                    else if (zonePrices.TryGetValue(section.BaseZoneId, out var zPli)) matchedPriceItem = zPli;
+                    if (sectionPrices.TryGetValue(section.Id, out var sPli))
+                    {
+                        matchedPriceItem = sPli;
+                    }
+                    else if (zonePrices.TryGetValue(section.BaseZoneId, out var zPli))
+                    {
+                        matchedPriceItem = zPli;
+                    }
 
                     return new
                     {

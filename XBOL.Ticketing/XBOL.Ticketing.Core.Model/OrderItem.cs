@@ -6,12 +6,10 @@ namespace XBOL.Ticketing.Core.Model
     {
         public long OrderId { get; set; }
         public Order Order { get; set; } = null!;
-
         public ItemType ItemType { get; set; }
         public long ItemReferenceId { get; set; }
-
         public bool IsCourtesy { get; set; }
-
         public decimal Price { get; set; }
+        public long PriceListItemId { get; set; }
     }
 }
