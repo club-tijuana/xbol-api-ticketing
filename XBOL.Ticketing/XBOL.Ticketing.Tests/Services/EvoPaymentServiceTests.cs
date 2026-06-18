@@ -115,12 +115,48 @@ public sealed class EvoPaymentServiceTests
             model.IsBundle);
     }
 
+    [Fact]
+    public async Task ConfirmCheckoutAsync_WhenPaymentFails_ReleasesSeatsFromTicketSchedule()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedPendingCheckoutOrderAsync(context);
+
+        var seatsIoBookingClient = Substitute.For<ISeatsIoBookingClient>();
+        var sut = CreateService(
+            context,
+            Substitute.For<IBackgroundJobClient>(),
+            seatsIoBookingClient,
+            """{"result":"FAILURE","status":"CANCELLED","gatewayCode":"DECLINED","totalCapturedAmount":0}""");
+
+        var result = await sut.ConfirmCheckoutAsync(new ConfirmCheckoutRequest
+        {
+            LocalOrderId = 1,
+            OrderRefId = "evo-order-1",
+            ResultIndicator = "success-indicator-1"
+        });
+
+        result.OrderStatus.Should().Be(OrderStatus.Cancelled.ToString());
+        result.PaymentStatus.Should().Be(PaymentStatus.Cancelled.ToString());
+
+        await seatsIoBookingClient.Received(1)
+            .ReleaseBookedSeatsAsync("schedule-100", Arg.Is<IReadOnlyCollection<string>>(seats => seats.SequenceEqual(new[] { "A-1" })), Arg.Any<CancellationToken>());
+    }
+
     private static EvoPaymentService CreateService(
         XBOLDbContext context,
-        IBackgroundJobClient backgroundJobs)
+        IBackgroundJobClient backgroundJobs,
+        ISeatsIoBookingClient? seatsIoBookingClient = null,
+        string retrieveOrderResponse = """{"result":"SUCCESS","status":"CAPTURED","totalCapturedAmount":125.00}""")
     {
-        var httpClient = new HttpClient(new StubHttpMessageHandler(
-            """{"result":"SUCCESS","status":"CAPTURED","totalCapturedAmount":125.00}"""))
+        var httpClient = new HttpClient(new StubHttpMessageHandler(retrieveOrderResponse))
         {
             BaseAddress = new Uri("https://gateway.example.test/api/")
         };
@@ -138,7 +174,7 @@ public sealed class EvoPaymentServiceTests
             Substitute.For<ILogger<SeatsIoService>>(),
             context,
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
-            Substitute.For<ISeatsIoBookingClient>(),
+            seatsIoBookingClient ?? Substitute.For<ISeatsIoBookingClient>(),
             new BookingConfirmationEmailQueue(
                 backgroundJobs,
                 new BookingEmailModelBuilder(context),
@@ -267,13 +303,12 @@ public sealed class EvoPaymentServiceTests
             Status = OrderStatus.Pending,
             SaleChannel = SaleChannel.Online,
             OrderType = OrderType.Ticket,
-            EventScheduleId = schedule.Id,
-            HoldToken = "hold-123",
             CreatedAt = now,
             UpdatedAt = now,
             CreatedBy = Guid.Empty,
             UpdatedBy = Guid.Empty
         };
+
         var ticket = new Ticket
         {
             Id = 1,
@@ -309,10 +344,8 @@ public sealed class EvoPaymentServiceTests
             PaymentType = PaymentType.Card,
             Provider = "EVOPayments",
             ProviderReference = "evo-order-1",
-            ProviderSessionReference = "success-indicator-1",
-            PaymentStatus = PaymentStatus.Pending,
             TransactionReference = Guid.NewGuid(),
-            AppliedAt = null,
+            AppliedAt = now,
             CreatedAt = now,
             CreatedBy = Guid.Empty,
             UpdatedBy = Guid.Empty
@@ -398,10 +431,8 @@ public sealed class EvoPaymentServiceTests
             PaymentType = PaymentType.Card,
             Provider = "EVOPayments",
             ProviderReference = "evo-order-bundle-1",
-            ProviderSessionReference = "success-indicator-bundle-1",
-            PaymentStatus = PaymentStatus.Pending,
             TransactionReference = Guid.NewGuid(),
-            AppliedAt = null,
+            AppliedAt = now,
             CreatedAt = now,
             CreatedBy = Guid.Empty,
             UpdatedBy = Guid.Empty

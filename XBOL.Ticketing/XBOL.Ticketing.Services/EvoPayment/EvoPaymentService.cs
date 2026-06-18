@@ -442,8 +442,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     Status = OrderStatus.Pending,
                     SaleChannel = SaleChannel.Online,
                     OrderType = OrderType.Ticket,
-                    EventScheduleId = request.EventScheduleId,
-                    HoldToken = request.HoldToken,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = Guid.Empty,
@@ -457,10 +455,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     PaymentType = PaymentType.Card,
                     Provider = "EVOPayments",
                     ProviderReference = orderRefId,
-                    ProviderSessionReference = successIndicator,
-                    PaymentStatus = PaymentStatus.Pending,
                     TransactionReference = Guid.NewGuid(),
-                    AppliedAt = null,
+                    AppliedAt = now,
                     CreatedAt = now,
                     CreatedBy = Guid.Empty,
                     UpdatedBy = Guid.Empty
@@ -581,8 +577,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     $"Payment not found for OrderId={order.Id} with ProviderReference={request.OrderRefId}.");
             }
 
-            if (payment.PaymentStatus == PaymentStatus.Captured
-                && order.Status == OrderStatus.Paid
+            if (order.Status == OrderStatus.Paid
                 && order.Tickets.All(t => t.Status == TicketStatus.Issued))
             {
                 _logger.LogInformation(
@@ -591,18 +586,10 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 {
                     OrderId = order.Id,
                     OrderStatus = order.Status.ToString(),
-                    PaymentStatus = payment.PaymentStatus.ToString(),
+                    PaymentStatus = PaymentStatus.Captured.ToString(),
                     TicketsIssued = order.Tickets.Count(t => t.Status == TicketStatus.Issued),
                     Reference = order.Reference
                 };
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.ResultIndicator)
-                && !string.Equals(request.ResultIndicator, payment.ProviderSessionReference, StringComparison.Ordinal))
-            {
-                _logger.LogWarning(
-                    "resultIndicator does not match ProviderSessionReference. OrderId={OrderId} ResultIndicator={RI} Expected={Expected}. Continuing with Retrieve Order.",
-                    order.Id, request.ResultIndicator, payment.ProviderSessionReference);
             }
 
             var evoResult = await RetrieveOrderAsync(request.OrderRefId, ct);
@@ -618,7 +605,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
-                    payment.PaymentStatus = PaymentStatus.Captured;
                     payment.AppliedAt = now;
 
                     order.Status = OrderStatus.Paid;
@@ -648,7 +634,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     {
                         OrderId = order.Id,
                         OrderStatus = order.Status.ToString(),
-                        PaymentStatus = payment.PaymentStatus.ToString(),
+                        PaymentStatus = PaymentStatus.Captured.ToString(),
                         TicketsIssued = issued,
                         Reference = order.Reference
                     };
@@ -669,8 +655,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
-                    payment.PaymentStatus = newPaymentStatus;
-
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = now;
                     order.UpdatedBy = Guid.Empty;
@@ -691,29 +675,44 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     throw;
                 }
 
-                var seatKeys = order.Tickets.Select(t => t.TicketCode).ToList();
-                if (seatKeys.Count > 0 && !string.IsNullOrWhiteSpace(order.EventScheduleId.ToString()))
-                {
-                    var eventKey = await _dbContext.EventSchedules
-                        .AsNoTracking()
-                        .Where(s => s.Id == order.EventScheduleId)
-                        .Select(s => s.ExternalEventKey)
-                        .FirstOrDefaultAsync(ct);
+                var seatsBySchedule = order.Tickets
+                    .GroupBy(ticket => ticket.EventScheduleId)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => (IReadOnlyCollection<string>)group.Select(ticket => ticket.TicketCode).ToList());
 
-                    if (!string.IsNullOrWhiteSpace(eventKey))
+                if (seatsBySchedule.Count > 0)
+                {
+                    var eventKeys = await _dbContext.EventSchedules
+                        .AsNoTracking()
+                        .Where(schedule => seatsBySchedule.Keys.Contains(schedule.Id))
+                        .Select(schedule => new
+                        {
+                            schedule.Id,
+                            schedule.ExternalEventKey
+                        })
+                        .ToDictionaryAsync(schedule => schedule.Id, schedule => schedule.ExternalEventKey, ct);
+
+                    foreach (var (eventScheduleId, seatKeys) in seatsBySchedule)
                     {
+                        if (!eventKeys.TryGetValue(eventScheduleId, out var eventKey) ||
+                            string.IsNullOrWhiteSpace(eventKey))
+                        {
+                            continue;
+                        }
+
                         try
                         {
                             await _seatsIoBookingClient.ReleaseBookedSeatsAsync(eventKey, seatKeys, ct);
                             _logger.LogInformation(
-                                "Seats.io released after payment failure. OrderId={OrderId} EventKey={EventKey}",
-                                order.Id, eventKey);
+                                "Seats.io released after payment failure. OrderId={OrderId} EventScheduleId={EventScheduleId} EventKey={EventKey}",
+                                order.Id, eventScheduleId, eventKey);
                         }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex,
-                                "Could not release Seats.io after payment failure. OrderId={OrderId} EventKey={EventKey}",
-                                order.Id, eventKey);
+                                "Could not release Seats.io after payment failure. OrderId={OrderId} EventScheduleId={EventScheduleId} EventKey={EventKey}",
+                                order.Id, eventScheduleId, eventKey);
                         }
                     }
                 }
@@ -726,7 +725,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 {
                     OrderId = order.Id,
                     OrderStatus = order.Status.ToString(),
-                    PaymentStatus = payment.PaymentStatus.ToString(),
+                    PaymentStatus = newPaymentStatus.ToString(),
                     TicketsIssued = 0,
                     Reference = order.Reference
                 };
