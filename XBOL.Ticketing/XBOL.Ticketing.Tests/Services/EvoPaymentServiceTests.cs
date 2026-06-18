@@ -21,11 +21,14 @@ using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.EvoPayment;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
+using TicketingEmailTemplateOptions = XBOL.Ticketing.Core.Commons.Options.EmailTemplateOptions;
 
 namespace XBOL.Ticketing.Tests.Services;
 
 public sealed class EvoPaymentServiceTests
 {
+    private const string SupportEmail = "soporte@pwrticket.mx";
+
     [Fact]
     public async Task ConfirmCheckoutAsync_WhenPaymentIsCaptured_EnqueuesConfirmationEmails()
     {
@@ -57,23 +60,59 @@ public sealed class EvoPaymentServiceTests
         result.OrderStatus.Should().Be(OrderStatus.Paid.ToString());
         result.PaymentStatus.Should().Be(PaymentStatus.Captured.ToString());
 
-        var emailModels = createdJobs
-            .Where(job =>
-                job.Type == typeof(IEmailJob) &&
-                job.Method.Name == nameof(IEmailJob.SendOrderConfirmationAsync) &&
-                job.Args.Count == 1)
-            .Select(job => job.Args[0])
-            .OfType<OrderEmailModel>()
-            .ToList();
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
         emailModels.Should().HaveCount(2);
         emailModels.Should().Contain(model =>
             model.ToAddress == "buyer@example.com" &&
             model.OrderDetails.OrderNumber == "ORD-PAY-1" &&
             !model.IsBundle);
         emailModels.Should().Contain(model =>
-            model.ToAddress == "support@xbol.com" &&
+            model.ToAddress == SupportEmail &&
             model.OrderDetails.OrderNumber == "ORD-PAY-1" &&
             !model.IsBundle);
+    }
+
+    [Fact]
+    public async Task ConfirmCheckoutAsync_WhenBundlePaymentIsCaptured_EnqueuesBundleConfirmationEmails()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedPendingBundleCheckoutOrderAsync(context);
+
+        var createdJobs = new List<Job>();
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
+        var sut = CreateService(context, backgroundJobs);
+
+        var result = await sut.ConfirmCheckoutAsync(new ConfirmCheckoutRequest
+        {
+            LocalOrderId = 2,
+            OrderRefId = "evo-order-bundle-1",
+            ResultIndicator = "success-indicator-bundle-1"
+        });
+
+        result.OrderStatus.Should().Be(OrderStatus.Paid.ToString());
+        result.PaymentStatus.Should().Be(PaymentStatus.Captured.ToString());
+
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
+        emailModels.Should().HaveCount(2);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == "bundle-buyer@example.com" &&
+            model.OrderDetails.OrderNumber == "ORD-BUNDLE-PAY-1" &&
+            model.IsBundle);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == SupportEmail &&
+            model.OrderDetails.OrderNumber == "ORD-BUNDLE-PAY-1" &&
+            model.IsBundle);
     }
 
     private static EvoPaymentService CreateService(
@@ -100,8 +139,26 @@ public sealed class EvoPaymentServiceTests
             context,
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
             Substitute.For<ISeatsIoBookingClient>(),
-            backgroundJobs,
-            new BookingEmailModelBuilder(context));
+            new BookingConfirmationEmailQueue(
+                backgroundJobs,
+                new BookingEmailModelBuilder(context),
+                Options.Create(new TicketingEmailTemplateOptions
+                {
+                    SupportEmail = SupportEmail
+                }),
+                Substitute.For<ILogger<BookingConfirmationEmailQueue>>()));
+    }
+
+    private static List<OrderEmailModel> ExtractOrderConfirmationModels(IEnumerable<Job> jobs)
+    {
+        return jobs
+            .Where(job =>
+                job.Type == typeof(IEmailJob) &&
+                job.Method.Name == nameof(IEmailJob.SendOrderConfirmationAsync) &&
+                job.Args.Count == 1)
+            .Select(job => job.Args[0])
+            .OfType<OrderEmailModel>()
+            .ToList();
     }
 
     private static async Task SeedPendingCheckoutOrderAsync(XBOLDbContext context)
@@ -262,6 +319,96 @@ public sealed class EvoPaymentServiceTests
         });
 
         context.Orders.Add(order);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedPendingBundleCheckoutOrderAsync(XBOLDbContext context)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var client = new Client
+        {
+            ClientType = ClientType.Individual,
+            Email = "bundle-buyer@example.com",
+            FullName = "Bundle Buyer",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var bundle = new Bundle
+        {
+            Id = 2,
+            Name = "Season Bundle",
+            Status = EventStatus.Published,
+            BundleType = BundleType.SeasonPass,
+            BundlePricingType = BundlePricingType.Single,
+            BannerImageUrl = "bundle-banner.png",
+            LandingUrl = "https://example.test/bundle",
+            StartDate = now.AddDays(7),
+            EndDate = now.AddMonths(6),
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var pass = new BundlePass
+        {
+            Id = 2,
+            Bundle = bundle,
+            Client = client,
+            TrackingCode = "A-1",
+            PrivateToken = "private-token",
+            BundlePassType = BundlePassType.Full,
+            Status = BundlePassStatus.Active,
+            IsDigital = true,
+            Price = 500m,
+            PurchasedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var order = new Order
+        {
+            Id = 2,
+            Client = client,
+            Reference = "ORD-BUNDLE-PAY-1",
+            SubTotal = 500m,
+            TotalFees = 0m,
+            TotalTaxes = 0m,
+            Total = 500m,
+            Status = OrderStatus.Pending,
+            SaleChannel = SaleChannel.Online,
+            OrderType = OrderType.Bundle,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        order.Items.Add(new OrderItem
+        {
+            ItemType = ItemType.BundlePass,
+            ItemReferenceId = pass.Id,
+            Price = 500m
+        });
+        order.Payments.Add(new Payment
+        {
+            Amount = 500m,
+            PaymentType = PaymentType.Card,
+            Provider = "EVOPayments",
+            ProviderReference = "evo-order-bundle-1",
+            ProviderSessionReference = "success-indicator-bundle-1",
+            PaymentStatus = PaymentStatus.Pending,
+            TransactionReference = Guid.NewGuid(),
+            AppliedAt = null,
+            CreatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        });
+
+        context.Orders.Add(order);
+        context.BundlePasses.Add(pass);
         await context.SaveChangesAsync();
     }
 

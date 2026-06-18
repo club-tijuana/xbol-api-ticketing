@@ -1,9 +1,6 @@
-using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Odasoft.XBOL.Commons.Email;
-using Odasoft.XBOL.Commons.Requests;
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -33,8 +30,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
         private readonly XBOLDbContext _dbContext;
         private readonly SequenceTrackerService _sequenceTrackerService;
         private readonly ISeatsIoBookingClient _seatsIoBookingClient;
-        private readonly IBackgroundJobClient _backgroundJobClient;
-        private readonly BookingEmailModelBuilder _emailModelBuilder;
+        private readonly BookingConfirmationEmailQueue _confirmationEmailQueue;
 
         public EvoPaymentService(
             HttpClient httpClient,
@@ -45,8 +41,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             XBOLDbContext dbContext,
             SequenceTrackerService sequenceTrackerService,
             ISeatsIoBookingClient seatsIoBookingClient,
-            IBackgroundJobClient backgroundJobClient,
-            BookingEmailModelBuilder emailModelBuilder)
+            BookingConfirmationEmailQueue confirmationEmailQueue)
         {
             _httpClient = httpClient;
             _settings = settings.Value;
@@ -56,8 +51,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             _dbContext = dbContext;
             _sequenceTrackerService = sequenceTrackerService;
             _seatsIoBookingClient = seatsIoBookingClient;
-            _backgroundJobClient = backgroundJobClient;
-            _emailModelBuilder = emailModelBuilder;
+            _confirmationEmailQueue = confirmationEmailQueue;
         }
 
         public async Task<SessionResponse> CreateSessionAsync()
@@ -643,7 +637,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     await _dbContext.SaveChangesAsync(ct);
                     await transaction.CommitAsync(ct);
 
-                    await EnqueueConfirmationEmailsAsync(order.Id, order.Client, ct);
+                    await _confirmationEmailQueue.EnqueueAsync(order.Id, order.Client, ct);
 
                     var issued = order.Tickets.Count(t => t.Status == TicketStatus.Issued);
                     _logger.LogInformation(
@@ -752,70 +746,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
 
             return PaymentStatus.Failed;
-        }
-
-        private async Task EnqueueConfirmationEmailsAsync(
-            long orderId,
-            ModelClient client,
-            CancellationToken cancellationToken)
-        {
-            await EnqueueConfirmationEmailAsync(
-                orderId,
-                "buyer",
-                client.Email ?? "",
-                client.FullName ?? "",
-                cancellationToken);
-
-            await EnqueueConfirmationEmailAsync(
-                orderId,
-                "seller",
-                "support@xbol.com",
-                "Seller",
-                cancellationToken);
-        }
-
-        private async Task EnqueueConfirmationEmailAsync(
-            long orderId,
-            string recipientKind,
-            string toAddress,
-            string toName,
-            CancellationToken cancellationToken)
-        {
-            OrderEmailModel model;
-
-            try
-            {
-                model = await _emailModelBuilder.BuildAsync(
-                    orderId, toAddress, toName, "es-MX", cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Failed to build {RecipientKind} confirmation email model for order {OrderId}",
-                    recipientKind,
-                    orderId);
-                return;
-            }
-
-            try
-            {
-                var jobId = _backgroundJobClient.Enqueue<IEmailJob>(
-                    x => x.SendOrderConfirmationAsync(model));
-                _logger.LogInformation(
-                    "Enqueued {RecipientKind} confirmation email job {JobId} for order {OrderId}",
-                    recipientKind,
-                    jobId,
-                    orderId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Failed to enqueue {RecipientKind} confirmation email job for order {OrderId}",
-                    recipientKind,
-                    orderId);
-            }
         }
 
         private async Task<(string SessionId, string SuccessIndicator)> CallInitiateCheckoutAsync(

@@ -1,9 +1,6 @@
-using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Odasoft.XBOL.Commons.Email;
-using Odasoft.XBOL.Commons.Requests;
 using System.Data;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Options;
@@ -27,8 +24,7 @@ namespace XBOL.Ticketing.Services.Booking
     XBOLDbContext dbContext,
     ISeatsIoBookingClient seatsIoBookingClient,
     SequenceTrackerService sequenceTrackerService,
-    IBackgroundJobClient backgroundJobClient,
-    BookingEmailModelBuilder emailModelBuilder,
+    BookingConfirmationEmailQueue confirmationEmailQueue,
     ILogger<BookingOrchestrationService> logger,
     IOptions<DefaultExchangeRateOptions> defaultExchangeRateOptions,
     IOptions<PaymentLinkOptions> paymentLinkOptions,
@@ -37,8 +33,7 @@ namespace XBOL.Ticketing.Services.Booking
         private readonly XBOLDbContext _dbContext = dbContext;
         private readonly ISeatsIoBookingClient _seatsIoBookingClient = seatsIoBookingClient;
         private readonly SequenceTrackerService _sequenceTrackerService = sequenceTrackerService;
-        private readonly IBackgroundJobClient _backgroundJobClient = backgroundJobClient;
-        private readonly BookingEmailModelBuilder _emailModelBuilder = emailModelBuilder;
+        private readonly BookingConfirmationEmailQueue _confirmationEmailQueue = confirmationEmailQueue;
         private readonly ILogger<BookingOrchestrationService> _logger = logger;
         private readonly DefaultExchangeRateOptions _defaultExchangeRateOptions = defaultExchangeRateOptions.Value;
         private readonly PaymentLinkOptions _paymentLinkOptions = paymentLinkOptions.Value;
@@ -338,7 +333,7 @@ namespace XBOL.Ticketing.Services.Booking
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
+            await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
 
             return new BookingResultResponse
             {
@@ -474,7 +469,7 @@ namespace XBOL.Ticketing.Services.Booking
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            await EnqueueConfirmationEmailsAsync(order.Id, client, cancellationToken);
+            await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
 
             return new BookingResultResponse
             {
@@ -866,70 +861,6 @@ namespace XBOL.Ticketing.Services.Booking
         private static string NormalizePhoneNumber(string phoneNumber)
         {
             return new string(phoneNumber.Where(char.IsAsciiDigit).ToArray());
-        }
-
-        private async Task EnqueueConfirmationEmailsAsync(
-            long orderId,
-            ModelClient client,
-            CancellationToken cancellationToken)
-        {
-            await EnqueueConfirmationEmailAsync(
-                orderId,
-                "buyer",
-                client.Email ?? "",
-                client.FullName ?? "",
-                cancellationToken);
-
-            await EnqueueConfirmationEmailAsync(
-                orderId,
-                "seller",
-                "support@xbol.com",
-                "Seller",
-                cancellationToken);
-        }
-
-        private async Task EnqueueConfirmationEmailAsync(
-            long orderId,
-            string recipientKind,
-            string toAddress,
-            string toName,
-            CancellationToken cancellationToken)
-        {
-            OrderEmailModel model;
-
-            try
-            {
-                model = await _emailModelBuilder.BuildAsync(
-                    orderId, toAddress, toName, "es-MX", cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Failed to build {RecipientKind} confirmation email model for order {OrderId}",
-                    recipientKind,
-                    orderId);
-                return;
-            }
-
-            try
-            {
-                var jobId = _backgroundJobClient.Enqueue<IEmailJob>(
-                    x => x.SendOrderConfirmationAsync(model));
-                _logger.LogInformation(
-                    "Enqueued {RecipientKind} confirmation email job {JobId} for order {OrderId}",
-                    recipientKind,
-                    jobId,
-                    orderId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(
-                    ex,
-                    "Failed to enqueue {RecipientKind} confirmation email job for order {OrderId}",
-                    recipientKind,
-                    orderId);
-            }
         }
 
         private sealed record RemoteBooking(string EventKey, IReadOnlyList<string> SeatKeys);

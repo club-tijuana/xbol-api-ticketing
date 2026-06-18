@@ -82,6 +82,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<RulesEngineService>();
             services.AddScoped<BookingHoldService>();
             services.AddScoped<BookingEmailModelBuilder>();
+            services.AddScoped<BookingConfirmationEmailQueue>();
 
             services.AddScoped<ISeatsIoEventLifecycleClient, SeatsIoService>();
             services.AddScoped<ISeatsIoSeasonLifecycleClient, SeatsIoService>();

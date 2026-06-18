@@ -18,11 +18,14 @@ using XBOL.Ticketing.Data.Repositories;
 using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
+using TicketingEmailTemplateOptions = XBOL.Ticketing.Core.Commons.Options.EmailTemplateOptions;
 
 namespace XBOL.Ticketing.Tests.Services;
 
 public class BookingOrchestrationServiceTests
 {
+    private const string SupportEmail = "soporte@pwrticket.mx";
+
     [Fact]
     public async Task BookAsync_TicketRequest_BooksSeatsAndPersistsPaidOrderTicketsAndItems()
     {
@@ -126,7 +129,7 @@ public class BookingOrchestrationServiceTests
             model.OrderDetails.OrderNumber == "ORD-E-100-000001" &&
             !model.IsBundle);
         emailModels.Should().Contain(model =>
-            model.ToAddress == "support@xbol.com" &&
+            model.ToAddress == SupportEmail &&
             model.OrderDetails.OrderNumber == "ORD-E-100-000001" &&
             !model.IsBundle);
     }
@@ -516,7 +519,7 @@ public class BookingOrchestrationServiceTests
             model.OrderDetails.OrderNumber == "ORD-B-20-000001" &&
             model.IsBundle);
         emailModels.Should().Contain(model =>
-            model.ToAddress == "support@xbol.com" &&
+            model.ToAddress == SupportEmail &&
             model.OrderDetails.OrderNumber == "ORD-B-20-000001" &&
             model.IsBundle);
     }
@@ -586,7 +589,7 @@ public class BookingOrchestrationServiceTests
         var emailModels = ExtractOrderConfirmationModels(createdJobs);
         emailModels.Should().HaveCount(2);
         emailModels[0].ToAddress.Should().Be("buyer@example.com");
-        emailModels[1].ToAddress.Should().Be("support@xbol.com");
+        emailModels[1].ToAddress.Should().Be(SupportEmail);
     }
 
     [Fact]
@@ -615,8 +618,12 @@ public class BookingOrchestrationServiceTests
         backgroundJobs
             .Create(Arg.Any<Job>(), Arg.Any<EnqueuedState>())
             .Returns("buyer-job-1", "seller-job-1");
-        var logger = Substitute.For<ILogger<BookingOrchestrationService>>();
-        var sut = CreateService(context, bookingClient, backgroundJobs, logger);
+        var emailLogger = Substitute.For<ILogger<BookingConfirmationEmailQueue>>();
+        var sut = CreateService(
+            context,
+            bookingClient,
+            backgroundJobs,
+            confirmationEmailLogger: emailLogger);
         var request = new BookSeatsActionRequest
         {
             EventKey = "schedule-100",
@@ -646,7 +653,7 @@ public class BookingOrchestrationServiceTests
         var result = await sut.BookAsync(request, Guid.NewGuid());
         var orderId = result.OrderId.ToString();
 
-        var infoLogs = RenderedLogMessages(logger, LogLevel.Information);
+        var infoLogs = RenderedLogMessages(emailLogger, LogLevel.Information);
         infoLogs.Should().Contain(message =>
             message.Contains("buyer-job-1", StringComparison.Ordinal) &&
             message.Contains(orderId, StringComparison.Ordinal));
@@ -1745,14 +1752,21 @@ public class BookingOrchestrationServiceTests
         XBOLDbContext context,
         ISeatsIoBookingClient bookingClient,
         IBackgroundJobClient? backgroundJobClient = null,
-        ILogger<BookingOrchestrationService>? logger = null)
+        ILogger<BookingOrchestrationService>? logger = null,
+        ILogger<BookingConfirmationEmailQueue>? confirmationEmailLogger = null)
     {
         return new BookingOrchestrationService(
             context,
             bookingClient,
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
-            backgroundJobClient ?? Substitute.For<IBackgroundJobClient>(),
-            new BookingEmailModelBuilder(context),
+            new BookingConfirmationEmailQueue(
+                backgroundJobClient ?? Substitute.For<IBackgroundJobClient>(),
+                new BookingEmailModelBuilder(context),
+                Options.Create(new TicketingEmailTemplateOptions
+                {
+                    SupportEmail = SupportEmail
+                }),
+                confirmationEmailLogger ?? Substitute.For<ILogger<BookingConfirmationEmailQueue>>()),
             logger ?? Substitute.For<ILogger<BookingOrchestrationService>>(),
             Options.Create(new DefaultExchangeRateOptions { Value = 20m }),
             Options.Create(new PaymentLinkOptions { Url = "https://example.test/pay/{paymentLinkCode}" }),
@@ -1790,7 +1804,7 @@ public class BookingOrchestrationServiceTests
     }
 
     private static List<string> RenderedLogMessages(
-        ILogger<BookingOrchestrationService> logger,
+        ILogger logger,
         LogLevel logLevel)
     {
         return logger.ReceivedCalls()
