@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Odasoft.XBOL.Commons.Email;
+using Odasoft.XBOL.Commons.Requests;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Core.DTO.Requests;
@@ -437,6 +438,67 @@ public class BookingOrchestrationServiceTests
             default!,
             default!,
             default);
+    }
+
+    [Fact]
+    public async Task BookAsync_SeasonPassBundleRequest_EnqueuesBundleConfirmationEmails()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedSeasonPassBundleAsync(context);
+        var sourceOrder = await SeedSourceOrderAsync(context, "ORD-B-OLD-000001");
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        AllowSeasonPassRemoteReadiness(bookingClient);
+        bookingClient.BookSeatsAsync(
+                "season-20",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var sut = CreateService(context, bookingClient, backgroundJobs);
+        var request = new BookSeatsActionRequest
+        {
+            BundleId = 20,
+            EventKey = "season-20",
+            EventScheduleId = 0,
+            HoldToken = "hold-123",
+            TicketType = ItemType.BundlePass,
+            Localizer = "ORD-B-20-000001",
+            ReferenceOrderId = sourceOrder.Id,
+            Seats =
+            [
+                new BookingSeatRequest
+                {
+                    SeatKey = "A-1",
+                    SeatPrice = 500m,
+                    PriceListItemId = 3
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                Email = "season@example.com",
+                FirstName = "Ada",
+                LastName = "Lovelace"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        await sut.BookAsync(request, Guid.NewGuid());
+
+        backgroundJobs.Received(2).Create(
+            Arg.Is<Job>(job => IsBundleOrderConfirmationJob(job)),
+            Arg.Any<EnqueuedState>());
     }
 
     [Fact]
@@ -1559,6 +1621,19 @@ public class BookingOrchestrationServiceTests
     {
         CashAmount = 10_000m
     };
+
+    private static bool IsBundleOrderConfirmationJob(Job job)
+    {
+        if (job.Type != typeof(IEmailJob) ||
+            job.Method.Name != nameof(IEmailJob.SendOrderConfirmationAsync) ||
+            job.Args.Count != 1 ||
+            job.Args[0] is not OrderEmailModel model)
+        {
+            return false;
+        }
+
+        return model.GetType().GetProperty("IsBundle")?.GetValue(model) is true;
+    }
 
     private static async Task SeedStandaloneEventAsync(
         XBOLDbContext context,

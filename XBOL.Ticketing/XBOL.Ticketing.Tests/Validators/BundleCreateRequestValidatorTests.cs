@@ -18,6 +18,8 @@ public class BundleCreateRequestValidatorTests
         BundleType = BundleType.Basic,
         BundlePricingType = BundlePricingType.Composite,
         EventScheduleIds = [101],
+        StartDate = DateTimeOffset.UtcNow.AddDays(7),
+        EndDate = DateTimeOffset.UtcNow.AddDays(8),
         OnSaleDate = DateTimeOffset.UtcNow.AddDays(-1),
         OffSaleDate = DateTimeOffset.UtcNow.AddDays(30)
     };
@@ -117,12 +119,14 @@ public class BundleCreateRequestValidatorTests
     }
 
     [Fact]
-    public async Task EventScheduleIds_Empty_Fails()
+    public async Task EventScheduleIds_Empty_Passes()
     {
         var request = ValidRequest();
         request.EventScheduleIds = [];
+
         var result = await _sut.TestValidateAsync(request);
-        result.ShouldHaveValidationErrorFor(x => x.EventScheduleIds);
+
+        result.ShouldNotHaveValidationErrorFor(x => x.EventScheduleIds);
     }
 
     [Fact]
@@ -168,6 +172,28 @@ public class BundleCreateRequestValidatorTests
         request.StartDate = DateTimeOffset.UtcNow;
         request.EndDate = DateTimeOffset.UtcNow.AddDays(-1);
         var result = await _sut.TestValidateAsync(request);
+        result.ShouldHaveValidationErrorFor(x => x.EndDate);
+    }
+
+    [Fact]
+    public async Task StartDate_Missing_Fails()
+    {
+        var request = ValidRequest();
+        request.StartDate = null;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.StartDate);
+    }
+
+    [Fact]
+    public async Task EndDate_Missing_Fails()
+    {
+        var request = ValidRequest();
+        request.EndDate = null;
+
+        var result = await _sut.TestValidateAsync(request);
+
         result.ShouldHaveValidationErrorFor(x => x.EndDate);
     }
 

@@ -209,7 +209,8 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
             AppleWalletUrl = "#",
             EntryInstructions = EntryInstructions,
             PromoBannerImageUrl = "",
-            PromoBannerLinkUrl = bundle.LandingUrl
+            PromoBannerLinkUrl = bundle.LandingUrl,
+            IsBundle = true
         };
     }
 

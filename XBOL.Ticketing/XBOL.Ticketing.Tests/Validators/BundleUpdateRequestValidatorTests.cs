@@ -107,6 +107,29 @@ public class BundleUpdateRequestValidatorTests
     }
 
     [Fact]
+    public async Task DatePairs_WhenOnlyOneSideProvided_Pass()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var requests = new[]
+        {
+            new BundleUpdateRequest { EndDate = now },
+            new BundleUpdateRequest { PublishedDate = now },
+            new BundleUpdateRequest { PreSaleDate = now },
+            new BundleUpdateRequest { OnSaleDate = now },
+            new BundleUpdateRequest { OffSaleDate = now },
+            new BundleUpdateRequest { RenewalStartDate = now },
+            new BundleUpdateRequest { RenewalEndDate = now }
+        };
+
+        foreach (var request in requests)
+        {
+            var result = await _sut.TestValidateAsync(request);
+
+            result.ShouldNotHaveAnyValidationErrors();
+        }
+    }
+
+    [Fact]
     public async Task OffSaleDate_BeforeOnSaleDate_WhenBothProvided_Fails()
     {
         var request = new BundleUpdateRequest

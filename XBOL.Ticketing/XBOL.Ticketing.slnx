@@ -14,5 +14,6 @@
   <Folder Name="/Service/">
     <Project Path="XBOL.Ticketing.Services/XBOL.Ticketing.Services.csproj" />
   </Folder>
+  <Project Path="Odasoft.XBOL.Commons/Odasoft.XBOL.Commons.csproj" />
   <Project Path="XBOL.Ticketing.API/XBOL.Ticketing.API.csproj" />
 </Solution>
