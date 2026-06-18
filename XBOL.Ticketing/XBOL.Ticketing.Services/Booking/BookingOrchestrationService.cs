@@ -600,34 +600,37 @@ namespace XBOL.Ticketing.Services.Booking
                 throw new InvalidOperationException("Bundle sale window is not configured.");
             }
 
-            if (now < bundle.OnSaleDate.Value || now >= bundle.OffSaleDate.Value)
+            if (now >= bundle.OffSaleDate.Value)
             {
-                throw new InvalidOperationException("Bundle is not on sale.");
+                throw new InvalidOperationException("Bundle is no longer on sale.");
             }
 
-            if (!bundle.PreviousBundleId.HasValue)
+            if (bundle.PreviousBundleId.HasValue)
             {
-                return;
-            }
-
-            if (!bundle.RenewalStartDate.HasValue || !bundle.RenewalEndDate.HasValue)
-            {
-                throw new InvalidOperationException("Bundle renewal window is not configured.");
-            }
-
-            if (request.ReferenceOrderId.HasValue)
-            {
-                if (now < bundle.RenewalStartDate.Value)
+                if (!bundle.RenewalStartDate.HasValue || !bundle.RenewalEndDate.HasValue)
                 {
-                    throw new InvalidOperationException("Bundle renewal window is not open.");
+                    throw new InvalidOperationException("Bundle renewal window is not configured.");
                 }
 
-                return;
+                if (request.ReferenceOrderId.HasValue)
+                {
+                    if (now < bundle.RenewalStartDate.Value)
+                    {
+                        throw new InvalidOperationException("Bundle renewal window is not open.");
+                    }
+
+                    return;
+                }
+
+                if (now < bundle.RenewalEndDate.Value)
+                {
+                    throw new InvalidOperationException("Bundle is reserved for renewals until the renewal window closes.");
+                }
             }
 
-            if (now < bundle.RenewalEndDate.Value)
+            if (now < bundle.OnSaleDate.Value)
             {
-                throw new InvalidOperationException("Bundle is reserved for renewals until the renewal window closes.");
+                throw new InvalidOperationException("Bundle is not on sale.");
             }
         }
 
@@ -767,7 +770,7 @@ namespace XBOL.Ticketing.Services.Booking
                 .Where(schedule => request.EventScheduleId == 0 || schedule.Id == request.EventScheduleId)
                 .ToList();
 
-            if (schedules.Count == 0)
+            if (schedules.Count == 0 && bundle.BundleType != BundleType.SeasonPass)
             {
                 throw new InvalidOperationException("Bundle has no matching event schedules to book.");
             }
