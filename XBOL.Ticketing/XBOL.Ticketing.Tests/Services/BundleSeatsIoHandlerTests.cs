@@ -33,25 +33,45 @@ public class BundleSeatsIoHandlerTests
 
         await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
 
+        bundle.ExternalKey.Should().MatchRegex("^season-20-[0-9a-f]{32}$");
+        var seasonKey = bundle.ExternalKey!;
         await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
             "chart-main",
-            "season-20",
+            seasonKey,
             Arg.Is<string[]>(eventKeys =>
                 eventKeys.SequenceEqual(new[]
                 {
-                    "season-20-schedule-10",
-                    "season-20-schedule-11"
+                    $"{seasonKey}-schedule-10",
+                    $"{seasonKey}-schedule-11"
                 })));
-        bundle.ExternalKey.Should().Be("season-20");
         bundle.Status.Should().Be(EventStatus.Published);
         bundle.PublishedDate.Should().NotBeNull();
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.ExternalEventKey)
-            .Should().Equal("season-20-schedule-10", "season-20-schedule-11");
+            .Should().Equal($"{seasonKey}-schedule-10", $"{seasonKey}-schedule-11");
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.Status)
             .Should().Equal(ScheduleStatus.OnSale, ScheduleStatus.OnSale);
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.PublishedDate)
             .Should().OnlyContain(publishedDate => publishedDate.HasValue);
         await _bundleRepository.Received(1).UpdateAsync(bundle);
+    }
+
+    [Fact]
+    public async Task CreateSeatsIoSeasonHandler_NewBundleGeneratesUniqueSeasonKey()
+    {
+        var bundle = SeasonPassBundle(20, [ScheduleLink(20, 10)]);
+        _bundleRepository.GetByIdWithVenueMapAndSchedulesAsync(20).Returns(bundle);
+
+        var sut = Handler();
+
+        await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
+
+        bundle.ExternalKey.Should().MatchRegex("^season-20-[0-9a-f]{32}$");
+        bundle.BundleEventSchedules[0].EventSchedule.ExternalEventKey.Should()
+            .Be($"{bundle.ExternalKey}-schedule-10");
+        await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
+            "chart-main",
+            bundle.ExternalKey,
+            Arg.Is<string[]>(eventKeys => eventKeys.SequenceEqual(new[] { $"{bundle.ExternalKey}-schedule-10" })));
     }
 
     [Fact]
@@ -64,11 +84,11 @@ public class BundleSeatsIoHandlerTests
 
         await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
 
+        bundle.ExternalKey.Should().MatchRegex("^season-20-[0-9a-f]{32}$");
         await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
             "chart-main",
-            "season-20",
+            bundle.ExternalKey,
             Arg.Is<string[]>(keys => keys.Length == 0));
-        bundle.ExternalKey.Should().Be("season-20");
         bundle.Status.Should().Be(EventStatus.Published);
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
@@ -87,11 +107,12 @@ public class BundleSeatsIoHandlerTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("database failure");
+        bundle.ExternalKey.Should().MatchRegex("^season-20-[0-9a-f]{32}$");
         await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
             "chart-main",
-            "season-20",
+            bundle.ExternalKey,
             Arg.Any<string[]>());
-        await _seatsIo.Received(1).DeleteSeatsIoSeasonAsync("season-20");
+        await _seatsIo.Received(1).DeleteSeatsIoSeasonAsync(bundle.ExternalKey);
     }
 
     [Fact]

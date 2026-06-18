@@ -27,7 +27,7 @@ public class CreateSeatsIoSeasonHandler(
 
         var chartKey = ResolveChartKey(bundle);
         var seasonKey = string.IsNullOrWhiteSpace(bundle.ExternalKey)
-            ? $"season-{bundle.Id}"
+            ? CreateSeasonKey(bundle.Id)
             : bundle.ExternalKey;
         var links = bundle.BundleEventSchedules
             .OrderBy(link => link.SortOrder ?? int.MaxValue)
@@ -73,6 +73,11 @@ public class CreateSeatsIoSeasonHandler(
         return bundle.VenueMap?.ExternalMapKey
             ?? throw new InvalidOperationException(
                 $"Bundle {bundle.Id} cannot be published because it has no VenueMap.ExternalMapKey.");
+    }
+
+    private static string CreateSeasonKey(long bundleId)
+    {
+        return $"season-{bundleId}-{Guid.NewGuid():N}";
     }
 }
 
