@@ -23,18 +23,29 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<PagedResponse<BundleDTO>> GetPagedAsync(BundleQueryParams queryParams)
         {
+            var page = Math.Max(1, queryParams.Page);
+            var pageSize = Math.Max(1, queryParams.PageSize);
+            var skip = (page - 1) * pageSize;
             var searchTerm = queryParams.SearchTerm?.Trim().ToLower() ?? "";
+            var filter = string.IsNullOrEmpty(searchTerm)
+                ? null
+                : (System.Linq.Expressions.Expression<Func<Core.Model.Bundle, bool>>)(b => b.Name.ToLower().Contains(searchTerm));
 
             var bundles = Repository.Get(
-                filter: string.IsNullOrEmpty(searchTerm)
-                    ? null
-                    : b => b.Name.ToLower().Contains(searchTerm),
+                filter: filter,
                 orderBy: q => q.OrderBy(b => b.Id),
-                pageSize: queryParams.PageSize,
-                currentPage: queryParams.Page
+                pageSize: skip,
+                currentPage: pageSize,
+                includedProperties:
+                [
+                    "VenueMap.Venue",
+                    "Categories",
+                    "BundleSections.BundleSeats",
+                    "BundleEventSchedules.EventSchedule.Sections"
+                ]
             ).ToList();
 
-            var totalCount = Repository.Get().Count();
+            var totalCount = Repository.Get(filter: filter).Count();
 
             var bundleIds = bundles.Select(b => b.Id).ToList();
 
@@ -80,8 +91,8 @@ namespace XBOL.Ticketing.Services.Bundle
             {
                 Items = dtos,
                 TotalCount = totalCount,
-                Page = queryParams.Page,
-                PageSize = queryParams.PageSize
+                Page = page,
+                PageSize = pageSize
             };
         }
 
