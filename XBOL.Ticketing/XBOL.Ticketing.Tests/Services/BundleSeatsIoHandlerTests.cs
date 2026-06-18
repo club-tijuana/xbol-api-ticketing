@@ -55,19 +55,22 @@ public class BundleSeatsIoHandlerTests
     }
 
     [Fact]
-    public async Task CreateSeatsIoSeasonHandler_WithoutLinkedSchedules_RejectsPublish()
+    public async Task CreateSeatsIoSeasonHandler_WithoutLinkedSchedules_CreatesSeasonWithEmptyEvents()
     {
         var bundle = SeasonPassBundle(20, []);
         _bundleRepository.GetByIdWithVenueMapAndSchedulesAsync(20).Returns(bundle);
 
         var sut = Handler();
 
-        var act = () => sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
+        await sut.Handle(new CreateSeatsIoSeasonCommand(20, Guid.Empty));
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*has no linked event schedules*");
-        await _seatsIo.DidNotReceiveWithAnyArgs().CreateSeatsIoSeasonAsync(default!, default!, default!);
-        await _bundleRepository.DidNotReceive().UpdateAsync(bundle);
+        await _seatsIo.Received(1).CreateSeatsIoSeasonAsync(
+            "chart-main",
+            "season-20",
+            Arg.Is<string[]>(keys => keys.Length == 0));
+        bundle.ExternalKey.Should().Be("season-20");
+        bundle.Status.Should().Be(EventStatus.Published);
+        await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
 
     [Fact]

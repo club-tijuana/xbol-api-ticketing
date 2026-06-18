@@ -270,7 +270,7 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
-    public async Task GetItemsAsync_SetsSeasonPassBookabilityFromLinkedSchedulesAndForSaleSeats()
+    public async Task GetItemsAsync_SetsSeasonPassBookabilityFromForSaleSeats()
     {
         await using var database = await TestDatabase.CreateAsync();
         var now = DateTimeOffset.UtcNow;
@@ -305,7 +305,7 @@ public class EventCatalogServiceTests
         });
 
         result.Items.Single(item => item.Id == 30).IsBookable.Should().BeTrue();
-        result.Items.Single(item => item.Id == 90).IsBookable.Should().BeFalse();
+        result.Items.Single(item => item.Id == 90).IsBookable.Should().BeTrue();
     }
 
     [Fact]

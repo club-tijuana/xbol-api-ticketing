@@ -33,12 +33,6 @@ public class CreateSeatsIoSeasonHandler(
             .OrderBy(link => link.SortOrder ?? int.MaxValue)
             .ThenBy(link => link.EventScheduleId)
             .ToList();
-        //if (links.Count == 0)
-        //{
-        //    throw new InvalidOperationException(
-        //        $"Bundle {bundle.Id} cannot be published because it has no linked event schedules.");
-        //}
-
         var eventKeys = links
             .Select(link => $"{seasonKey}-schedule-{link.EventScheduleId}")
             .ToArray();

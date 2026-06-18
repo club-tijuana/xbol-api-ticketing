@@ -461,11 +461,6 @@ namespace XBOL.Ticketing.Services.Booking
                 .OrderBy(b => b.Id)
                 .FirstOrDefaultAsync(cancellationToken);
 
-            //if (inventoryBatch is null)
-            //{
-            //    throw new InvalidOperationException("No active inventory batch exists for this event schedule.");
-            //}
-
             return inventoryBatch?.Id;
         }
 
@@ -483,13 +478,6 @@ namespace XBOL.Ticketing.Services.Booking
                     item => item.EventScheduleId,
                     item => item.InventoryBatchId,
                     cancellationToken);
-
-            //var missingScheduleId = eventScheduleIds.FirstOrDefault(id => !batches.ContainsKey(id));
-            //if (missingScheduleId != 0)
-            //{
-            //    throw new InvalidOperationException(
-            //        $"No active inventory batch exists for event schedule {missingScheduleId}.");
-            //}
 
             return batches;
         }

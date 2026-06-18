@@ -306,7 +306,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Seats.io season*season-20*does not exist*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -362,7 +362,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Seats.io season*does not contain one or more requested seats*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -421,7 +421,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*Seats.io season event*season-20-schedule-202*does not exist*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -611,7 +611,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not configured for this bundle*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -669,7 +669,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not for sale*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -721,7 +721,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not on sale*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -773,7 +773,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*not on sale*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -825,7 +825,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*sale window is not configured*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -878,7 +878,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*renewal window is not open*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1000,7 +1000,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*source order*already been renewed*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1055,7 +1055,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*source order*already been renewed*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1102,7 +1102,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*reserved for renewals*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1215,7 +1215,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*source order*requested bundle seats*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1270,7 +1270,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*source order*requested bundle seats*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1325,7 +1325,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*source order*requested bundle seats*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
@@ -1376,7 +1376,7 @@ public class BookingOrchestrationServiceTests
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*every linked event schedule*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
-            default!,
+            default(string)!,
             default!,
             default!,
             default);
