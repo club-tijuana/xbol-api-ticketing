@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Odasoft.XBOL.Commons.Email;
+using Odasoft.XBOL.Commons.Requests;
 using System.Data;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Commons.Options;
@@ -872,22 +873,62 @@ namespace XBOL.Ticketing.Services.Booking
             ModelClient client,
             CancellationToken cancellationToken)
         {
-            var buyerEmail = client.Email ?? "";
-            var buyerName = client.FullName ?? "";
+            await EnqueueConfirmationEmailAsync(
+                orderId,
+                "buyer",
+                client.Email ?? "",
+                client.FullName ?? "",
+                cancellationToken);
+
+            await EnqueueConfirmationEmailAsync(
+                orderId,
+                "seller",
+                "support@xbol.com",
+                "Seller",
+                cancellationToken);
+        }
+
+        private async Task EnqueueConfirmationEmailAsync(
+            long orderId,
+            string recipientKind,
+            string toAddress,
+            string toName,
+            CancellationToken cancellationToken)
+        {
+            OrderEmailModel model;
 
             try
             {
-                var buyerModel = await _emailModelBuilder.BuildAsync(
-                    orderId, buyerEmail, buyerName, "es-MX", cancellationToken);
-                _backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(buyerModel));
-
-                var sellerModel = await _emailModelBuilder.BuildAsync(
-                    orderId, "support@xbol.com", "Seller", "es-MX", cancellationToken);
-                _backgroundJobClient.Enqueue<IEmailJob>(x => x.SendOrderConfirmationAsync(sellerModel));
+                model = await _emailModelBuilder.BuildAsync(
+                    orderId, toAddress, toName, "es-MX", cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to enqueue confirmation email for order {OrderId}", orderId);
+                _logger.LogError(
+                    ex,
+                    "Failed to build {RecipientKind} confirmation email model for order {OrderId}",
+                    recipientKind,
+                    orderId);
+                return;
+            }
+
+            try
+            {
+                var jobId = _backgroundJobClient.Enqueue<IEmailJob>(
+                    x => x.SendOrderConfirmationAsync(model));
+                _logger.LogInformation(
+                    "Enqueued {RecipientKind} confirmation email job {JobId} for order {OrderId}",
+                    recipientKind,
+                    jobId,
+                    orderId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to enqueue {RecipientKind} confirmation email job for order {OrderId}",
+                    recipientKind,
+                    orderId);
             }
         }
 

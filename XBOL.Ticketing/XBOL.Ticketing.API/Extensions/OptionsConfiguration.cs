@@ -1,5 +1,6 @@
 using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Services.EvoPayment;
+using BackgroundJobsOptions = Odasoft.XBOL.Commons.Options.BackgroundJobsOptions;
 
 namespace XBOL.Ticketing.API.Extensions;
 

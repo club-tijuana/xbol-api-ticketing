@@ -46,6 +46,10 @@ public class BookingOrchestrationServiceTests
             .Returns(["A-1", "A-2"]);
 
         var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var createdJobs = new List<Job>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
         var sut = CreateService(context, bookingClient, backgroundJobs);
         var actorUserId = Guid.NewGuid();
         var request = new BookSeatsActionRequest
@@ -115,11 +119,16 @@ public class BookingOrchestrationServiceTests
         order.Items.Select(i => i.Price).Should().BeEquivalentTo([125m, 175m]);
         order.Items.Select(i => i.ItemReferenceId).Should().BeEquivalentTo(result.TicketIds);
 
-        backgroundJobs.Received(2).Create(
-            Arg.Is<Job>(job =>
-                job.Type == typeof(IEmailJob) &&
-                job.Method.Name == nameof(IEmailJob.SendOrderConfirmationAsync)),
-            Arg.Any<EnqueuedState>());
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
+        emailModels.Should().HaveCount(2);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == "buyer@example.com" &&
+            model.OrderDetails.OrderNumber == "ORD-E-100-000001" &&
+            !model.IsBundle);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == "support@xbol.com" &&
+            model.OrderDetails.OrderNumber == "ORD-E-100-000001" &&
+            !model.IsBundle);
     }
 
     [Fact]
@@ -465,6 +474,10 @@ public class BookingOrchestrationServiceTests
             .Returns(["A-1"]);
 
         var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var createdJobs = new List<Job>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
         var sut = CreateService(context, bookingClient, backgroundJobs);
         var request = new BookSeatsActionRequest
         {
@@ -496,9 +509,150 @@ public class BookingOrchestrationServiceTests
 
         await sut.BookAsync(request, Guid.NewGuid());
 
-        backgroundJobs.Received(2).Create(
-            Arg.Is<Job>(job => IsBundleOrderConfirmationJob(job)),
-            Arg.Any<EnqueuedState>());
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
+        emailModels.Should().HaveCount(2);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == "season@example.com" &&
+            model.OrderDetails.OrderNumber == "ORD-B-20-000001" &&
+            model.IsBundle);
+        emailModels.Should().Contain(model =>
+            model.ToAddress == "support@xbol.com" &&
+            model.OrderDetails.OrderNumber == "ORD-B-20-000001" &&
+            model.IsBundle);
+    }
+
+    [Fact]
+    public async Task BookAsync_WhenBuyerConfirmationEmailEnqueueFails_StillEnqueuesSellerAndReturnsSuccess()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedStandaloneEventAsync(context);
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        bookingClient.BookSeatsAsync(
+                "schedule-100",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var createdJobs = new List<Job>();
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(
+                _ => throw new InvalidOperationException("buyer enqueue failed"),
+                _ => "seller-job-1");
+
+        var sut = CreateService(context, bookingClient, backgroundJobs);
+        var request = new BookSeatsActionRequest
+        {
+            EventKey = "schedule-100",
+            EventScheduleId = 100,
+            HoldToken = "hold-123",
+            TicketType = ItemType.Ticket,
+            Localizer = "ORD-E-100-000001",
+            Seats =
+            [
+                new BookingSeatRequest
+                {
+                    SeatKey = "A-1",
+                    SeatPrice = 125m,
+                    PriceListItemId = 1
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                Email = "buyer@example.com",
+                FirstName = "Rita",
+                LastName = "Moreno"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+
+        result.Reference.Should().Be("ORD-E-100-000001");
+        context.Orders.Should().ContainSingle(order => order.Reference == "ORD-E-100-000001");
+
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
+        emailModels.Should().HaveCount(2);
+        emailModels[0].ToAddress.Should().Be("buyer@example.com");
+        emailModels[1].ToAddress.Should().Be("support@xbol.com");
+    }
+
+    [Fact]
+    public async Task BookAsync_LogsConfirmationEmailJobIds()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedStandaloneEventAsync(context);
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        bookingClient.BookSeatsAsync(
+                "schedule-100",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Any<Job>(), Arg.Any<EnqueuedState>())
+            .Returns("buyer-job-1", "seller-job-1");
+        var logger = Substitute.For<ILogger<BookingOrchestrationService>>();
+        var sut = CreateService(context, bookingClient, backgroundJobs, logger);
+        var request = new BookSeatsActionRequest
+        {
+            EventKey = "schedule-100",
+            EventScheduleId = 100,
+            HoldToken = "hold-123",
+            TicketType = ItemType.Ticket,
+            Localizer = "ORD-E-100-000001",
+            Seats =
+            [
+                new BookingSeatRequest
+                {
+                    SeatKey = "A-1",
+                    SeatPrice = 125m,
+                    PriceListItemId = 1
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                Email = "buyer@example.com",
+                FirstName = "Rita",
+                LastName = "Moreno"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+        var orderId = result.OrderId.ToString();
+
+        var infoLogs = RenderedLogMessages(logger, LogLevel.Information);
+        infoLogs.Should().Contain(message =>
+            message.Contains("buyer-job-1", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal));
+        infoLogs.Should().Contain(message =>
+            message.Contains("seller-job-1", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -845,7 +999,7 @@ public class BookingOrchestrationServiceTests
         var act = () => sut.BookAsync(request, Guid.NewGuid());
 
         await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*not on sale*");
+            .WithMessage("*no longer on sale*");
         await bookingClient.DidNotReceiveWithAnyArgs().BookSeatsAsync(
             default(string)!,
             default!,
@@ -1590,7 +1744,8 @@ public class BookingOrchestrationServiceTests
     private static BookingOrchestrationService CreateService(
         XBOLDbContext context,
         ISeatsIoBookingClient bookingClient,
-        IBackgroundJobClient? backgroundJobClient = null)
+        IBackgroundJobClient? backgroundJobClient = null,
+        ILogger<BookingOrchestrationService>? logger = null)
     {
         return new BookingOrchestrationService(
             context,
@@ -1598,7 +1753,7 @@ public class BookingOrchestrationServiceTests
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
             backgroundJobClient ?? Substitute.For<IBackgroundJobClient>(),
             new BookingEmailModelBuilder(context),
-            Substitute.For<ILogger<BookingOrchestrationService>>(),
+            logger ?? Substitute.For<ILogger<BookingOrchestrationService>>(),
             Options.Create(new DefaultExchangeRateOptions { Value = 20m }),
             Options.Create(new PaymentLinkOptions { Url = "https://example.test/pay/{paymentLinkCode}" }),
             new ExchangeRateRepository(context));
@@ -1622,17 +1777,29 @@ public class BookingOrchestrationServiceTests
         CashAmount = 10_000m
     };
 
-    private static bool IsBundleOrderConfirmationJob(Job job)
+    private static List<OrderEmailModel> ExtractOrderConfirmationModels(IEnumerable<Job> jobs)
     {
-        if (job.Type != typeof(IEmailJob) ||
-            job.Method.Name != nameof(IEmailJob.SendOrderConfirmationAsync) ||
-            job.Args.Count != 1 ||
-            job.Args[0] is not OrderEmailModel model)
-        {
-            return false;
-        }
+        return jobs
+            .Where(job =>
+                job.Type == typeof(IEmailJob) &&
+                job.Method.Name == nameof(IEmailJob.SendOrderConfirmationAsync) &&
+                job.Args.Count == 1)
+            .Select(job => job.Args[0])
+            .OfType<OrderEmailModel>()
+            .ToList();
+    }
 
-        return model.GetType().GetProperty("IsBundle")?.GetValue(model) is true;
+    private static List<string> RenderedLogMessages(
+        ILogger<BookingOrchestrationService> logger,
+        LogLevel logLevel)
+    {
+        return logger.ReceivedCalls()
+            .Where(call =>
+                call.GetMethodInfo().Name == nameof(ILogger.Log) &&
+                call.GetArguments()[0] is LogLevel level &&
+                level == logLevel)
+            .Select(call => call.GetArguments()[2]?.ToString() ?? "")
+            .ToList();
     }
 
     private static async Task SeedStandaloneEventAsync(

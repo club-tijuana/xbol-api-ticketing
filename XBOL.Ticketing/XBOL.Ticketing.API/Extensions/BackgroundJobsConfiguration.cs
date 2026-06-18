@@ -1,6 +1,6 @@
 using Hangfire;
-using Hangfire.PostgreSql;
-using XBOL.Ticketing.Core.Commons.Options;
+using Odasoft.XBOL.Commons.BackgroundJobs;
+using BackgroundJobsOptions = Odasoft.XBOL.Commons.Options.BackgroundJobsOptions;
 
 namespace XBOL.Ticketing.API.Extensions;
 
@@ -12,17 +12,7 @@ public static class BackgroundJobsConfiguration
         var options = new BackgroundJobsOptions();
         configuration.GetRequiredSection("BackgroundJobs").Bind(options);
 
-        services.AddHangfire(config => config
-            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-            .UseSimpleAssemblyNameTypeSerializer()
-            .UseRecommendedSerializerSettings()
-            .UsePostgreSqlStorage(
-                opts => opts.UseNpgsqlConnection(options.ConnectionString),
-                new PostgreSqlStorageOptions
-                {
-                    PrepareSchemaIfNecessary = false,
-                    DistributedLockTimeout = TimeSpan.FromMinutes(1)
-                }));
+        services.AddHangfire(config => config.UseDefaultStorage(options));
 
         return services;
     }
