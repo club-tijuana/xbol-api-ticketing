@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Odasoft.XBOL.Commons.Requests;
 using System.Globalization;
 using XBOL.Ticketing.Core.Commons.Enums;
-using XBOL.Ticketing.Core.Commons.Request;
 using XBOL.Ticketing.Data;
 using ModelOrder = XBOL.Ticketing.Core.Model.Order;
 

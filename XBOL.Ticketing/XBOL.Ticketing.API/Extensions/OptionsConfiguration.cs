@@ -33,11 +33,6 @@ public static class OptionsConfiguration
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        services.AddOptions<BackgroundJobsOptions>()
-            .BindConfiguration("BackgroundJobs")
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
         services.AddOptions<EmailTemplateOptions>()
             .BindConfiguration("EmailTemplate")
             .ValidateDataAnnotations()

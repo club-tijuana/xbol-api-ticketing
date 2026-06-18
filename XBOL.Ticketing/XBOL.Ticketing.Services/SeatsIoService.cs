@@ -8,6 +8,7 @@ using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
 using SeatsioDotNet.Util;
+using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services.Event;
 

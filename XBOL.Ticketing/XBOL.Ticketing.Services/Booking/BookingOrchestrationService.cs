@@ -2,9 +2,10 @@ using Hangfire;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Odasoft.XBOL.Commons.Email;
 using System.Data;
-using XBOL.Ticketing.Core.Commons.Email;
 using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.DTO.Responses;
 using XBOL.Ticketing.Core.Model;
@@ -29,7 +30,8 @@ namespace XBOL.Ticketing.Services.Booking
     BookingEmailModelBuilder emailModelBuilder,
     ILogger<BookingOrchestrationService> logger,
     IOptions<DefaultExchangeRateOptions> defaultExchangeRateOptions,
-        IOptions<PaymentLinkOptions> paymentLinkOptions) : IBookingOrchestrationService
+    IOptions<PaymentLinkOptions> paymentLinkOptions,
+    ExchangeRateRepository exchangeRateRepository) : IBookingOrchestrationService
     {
         private readonly XBOLDbContext _dbContext = dbContext;
         private readonly ISeatsIoBookingClient _seatsIoBookingClient = seatsIoBookingClient;
@@ -39,7 +41,7 @@ namespace XBOL.Ticketing.Services.Booking
         private readonly ILogger<BookingOrchestrationService> _logger = logger;
         private readonly DefaultExchangeRateOptions _defaultExchangeRateOptions = defaultExchangeRateOptions.Value;
         private readonly PaymentLinkOptions _paymentLinkOptions = paymentLinkOptions.Value;
-        private readonly ExchangeRateRepository _exchangeRateRepository;
+        private readonly ExchangeRateRepository _exchangeRateRepository = exchangeRateRepository;
 
         public async Task<BookingResultResponse> BookAsync(
             BookSeatsActionRequest request,
@@ -1007,7 +1009,10 @@ namespace XBOL.Ticketing.Services.Booking
             decimal otherAmount = paymentInfo.OtherAmount;
             decimal _total = Total;
 
-            var currentExchangeRate = await _exchangeRateRepository.Get(
+            ExchangeRateResponse? currentExchangeRate = null;
+            if (organizerId.HasValue)
+            {
+                currentExchangeRate = await _exchangeRateRepository.Get(
                     filter: er => er.OrganizerId == organizerId
                     && er.StartedAt <= now
                 )
@@ -1018,6 +1023,7 @@ namespace XBOL.Ticketing.Services.Booking
                     Rate = er.Rate
                 })
                 .FirstOrDefaultAsync();
+            }
 
             currentExchangeRate ??= defaultExchangeRate;
 

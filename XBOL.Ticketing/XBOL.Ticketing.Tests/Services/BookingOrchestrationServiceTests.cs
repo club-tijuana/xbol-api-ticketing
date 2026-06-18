@@ -1,10 +1,15 @@
 using FluentAssertions;
 using Hangfire;
+using Hangfire.Common;
+using Hangfire.States;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NSubstitute;
+using Odasoft.XBOL.Commons.Email;
 using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
@@ -39,7 +44,8 @@ public class BookingOrchestrationServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(["A-1", "A-2"]);
 
-        var sut = CreateService(context, bookingClient);
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var sut = CreateService(context, bookingClient, backgroundJobs);
         var actorUserId = Guid.NewGuid();
         var request = new BookSeatsActionRequest
         {
@@ -48,7 +54,7 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
             Localizer = "ORD-E-100-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 }, new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 175m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 }, new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 175m, PriceListItemId = 2 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "buyer@example.com",
@@ -56,7 +62,7 @@ public class BookingOrchestrationServiceTests
                 LastName = "Moreno",
                 PhoneNumber = "(555) 222-0100"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -107,10 +113,16 @@ public class BookingOrchestrationServiceTests
         order.Items.Should().OnlyContain(i => !i.IsCourtesy);
         order.Items.Select(i => i.Price).Should().BeEquivalentTo([125m, 175m]);
         order.Items.Select(i => i.ItemReferenceId).Should().BeEquivalentTo(result.TicketIds);
+
+        backgroundJobs.Received(2).Create(
+            Arg.Is<Job>(job =>
+                job.Type == typeof(IEmailJob) &&
+                job.Method.Name == nameof(IEmailJob.SendOrderConfirmationAsync)),
+            Arg.Any<EnqueuedState>());
     }
 
     [Fact]
-    public async Task BookAsync_WhenLocalPersistenceFailsAfterSeatsIoBooking_ReleasesSeatsAndPersistsNoOrder()
+    public async Task BookAsync_WhenInventoryBatchIsMissing_PersistsTicketWithoutInventoryBatch()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
@@ -146,20 +158,20 @@ public class BookingOrchestrationServiceTests
                 FirstName = "Rita",
                 LastName = "Moreno"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
-        var act = () => sut.BookAsync(request, Guid.NewGuid());
+        var result = await sut.BookAsync(request, Guid.NewGuid());
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*No active inventory batch*");
-        await bookingClient.Received(1).ReleaseBookedSeatsAsync(
+        result.TicketIds.Should().ContainSingle();
+        await bookingClient.DidNotReceive().ReleaseBookedSeatsAsync(
             "schedule-100",
-            Arg.Is<IReadOnlyCollection<string>>(seats => seats.SequenceEqual(new[] { "A-1" })),
+            Arg.Any<IReadOnlyCollection<string>>(),
             Arg.Any<CancellationToken>());
-        context.Orders.Should().BeEmpty();
-        context.Tickets.Should().BeEmpty();
+        context.Orders.Should().ContainSingle();
+        var ticket = await context.Tickets.SingleAsync();
+        ticket.InventoryBatchId.Should().BeNull();
     }
 
     [Fact]
@@ -197,14 +209,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -290,14 +302,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -346,14 +358,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -405,14 +417,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -467,14 +479,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -546,13 +558,13 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FullName = "Ada Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -595,14 +607,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-404", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-404", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -653,14 +665,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = 123,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -705,14 +717,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = 123,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -757,14 +769,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = 123,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -809,14 +821,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = 123,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -862,14 +874,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = 123,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -928,14 +940,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -984,14 +996,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000002",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1039,14 +1051,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000002",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1086,14 +1098,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1146,14 +1158,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "new-buyer@example.com",
                 FirstName = "New",
                 LastName = "Buyer"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1199,14 +1211,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = sourceOrder.Client.Email!,
                 FirstName = "Existing",
                 LastName = "Buyer"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1254,14 +1266,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1309,14 +1321,14 @@ public class BookingOrchestrationServiceTests
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
             ReferenceOrderId = sourceOrder.Id,
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1360,14 +1372,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-20-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1398,7 +1410,7 @@ public class BookingOrchestrationServiceTests
 
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
-                "basic-21-schedule-201",
+                Arg.Is<string[]>(keys => keys.SequenceEqual(new[] { "basic-21-schedule-201" })),
                 Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
@@ -1413,14 +1425,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-21-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 4 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "basic@example.com",
                 FirstName = "Grace",
                 LastName = "Hopper"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1430,12 +1442,12 @@ public class BookingOrchestrationServiceTests
         result.BundlePassIds.Should().ContainSingle();
         result.TicketIds.Should().ContainSingle();
         await bookingClient.Received(1).BookSeatsAsync(
-            "basic-21-schedule-201",
+            Arg.Is<string[]>(keys => keys.SequenceEqual(new[] { "basic-21-schedule-201" })),
             Arg.Any<List<BookingSeatRequest>>(),
             "hold-123",
             Arg.Any<CancellationToken>());
         await bookingClient.DidNotReceive().BookSeatsAsync(
-            "basic-21-schedule-202",
+            Arg.Is<string[]>(keys => keys.Contains("basic-21-schedule-202")),
             Arg.Any<List<BookingSeatRequest>>(),
             Arg.Any<string>(),
             Arg.Any<CancellationToken>());
@@ -1459,7 +1471,7 @@ public class BookingOrchestrationServiceTests
     }
 
     [Fact]
-    public async Task BookAsync_BasicBundleRequest_ReleasesPriorEventBookingsWhenLaterEventBookingFails()
+    public async Task BookAsync_BasicBundleRequest_WhenBatchSeatsIoBookingFails_PersistsNoOrder()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
@@ -1474,13 +1486,7 @@ public class BookingOrchestrationServiceTests
 
         var bookingClient = Substitute.For<ISeatsIoBookingClient>();
         bookingClient.BookSeatsAsync(
-                "basic-21-schedule-201",
-                Arg.Any<List<BookingSeatRequest>>(),
-                "hold-123",
-                Arg.Any<CancellationToken>())
-            .Returns(["A-1"]);
-        bookingClient.BookSeatsAsync(
-                "basic-21-schedule-202",
+                Arg.Is<string[]>(keys => keys.SequenceEqual(new[] { "basic-21-schedule-201", "basic-21-schedule-202" })),
                 Arg.Any<List<BookingSeatRequest>>(),
                 "hold-123",
                 Arg.Any<CancellationToken>())
@@ -1495,14 +1501,14 @@ public class BookingOrchestrationServiceTests
             HoldToken = "hold-123",
             TicketType = ItemType.BundlePass,
             Localizer = "ORD-B-21-000001",
-            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 1 } },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 4 } },
             ClientContact = new ClientInfoRequest
             {
                 Email = "basic@example.com",
                 FirstName = "Grace",
                 LastName = "Hopper"
             },
-            PaymentInfoRequest = new PaymentInfoRequest(),
+            PaymentInfoRequest = PaidInCash(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
@@ -1510,10 +1516,10 @@ public class BookingOrchestrationServiceTests
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("Seats.io failed");
-        await bookingClient.Received(1).ReleaseBookedSeatsAsync(
-            "basic-21-schedule-201",
-            Arg.Is<IReadOnlyCollection<string>>(seats => seats.SequenceEqual(new[] { "A-1" })),
-            Arg.Any<CancellationToken>());
+        await bookingClient.DidNotReceiveWithAnyArgs().ReleaseBookedSeatsAsync(
+            default!,
+            default!,
+            default);
         context.Orders.Should().BeEmpty();
         context.Tickets.Should().BeEmpty();
         context.BundlePasses.Should().BeEmpty();
@@ -1521,15 +1527,19 @@ public class BookingOrchestrationServiceTests
 
     private static BookingOrchestrationService CreateService(
         XBOLDbContext context,
-        ISeatsIoBookingClient bookingClient)
+        ISeatsIoBookingClient bookingClient,
+        IBackgroundJobClient? backgroundJobClient = null)
     {
         return new BookingOrchestrationService(
             context,
             bookingClient,
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
-            Substitute.For<IBackgroundJobClient>(),
+            backgroundJobClient ?? Substitute.For<IBackgroundJobClient>(),
             new BookingEmailModelBuilder(context),
-            Substitute.For<ILogger<BookingOrchestrationService>>());
+            Substitute.For<ILogger<BookingOrchestrationService>>(),
+            Options.Create(new DefaultExchangeRateOptions { Value = 20m }),
+            Options.Create(new PaymentLinkOptions { Url = "https://example.test/pay/{paymentLinkCode}" }),
+            new ExchangeRateRepository(context));
     }
 
     private static void AllowSeasonPassRemoteReadiness(ISeatsIoBookingClient bookingClient)
@@ -1544,6 +1554,11 @@ public class BookingOrchestrationServiceTests
                 Arg.Any<CancellationToken>())
             .Returns(true);
     }
+
+    private static PaymentInfoRequest PaidInCash() => new()
+    {
+        CashAmount = 10_000m
+    };
 
     private static async Task SeedStandaloneEventAsync(
         XBOLDbContext context,
@@ -1660,8 +1675,123 @@ public class BookingOrchestrationServiceTests
                 BaseSeat = baseSeat2,
                 ExternalSeatObjectKey = "A-2"
             });
+        SeedPriceListItem(context, SaleType.Event, schedule.Id, venueMap.Id, baseZone, baseSection, baseRow, baseSeat1);
 
         await context.SaveChangesAsync();
+    }
+
+    private static void SeedPriceListItem(
+        XBOLDbContext context,
+        SaleType referenceType,
+        long referenceId,
+        long venueMapId,
+        BaseZone baseZone,
+        BaseSection baseSection,
+        BaseRow baseRow,
+        BaseSeat baseSeat)
+    {
+        var priceReference = new PriceReference
+        {
+            ReferenceType = referenceType,
+            ReferenceId = referenceId,
+            IsActive = true
+        };
+        var priceSegment = new PriceSegment
+        {
+            PriceReference = priceReference,
+            BaseZone = baseZone,
+            BaseSection = baseSection,
+            BaseRow = baseRow,
+            BaseSeat = baseSeat,
+            PriceItemType = PriceItemType.Seat,
+            VenueMapId = venueMapId,
+            PriceTypes =
+            [
+                new PriceType
+                {
+                    Id = 1,
+                    Name = "General",
+                    IsBasePrice = true
+                }
+            ]
+        };
+        var priceType = priceSegment.PriceTypes.Single();
+        var price = new Price
+        {
+            Id = 1,
+            PriceSegment = priceSegment,
+            PriceType = priceType,
+            PriceValue = 125m
+        };
+        var priceList = new PriceList
+        {
+            Id = 1,
+            PriceReference = priceReference,
+            Status = VersionStatus.Active
+        };
+
+        priceList.Items.Add(CreatePriceListItem(
+            id: 1,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            price,
+            priceType,
+            basePrice: 125m));
+        priceList.Items.Add(CreatePriceListItem(
+            id: 2,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            price,
+            priceType,
+            basePrice: 175m));
+        priceList.Items.Add(CreatePriceListItem(
+            id: 3,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            price,
+            priceType,
+            basePrice: 500m));
+        priceList.Items.Add(CreatePriceListItem(
+            id: 4,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            price,
+            priceType,
+            basePrice: 100m));
+
+        context.PriceLists.Add(priceList);
+    }
+
+    private static PriceListItem CreatePriceListItem(
+        long id,
+        BaseZone baseZone,
+        BaseSection baseSection,
+        BaseRow baseRow,
+        BaseSeat baseSeat,
+        Price price,
+        PriceType priceType,
+        decimal basePrice)
+    {
+        return new PriceListItem
+        {
+            Id = id,
+            BaseZone = baseZone,
+            BaseSection = baseSection,
+            BaseRow = baseRow,
+            BaseSeat = baseSeat,
+            Price = price,
+            PriceType = priceType,
+            BasePrice = basePrice,
+            FinalPrice = basePrice
+        };
     }
 
     private static async Task SeedSeasonPassBundleAsync(XBOLDbContext context)
@@ -1758,6 +1888,7 @@ public class BookingOrchestrationServiceTests
         });
 
         context.Bundles.Add(bundle);
+        SeedPriceListItem(context, SaleType.SeasonPass, bundle.Id, venueMap.Id, baseZone, baseSection, baseRow, baseSeat);
         await context.SaveChangesAsync();
     }
 
@@ -1952,6 +2083,7 @@ public class BookingOrchestrationServiceTests
         });
 
         context.Bundles.Add(bundle);
+        SeedPriceListItem(context, SaleType.Bundle, bundle.Id, venueMap.Id, baseZone, baseSection, baseRow, baseSeat);
         await context.SaveChangesAsync();
     }
 
