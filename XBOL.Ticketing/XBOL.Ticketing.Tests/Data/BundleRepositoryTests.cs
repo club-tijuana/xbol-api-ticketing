@@ -73,6 +73,13 @@ public sealed class BundleRepositoryTests
                 CreatedAt = now,
                 UpdatedAt = now
             };
+            var category = new EventCategory
+            {
+                Id = 8,
+                Name = "sports",
+                DisplayName = "Sports",
+                IsActive = true
+            };
             var schedule = new EventSchedule
             {
                 Id = 6,
@@ -105,6 +112,7 @@ public sealed class BundleRepositoryTests
                 BundlePricingType = BundlePricingType.Composite,
                 CreatedAt = now,
                 UpdatedAt = now,
+                Categories = [category],
                 BundleEventSchedules =
                 [
                     new BundleEventSchedule
@@ -129,6 +137,7 @@ public sealed class BundleRepositoryTests
         result!.VenueMap.Should().NotBeNull();
         result.VenueMap!.ExternalMapKey.Should().Be("chart-key");
         result.VenueMap.Venue.Should().BeNull();
+        result.Categories.Should().ContainSingle().Which.DisplayName.Should().Be("Sports");
         result.BundleEventSchedules.Should().ContainSingle();
         result.BundleEventSchedules.Single().EventSchedule.Sections.Should().ContainSingle();
     }

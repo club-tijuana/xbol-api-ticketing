@@ -8,10 +8,18 @@ namespace XBOL.Ticketing.Data.Repositories.Bundle
     public class BundleRepository(XBOLDbContext dbContext)
         : BaseRepository<Core.Model.Bundle>(dbContext), IBundleRepository
     {
+        public new async Task<Core.Model.Bundle?> GetByIdAsync(long id)
+        {
+            return await dbContext.Bundles
+                .Include(bundle => bundle.Categories)
+                .FirstOrDefaultAsync(bundle => bundle.Id == id);
+        }
+
         public async Task<Core.Model.Bundle?> GetByIdWithVenueMapAndSchedulesAsync(long id)
         {
             return await dbContext.Bundles
                 .Include(bundle => bundle.VenueMap)
+                .Include(bundle => bundle.Categories)
                 .Include(bundle => bundle.BundleSections)
                 //.ThenInclude(section => section.BundleSeats)
                 .Include(bundle => bundle.BundleEventSchedules)
