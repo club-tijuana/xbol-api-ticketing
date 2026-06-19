@@ -1172,16 +1172,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 client.Email = contact.Email.Trim();
             }
 
-            if (contact.PhoneRegionCodeId.HasValue)
-            {
-                client.PhoneRegionCodeId = contact.PhoneRegionCodeId;
-            }
-
-            if (!string.IsNullOrWhiteSpace(contact.PhoneNumber))
-            {
-                client.PhoneNumber = NormalizePhoneNumber(contact.PhoneNumber);
-            }
-
+            client.PhoneRegionCodeId = contact.PhoneRegionCodeId;
+            client.PhoneNumber = NormalizePhoneNumber(contact.PhoneNumber);
             client.FullName = ResolveFullName(contact, client.FullName);
             client.UpdatedAt = now;
             client.UpdatedBy = Guid.Empty;

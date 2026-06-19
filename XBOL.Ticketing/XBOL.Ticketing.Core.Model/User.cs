@@ -10,8 +10,8 @@ namespace XBOL.Ticketing.Core.Model
         public long? OrganizerId { get; set; }
         public Organizer? Organizer { get; set; }
 
-        public long? PhoneRegionCodeId { get; set; }
-        public PhoneRegionCode? PhoneRegionCode { get; set; }
+        public long PhoneRegionCodeId { get; set; }
+        public PhoneRegionCode PhoneRegionCode { get; set; } = null!;
 
         public DateTimeOffset? EmailVerifiedTimeStamp { get; set; }
         public DateTimeOffset? PhoneVerifiedTimeStamp { get; set; }
