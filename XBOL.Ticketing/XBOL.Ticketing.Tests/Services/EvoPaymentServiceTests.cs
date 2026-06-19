@@ -300,6 +300,8 @@ public sealed class EvoPaymentServiceTests
     private static async Task SeedPendingCheckoutOrderAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var venue = new Venue
         {
             Name = "Arena",
@@ -385,6 +387,8 @@ public sealed class EvoPaymentServiceTests
             ClientType = ClientType.Individual,
             Email = "buyer@example.com",
             FullName = "Buyer Example",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5552220100",
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -458,11 +462,15 @@ public sealed class EvoPaymentServiceTests
     private static async Task SeedPendingBundleCheckoutOrderAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var client = new Client
         {
             ClientType = ClientType.Individual,
             Email = "bundle-buyer@example.com",
             FullName = "Bundle Buyer",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5553330100",
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -540,6 +548,23 @@ public sealed class EvoPaymentServiceTests
 
         context.Orders.Add(order);
         context.BundlePasses.Add(pass);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task EnsurePhoneRegionCodeAsync(XBOLDbContext context)
+    {
+        if (await context.Set<PhoneRegionCode>().AnyAsync(region => region.Id == 1))
+        {
+            return;
+        }
+
+        context.Set<PhoneRegionCode>().Add(new PhoneRegionCode
+        {
+            Id = 1,
+            RegionCode = "MX",
+            DialCode = "+52",
+            FlagEmoji = "MX"
+        });
         await context.SaveChangesAsync();
     }
 
