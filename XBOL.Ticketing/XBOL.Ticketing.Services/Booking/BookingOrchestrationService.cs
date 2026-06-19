@@ -333,7 +333,9 @@ namespace XBOL.Ticketing.Services.Booking
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
+            LogStartingConfirmationEmailEnqueue("event", order);
+            var emailResults = await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
+            LogCompletedConfirmationEmailEnqueue("event", order, emailResults);
 
             return new BookingResultResponse
             {
@@ -469,7 +471,9 @@ namespace XBOL.Ticketing.Services.Booking
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
+            LogStartingConfirmationEmailEnqueue("bundle", order);
+            var emailResults = await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
+            LogCompletedConfirmationEmailEnqueue("bundle", order, emailResults);
 
             return new BookingResultResponse
             {
@@ -484,6 +488,32 @@ namespace XBOL.Ticketing.Services.Booking
                 ClientId = client.Id,
                 Total = order.Total
             };
+        }
+
+        private void LogStartingConfirmationEmailEnqueue(
+            string sourcePath,
+            ModelOrder order)
+        {
+            _logger.LogInformation(
+                "Starting confirmation email enqueue for {SourcePath} order {OrderId} ({OrderReference}). OrderType={OrderType} SaleChannel={SaleChannel}",
+                sourcePath,
+                order.Id,
+                order.Reference,
+                order.OrderType,
+                order.SaleChannel);
+        }
+
+        private void LogCompletedConfirmationEmailEnqueue(
+            string sourcePath,
+            ModelOrder order,
+            IReadOnlyCollection<BookingConfirmationEmailEnqueueResult> results)
+        {
+            _logger.LogInformation(
+                "Completed confirmation email enqueue for {SourcePath} order {OrderId} ({OrderReference}). Results={EmailEnqueueResults}",
+                sourcePath,
+                order.Id,
+                order.Reference,
+                BookingConfirmationEmailEnqueueResultFormatter.Format(results));
         }
 
         private async Task<long?> GetInventoryBatchIdAsync(

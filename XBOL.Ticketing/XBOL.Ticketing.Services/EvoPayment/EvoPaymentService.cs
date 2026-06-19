@@ -26,7 +26,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
         private readonly EvoSettings _settings;
         private readonly OrderRepository _orderRepository;
         private readonly GatewayOptions _opt;
-        private readonly ILogger<SeatsIoService> _logger;
+        private readonly ILogger<EvoPaymentService> _logger;
         private readonly XBOLDbContext _dbContext;
         private readonly SequenceTrackerService _sequenceTrackerService;
         private readonly ISeatsIoBookingClient _seatsIoBookingClient;
@@ -37,7 +37,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             IOptions<EvoSettings> settings,
             OrderRepository orderRepository,
             IOptions<GatewayOptions> opt,
-            ILogger<SeatsIoService> logger,
+            ILogger<EvoPaymentService> logger,
             XBOLDbContext dbContext,
             SequenceTrackerService sequenceTrackerService,
             ISeatsIoBookingClient seatsIoBookingClient,
@@ -623,7 +623,19 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     await _dbContext.SaveChangesAsync(ct);
                     await transaction.CommitAsync(ct);
 
-                    await _confirmationEmailQueue.EnqueueAsync(order.Id, order.Client, ct);
+                    _logger.LogInformation(
+                        "Starting confirmation email enqueue for evo order {OrderId} ({OrderReference}). OrderType={OrderType} SaleChannel={SaleChannel} EvoOrderRefId={EvoOrderRefId}",
+                        order.Id,
+                        order.Reference,
+                        order.OrderType,
+                        order.SaleChannel,
+                        request.OrderRefId);
+                    var emailResults = await _confirmationEmailQueue.EnqueueAsync(order.Id, order.Client, ct);
+                    _logger.LogInformation(
+                        "Completed confirmation email enqueue for evo order {OrderId} ({OrderReference}). Results={EmailEnqueueResults}",
+                        order.Id,
+                        order.Reference,
+                        BookingConfirmationEmailEnqueueResultFormatter.Format(emailResults));
 
                     var issued = order.Tickets.Count(t => t.Status == TicketStatus.Issued);
                     _logger.LogInformation(

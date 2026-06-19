@@ -116,6 +116,92 @@ public sealed class EvoPaymentServiceTests
     }
 
     [Fact]
+    public async Task ConfirmCheckoutAsync_WhenPaymentIsCaptured_LogsCheckoutConfirmationWithEvoPaymentCategory()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedPendingCheckoutOrderAsync(context);
+
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Any<Job>(), Arg.Any<EnqueuedState>())
+            .Returns("buyer-job-1", "seller-job-1");
+        var logger = Substitute.For<ILogger<EvoPaymentService>>();
+        var sut = CreateService(context, backgroundJobs, logger: logger);
+
+        await sut.ConfirmCheckoutAsync(new ConfirmCheckoutRequest
+        {
+            LocalOrderId = 1,
+            OrderRefId = "evo-order-1",
+            ResultIndicator = "success-indicator-1"
+        });
+
+        var infoLogs = RenderedLogMessages(logger, LogLevel.Information);
+        infoLogs.Should().Contain(message =>
+            message.Contains("Checkout confirmed", StringComparison.Ordinal) &&
+            message.Contains("OrderId=1", StringComparison.Ordinal));
+        infoLogs.Should().Contain(message =>
+            message.Contains("Starting confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains("evo", StringComparison.Ordinal) &&
+            message.Contains("1", StringComparison.Ordinal) &&
+            message.Contains("evo-order-1", StringComparison.Ordinal));
+        infoLogs.Should().Contain(message =>
+            message.Contains("Completed confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains("1", StringComparison.Ordinal) &&
+            message.Contains("buyer-job-1", StringComparison.Ordinal) &&
+            message.Contains("seller-job-1", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConfirmCheckoutAsync_WhenOrderIsAlreadyConfirmed_DoesNotEnqueueConfirmationEmails()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedPendingCheckoutOrderAsync(context);
+        var order = await context.Orders
+            .Include(order => order.Tickets)
+            .SingleAsync(order => order.Id == 1);
+        order.Status = OrderStatus.Paid;
+        foreach (var ticket in order.Tickets)
+        {
+            ticket.Status = TicketStatus.Issued;
+        }
+        await context.SaveChangesAsync();
+
+        var createdJobs = new List<Job>();
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
+        var sut = CreateService(context, backgroundJobs);
+
+        var result = await sut.ConfirmCheckoutAsync(new ConfirmCheckoutRequest
+        {
+            LocalOrderId = 1,
+            OrderRefId = "evo-order-1",
+            ResultIndicator = "success-indicator-1"
+        });
+
+        result.OrderStatus.Should().Be(OrderStatus.Paid.ToString());
+        result.TicketsIssued.Should().Be(1);
+        createdJobs.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task ConfirmCheckoutAsync_WhenPaymentFails_ReleasesSeatsFromTicketSchedule()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
@@ -154,7 +240,8 @@ public sealed class EvoPaymentServiceTests
         XBOLDbContext context,
         IBackgroundJobClient backgroundJobs,
         ISeatsIoBookingClient? seatsIoBookingClient = null,
-        string retrieveOrderResponse = """{"result":"SUCCESS","status":"CAPTURED","totalCapturedAmount":125.00}""")
+        string retrieveOrderResponse = """{"result":"SUCCESS","status":"CAPTURED","totalCapturedAmount":125.00}""",
+        ILogger<EvoPaymentService>? logger = null)
     {
         var httpClient = new HttpClient(new StubHttpMessageHandler(retrieveOrderResponse))
         {
@@ -171,7 +258,7 @@ public sealed class EvoPaymentServiceTests
             }),
             new OrderRepository(context),
             Options.Create(new GatewayOptions()),
-            Substitute.For<ILogger<SeatsIoService>>(),
+            logger ?? Substitute.For<ILogger<EvoPaymentService>>(),
             context,
             new SequenceTrackerService(new SequenceTrackerRepository(context)),
             seatsIoBookingClient ?? Substitute.For<ISeatsIoBookingClient>(),
@@ -183,6 +270,19 @@ public sealed class EvoPaymentServiceTests
                     SupportEmail = SupportEmail
                 }),
                 Substitute.For<ILogger<BookingConfirmationEmailQueue>>()));
+    }
+
+    private static List<string> RenderedLogMessages(
+        ILogger logger,
+        LogLevel logLevel)
+    {
+        return logger.ReceivedCalls()
+            .Where(call =>
+                call.GetMethodInfo().Name == nameof(ILogger.Log) &&
+                call.GetArguments()[0] is LogLevel level &&
+                level == logLevel)
+            .Select(call => call.GetArguments()[2]?.ToString() ?? "")
+            .ToList();
     }
 
     private static List<OrderEmailModel> ExtractOrderConfirmationModels(IEnumerable<Job> jobs)

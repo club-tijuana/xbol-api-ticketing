@@ -59,6 +59,10 @@ builder.Services.AddHttpClient<IEvoPaymentService, EvoPaymentService>(
 
 var app = builder.Build();
 
+app.Logger.LogInformation(
+    "Ticketing BackgroundJobs configuration present. Hangfire storage registered for producer. ConnectionStringConfigured={ConnectionStringConfigured}",
+    !string.IsNullOrWhiteSpace(builder.Configuration["BackgroundJobs:ConnectionString"]));
+
 app.UseExceptionHandler();
 app.UseConfiguredCors(corsOptions);
 

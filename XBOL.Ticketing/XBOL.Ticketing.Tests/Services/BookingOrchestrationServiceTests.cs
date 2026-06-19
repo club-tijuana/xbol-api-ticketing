@@ -481,7 +481,12 @@ public class BookingOrchestrationServiceTests
         backgroundJobs
             .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
             .Returns(_ => $"job-{createdJobs.Count}");
-        var sut = CreateService(context, bookingClient, backgroundJobs);
+        var bookingLogger = Substitute.For<ILogger<BookingOrchestrationService>>();
+        var sut = CreateService(
+            context,
+            bookingClient,
+            backgroundJobs,
+            bookingLogger);
         var request = new BookSeatsActionRequest
         {
             BundleId = 20,
@@ -510,7 +515,8 @@ public class BookingOrchestrationServiceTests
             ChangeInfoRequest = new ChangeInfoRequest()
         };
 
-        await sut.BookAsync(request, Guid.NewGuid());
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+        var orderId = result.OrderId.ToString();
 
         var emailModels = ExtractOrderConfirmationModels(createdJobs);
         emailModels.Should().HaveCount(2);
@@ -522,6 +528,17 @@ public class BookingOrchestrationServiceTests
             model.ToAddress == SupportEmail &&
             model.OrderDetails.OrderNumber == "ORD-B-20-000001" &&
             model.IsBundle);
+
+        var bookingLogs = RenderedLogMessages(bookingLogger, LogLevel.Information);
+        bookingLogs.Should().Contain(message =>
+            message.Contains("Starting confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal) &&
+            message.Contains("bundle", StringComparison.Ordinal));
+        bookingLogs.Should().Contain(message =>
+            message.Contains("Completed confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal) &&
+            message.Contains("job-1", StringComparison.Ordinal) &&
+            message.Contains("job-2", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -593,6 +610,45 @@ public class BookingOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task BookingConfirmationEmailQueue_WhenModelBuildFails_ReturnsPerRecipientFailureResults()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var queue = new BookingConfirmationEmailQueue(
+            backgroundJobs,
+            new BookingEmailModelBuilder(context),
+            Options.Create(new TicketingEmailTemplateOptions
+            {
+                SupportEmail = SupportEmail
+            }),
+            Substitute.For<ILogger<BookingConfirmationEmailQueue>>());
+
+        var results = await queue.EnqueueAsync(
+            404,
+            new Client
+            {
+                Email = "buyer@example.com",
+                FullName = "Rita Moreno"
+            });
+
+        results.Should().HaveCount(2);
+        results.Should().OnlyContain(result => !result.Succeeded);
+        results.Should().OnlyContain(result =>
+            result.FailureStage == BookingConfirmationEmailFailureStage.ModelBuild &&
+            result.ExceptionType == typeof(InvalidOperationException).Name);
+        results.Select(result => result.RecipientKind).Should().BeEquivalentTo(["buyer", "seller"]);
+    }
+
+    [Fact]
     public async Task BookAsync_LogsConfirmationEmailJobIds()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
@@ -619,11 +675,13 @@ public class BookingOrchestrationServiceTests
             .Create(Arg.Any<Job>(), Arg.Any<EnqueuedState>())
             .Returns("buyer-job-1", "seller-job-1");
         var emailLogger = Substitute.For<ILogger<BookingConfirmationEmailQueue>>();
+        var bookingLogger = Substitute.For<ILogger<BookingOrchestrationService>>();
         var sut = CreateService(
             context,
             bookingClient,
             backgroundJobs,
-            confirmationEmailLogger: emailLogger);
+            bookingLogger,
+            emailLogger);
         var request = new BookSeatsActionRequest
         {
             EventKey = "schedule-100",
@@ -660,6 +718,17 @@ public class BookingOrchestrationServiceTests
         infoLogs.Should().Contain(message =>
             message.Contains("seller-job-1", StringComparison.Ordinal) &&
             message.Contains(orderId, StringComparison.Ordinal));
+
+        var bookingLogs = RenderedLogMessages(bookingLogger, LogLevel.Information);
+        bookingLogs.Should().Contain(message =>
+            message.Contains("Starting confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal) &&
+            message.Contains("event", StringComparison.Ordinal));
+        bookingLogs.Should().Contain(message =>
+            message.Contains("Completed confirmation email enqueue", StringComparison.Ordinal) &&
+            message.Contains(orderId, StringComparison.Ordinal) &&
+            message.Contains("buyer-job-1", StringComparison.Ordinal) &&
+            message.Contains("seller-job-1", StringComparison.Ordinal));
     }
 
     [Fact]

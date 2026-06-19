@@ -16,27 +16,35 @@ public class BookingConfirmationEmailQueue(
 {
     private readonly string _supportEmail = emailTemplateOptions.Value.SupportEmail;
 
-    public async Task EnqueueAsync(
+    public async Task<IReadOnlyList<BookingConfirmationEmailEnqueueResult>> EnqueueAsync(
         long orderId,
         ModelClient client,
         CancellationToken cancellationToken = default)
     {
-        await EnqueueAsync(
+        logger.LogInformation(
+            "Starting confirmation email queue for order {OrderId}. BuyerEmailPresent={BuyerEmailPresent} SellerSupportConfigured={SellerSupportConfigured}",
+            orderId,
+            !string.IsNullOrWhiteSpace(client.Email),
+            !string.IsNullOrWhiteSpace(_supportEmail));
+
+        var buyerResult = await EnqueueAsync(
             orderId,
             "buyer",
             client.Email ?? "",
             client.FullName ?? "",
             cancellationToken);
 
-        await EnqueueAsync(
+        var sellerResult = await EnqueueAsync(
             orderId,
             "seller",
             _supportEmail,
             "Seller",
             cancellationToken);
+
+        return [buyerResult, sellerResult];
     }
 
-    private async Task EnqueueAsync(
+    private async Task<BookingConfirmationEmailEnqueueResult> EnqueueAsync(
         long orderId,
         string recipientKind,
         string toAddress,
@@ -57,7 +65,11 @@ public class BookingConfirmationEmailQueue(
                 "Failed to build {RecipientKind} confirmation email model for order {OrderId}",
                 recipientKind,
                 orderId);
-            return;
+            return BookingConfirmationEmailEnqueueResult.Failure(
+                orderId,
+                recipientKind,
+                BookingConfirmationEmailFailureStage.ModelBuild,
+                ex);
         }
 
         try
@@ -69,6 +81,10 @@ public class BookingConfirmationEmailQueue(
                 recipientKind,
                 jobId,
                 orderId);
+            return BookingConfirmationEmailEnqueueResult.Success(
+                orderId,
+                recipientKind,
+                jobId);
         }
         catch (Exception ex)
         {
@@ -77,6 +93,11 @@ public class BookingConfirmationEmailQueue(
                 "Failed to enqueue {RecipientKind} confirmation email job for order {OrderId}",
                 recipientKind,
                 orderId);
+            return BookingConfirmationEmailEnqueueResult.Failure(
+                orderId,
+                recipientKind,
+                BookingConfirmationEmailFailureStage.Enqueue,
+                ex);
         }
     }
 }
