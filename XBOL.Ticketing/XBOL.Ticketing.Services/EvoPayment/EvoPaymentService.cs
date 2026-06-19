@@ -332,6 +332,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 throw new ArgumentException("ReturnUrl must be a valid absolute URI.", nameof(request));
             }
 
+            var currencyType = ParseCheckoutCurrency(request.Currency);
+            var currencyCode = currencyType.ToString();
+
             if (request.EventScheduleId != null)
             {
                 schedule = await _dbContext.EventSchedules
@@ -484,11 +487,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
 
             var orderRefId = Guid.NewGuid().ToString("N");
-            var (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
-                orderRefId, total, request.Currency, request.ReturnUrl,
-                $"XBOL — {request.Seats.Count} ticket(s)", ct);
-
-
             var bookingSeats = request.Seats
                 .Select(s => new BookingSeatRequest
                 {
@@ -498,45 +496,18 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 })
                 .ToList();
 
-            IReadOnlyList<string> bookedSeatKeys;
-            string? seatsIokey = schedule != null ? schedule.ExternalEventKey : bundle?.ExternalKey;
-            try
-            {
-                bookedSeatKeys = await _seatsIoBookingClient.BookSeatsAsync(
-                    seatsIokey, bookingSeats, request.HoldToken, ct);
-            }
-            catch (Exception ex)
-            {
-                if (schedule != null)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Seats.io BookSeatsAsync failed. EventScheduleId={EventScheduleId} HoldToken={HoldToken}",
-                        request.EventScheduleId,
-                        request.HoldToken);
-                }
-                else if (bundle != null)
-                {
-                    _logger.LogError(
-                        ex,
-                        "Seats.io BookSeatsAsync failed. BundleId={BundleId} HoldToken={HoldToken}",
-                        bundle.Id,
-                        request.HoldToken);
-                }
-
-                throw new InvalidOperationException(
-                    "Could not confirm seat reservation. Please try again.", ex);
-            }
-
-
             var now = DateTimeOffset.UtcNow;
+            string reference;
+            ModelOrder order;
+            Payment payment;
+
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
             try
             {
+                reference = await _sequenceTrackerService.GenerateLocalizerAsync("ORD");
                 var client = await ResolveClientAsync(request.ClientContact, now, ct);
-                var reference = await _sequenceTrackerService.GenerateLocalizerAsync("ORD");
 
-                var order = new ModelOrder
+                order = new ModelOrder
                 {
                     Client = client,
                     UserId = null,
@@ -549,20 +520,28 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     SaleChannel = SaleChannel.Online,
                     OrderType = schedule != null ? OrderType.Ticket : OrderType.Bundle,
                     RelatedOrderId = request.RelatedOrderId,
+                    EventScheduleId = schedule?.Id,
+                    HoldToken = request.HoldToken,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = Guid.Empty,
                     UpdatedBy = Guid.Empty
                 };
 
-                var payment = new Payment
+                payment = new Payment
                 {
                     Order = order,
+                    Currency = currencyType,
                     Amount = total,
+                    AmountMXN = total,
+                    ReceivedAmount = null,
+                    ReceivedAmountMXN = null,
+                    ExchangeRateId = 0,
+                    ExchangeRate = 0,
                     PaymentType = PaymentType.Card,
                     Provider = "EVOPayments",
                     ProviderReference = orderRefId,
-                    ProviderSessionReference = successIndicator,
+                    ProviderSessionReference = null,
                     PaymentStatus = PaymentStatus.Pending,
                     TransactionReference = Guid.NewGuid(),
                     AppliedAt = now,
@@ -778,48 +757,107 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
-
-                _logger.LogInformation(
-                    "Checkout initiated. LocalOrderId={OrderId} Reference={Reference} OrderRefId={OrderRefId} Amount={Amount} Tickets={TicketCount}",
-                    order.Id, reference, orderRefId, amountStr, order.Tickets.Count);
-
-                var gatewayBaseUrl = $"{_httpClient.BaseAddress!.Scheme}://{_httpClient.BaseAddress.Host}";
-
-                return new InitiateCheckoutResponse
-                {
-                    LocalOrderId = order.Id,
-                    SessionId = sessionId,
-                    SuccessIndicator = successIndicator,
-                    OrderRefId = orderRefId,
-                    Amount = amountStr,
-                    Currency = request.Currency,
-                    MerchantId = _settings.MerchantId,
-                    ApiVersion = _settings.Version,
-                    GatewayBaseUrl = gatewayBaseUrl
-                };
             }
-            catch
+            catch (Exception ex)
             {
                 await transaction.RollbackAsync(ct);
 
-
-                try
-                {
-                    await _seatsIoBookingClient.ReleaseBookedSeatsAsync(
-                        schedule.ExternalEventKey!, bookedSeatKeys, ct);
-                    _logger.LogInformation(
-                        "Compensatory Seats.io rollback completed. EventKey={EventKey}",
-                        schedule.ExternalEventKey);
-                }
-                catch (Exception releaseEx)
-                {
-                    _logger.LogError(releaseEx,
-                        "Compensatory Seats.io rollback FAILED. EventKey={EventKey} Seats={Seats}",
-                        schedule.ExternalEventKey, string.Join(", ", bookedSeatKeys));
-                }
+                _logger.LogError(
+                    ex,
+                    "Hosted checkout local persistence failed. EventScheduleId={EventScheduleId} BundleId={BundleId} SeatCount={SeatCount} HoldTokenPresent={HoldTokenPresent} OrderRefId={OrderRefId}",
+                    request.EventScheduleId,
+                    request.BundleId,
+                    request.Seats.Count,
+                    !string.IsNullOrWhiteSpace(request.HoldToken),
+                    orderRefId);
 
                 throw;
             }
+
+            string sessionId;
+            string successIndicator;
+            try
+            {
+                (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
+                    orderRefId, total, currencyCode, request.ReturnUrl,
+                    $"XBOL — {request.Seats.Count} ticket(s)", ct);
+            }
+            catch
+            {
+                await TryMarkHostedCheckoutFailedAsync(order, payment, ct);
+                throw;
+            }
+
+            try
+            {
+                payment.ProviderSessionReference = successIndicator;
+                await _dbContext.SaveChangesAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Hosted checkout provider session persistence failed. OrderId={OrderId} OrderRefId={OrderRefId}",
+                    order.Id,
+                    orderRefId);
+                await TryMarkHostedCheckoutFailedAsync(order, payment, ct);
+                throw;
+            }
+
+            var seatsIokey = schedule != null ? schedule.ExternalEventKey : bundle?.ExternalKey;
+            if (string.IsNullOrWhiteSpace(seatsIokey))
+            {
+                throw new InvalidOperationException("Seats.io event key is required.");
+            }
+
+            try
+            {
+                await _seatsIoBookingClient.BookSeatsAsync(
+                    seatsIokey, bookingSeats, request.HoldToken, ct);
+            }
+            catch (Exception ex)
+            {
+                if (schedule != null)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Seats.io BookSeatsAsync failed. EventScheduleId={EventScheduleId} HoldTokenPresent={HoldTokenPresent}",
+                        request.EventScheduleId,
+                        !string.IsNullOrWhiteSpace(request.HoldToken));
+                }
+                else if (bundle != null)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Seats.io BookSeatsAsync failed. BundleId={BundleId} HoldTokenPresent={HoldTokenPresent}",
+                        bundle.Id,
+                        !string.IsNullOrWhiteSpace(request.HoldToken));
+                }
+
+                await TryMarkHostedCheckoutFailedAsync(order, payment, ct);
+
+                throw new InvalidOperationException(
+                    "Could not confirm seat reservation. Please try again.", ex);
+            }
+
+            _logger.LogInformation(
+                "Checkout initiated. LocalOrderId={OrderId} Reference={Reference} OrderRefId={OrderRefId} Amount={Amount} Tickets={TicketCount}",
+                order.Id, reference, orderRefId, amountStr, order.Tickets.Count);
+
+            var gatewayBaseUrl = $"{_httpClient.BaseAddress!.Scheme}://{_httpClient.BaseAddress.Host}";
+
+            return new InitiateCheckoutResponse
+            {
+                LocalOrderId = order.Id,
+                SessionId = sessionId,
+                SuccessIndicator = successIndicator,
+                OrderRefId = orderRefId,
+                Amount = amountStr,
+                Currency = currencyCode,
+                MerchantId = _settings.MerchantId,
+                ApiVersion = _settings.Version,
+                GatewayBaseUrl = gatewayBaseUrl
+            };
         }
 
         public async Task<ConfirmCheckoutResponse> ConfirmCheckoutAsync(
@@ -1189,6 +1227,51 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             var composed = $"{contact.FirstName} {contact.LastName}".Trim();
             return string.IsNullOrWhiteSpace(composed) ? fallback : composed;
+        }
+
+        private static CurrencyType ParseCheckoutCurrency(string currency)
+        {
+            if (Enum.TryParse<CurrencyType>(currency, ignoreCase: true, out var currencyType)
+                && currencyType == CurrencyType.MXN)
+            {
+                return currencyType;
+            }
+
+            throw new ArgumentException("Only MXN checkout currency is supported.", nameof(currency));
+        }
+
+        private async Task TryMarkHostedCheckoutFailedAsync(
+            ModelOrder order,
+            Payment payment,
+            CancellationToken ct)
+        {
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                order.Status = OrderStatus.Cancelled;
+                order.UpdatedAt = now;
+                order.UpdatedBy = Guid.Empty;
+
+                payment.PaymentStatus = PaymentStatus.Failed;
+                payment.UpdatedBy = Guid.Empty;
+
+                foreach (var ticket in order.Tickets.Where(t => t.Status == TicketStatus.PendingPayment))
+                {
+                    ticket.Status = TicketStatus.Expired;
+                    ticket.UpdatedAt = now;
+                    ticket.UpdatedBy = Guid.Empty;
+                }
+
+                await _dbContext.SaveChangesAsync(ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Failed to mark hosted checkout as failed. OrderId={OrderId} ProviderReference={ProviderReference}",
+                    order.Id,
+                    payment.ProviderReference);
+            }
         }
 
         private static string NormalizePhoneNumber(string phoneNumber)
