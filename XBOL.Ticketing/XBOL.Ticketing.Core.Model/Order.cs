@@ -30,6 +30,8 @@ namespace XBOL.Ticketing.Core.Model
 
         public long? RelatedOrderId { get; set; }
         public Order? RelatedOrder { get; set; }
+        public long? EventScheduleId { get; set; }
+        public string? HoldToken { get; set; }
 
         public IList<OrderItem> Items { get; set; } = [];
         public IList<OrderFee> Fees { get; set; } = [];

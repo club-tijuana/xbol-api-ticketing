@@ -4,7 +4,10 @@ namespace XBOL.Ticketing.Core.DTO.EvoPayment
 {
     public class InitiateCheckoutRequest
     {
-        public long EventScheduleId { get; init; }
+        public long? EventScheduleId { get; init; }
+
+        public long? BundleId { get; set; }
+        public long? RelatedOrderId { get; set; }
 
         public required string HoldToken { get; init; }
 

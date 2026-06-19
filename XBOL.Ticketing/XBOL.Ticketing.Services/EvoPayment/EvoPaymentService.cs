@@ -13,6 +13,7 @@ using XBOL.Ticketing.Data.Repositories.Order;
 using XBOL.Ticketing.Services.Booking;
 using XBOL.Ticketing.Services.Email;
 using XBOL.Ticketing.Services.Odasoft.XBOL.Business.Services;
+using ModelBundle = XBOL.Ticketing.Core.Model.Bundle;
 using ModelClient = XBOL.Ticketing.Core.Model.Client;
 using ModelOrder = XBOL.Ticketing.Core.Model.Order;
 using ModelOrderItem = XBOL.Ticketing.Core.Model.OrderItem;
@@ -299,6 +300,13 @@ namespace XBOL.Ticketing.Services.EvoPayment
             InitiateCheckoutRequest request,
             CancellationToken ct = default)
         {
+            EventSchedule? schedule = null;
+            ModelBundle? bundle = null;
+            List<EventSeat>? eventSeats = null;
+            List<BundleSeat>? bundleSeats = null;
+            HashSet<string>? foundSeatKeys = null;
+            List<long> eventSchedulesIds = new List<long>();
+
             if (request.Seats.Count == 0)
             {
                 throw new ArgumentException("At least one seat is required.", nameof(request));
@@ -324,8 +332,11 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 throw new ArgumentException("ReturnUrl must be a valid absolute URI.", nameof(request));
             }
 
-            var schedule = await _dbContext.EventSchedules
+            if (request.EventScheduleId != null)
+            {
+                schedule = await _dbContext.EventSchedules
                 .FindAsync([request.EventScheduleId], ct);
+
             if (schedule is null)
             {
                 throw new KeyNotFoundException(
@@ -343,61 +354,140 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 throw new InvalidOperationException(
                     $"EventSchedule {request.EventScheduleId} does not have a published event in Seats.io.");
             }
+            }
+            else if (request.BundleId != null)
+            {
+                bundle = await _dbContext.Bundles
+                .Include(b => b.BundleEventSchedules)
+                    .ThenInclude(bes => bes.EventSchedule)
+                .FirstOrDefaultAsync(b => b.Id == request.BundleId, ct);
+
+                if (bundle is null)
+                {
+                    throw new KeyNotFoundException(
+                        $"Bundle {request.BundleId} not found.");
+                }
+
+                if (
+                    bundle.Status != EventStatus.Published ||
+                    bundle.BundleEventSchedules.All(s => s.EventSchedule.Status != ScheduleStatus.OnSale)
+                )
+                {
+                    throw new InvalidOperationException(
+                        $"The bundle is not available for sale (status: {bundle.Status}).");
+                }
+
+                if (string.IsNullOrWhiteSpace(bundle.ExternalKey))
+                {
+                    throw new InvalidOperationException(
+                        $"Bundle {request.BundleId} does not have a published season in Seats.io.");
+                }
+            }
 
             var requestedItemIds = request.Seats
                 .Select(s => s.PriceListItemId)
                 .Distinct()
                 .ToList();
 
+            long referenceId = 0;
+            SaleType saleType = SaleType.Event;
+
+            if (schedule != null)
+            {
+                referenceId = schedule.EventId;
+            }
+            else if (bundle != null)
+            {
+                referenceId = bundle.Id;
+                saleType = SaleType.Bundle;
+            }
+
             var validPriceItems = await _dbContext.PriceListItems
                 .Include(i => i.PriceList)
                     .ThenInclude(pl => pl.PriceReference)
                 .Where(i => requestedItemIds.Contains(i.Id)
                             && i.PriceList.Status == VersionStatus.Active
-                            && i.PriceList.PriceReference.ReferenceType == SaleType.Event
-                            && i.PriceList.PriceReference.ReferenceId == schedule.EventId)
+                            && i.PriceList.PriceReference.ReferenceType == saleType
+                            && i.PriceList.PriceReference.ReferenceId == referenceId)
                 .ToDictionaryAsync(i => i.Id, ct);
 
             var invalidItemIds = requestedItemIds.Where(id => !validPriceItems.ContainsKey(id)).ToList();
             if (invalidItemIds.Count > 0)
             {
                 throw new KeyNotFoundException(
-                    $"Invalid PriceListItem(s) or not belonging to this event: {string.Join(", ", invalidItemIds)}");
+                    $"Invalid PriceListItem(s) or not belonging to this {(schedule != null ? "event" : "bundle")}: {string.Join(", ", invalidItemIds)}");
             }
 
             var total = request.Seats.Sum(s => validPriceItems[s.PriceListItemId].FinalPrice);
             var amountStr = total.ToString("F2", CultureInfo.InvariantCulture);
 
             var requestedSeatKeys = request.Seats.Select(s => s.SeatKey).ToList();
-            var eventSeats = await _dbContext.EventSeats
+
+            if (schedule != null)
+            {
+                eventSeats = await _dbContext.EventSeats
                 .Include(es => es.EventSection)
                 .Where(es => requestedSeatKeys.Contains(es.ExternalSeatObjectKey)
                              && es.EventSection.EventScheduleId == request.EventScheduleId)
                 .ToListAsync(ct);
 
-            var foundSeatKeys = eventSeats.Select(es => es.ExternalSeatObjectKey).ToHashSet(StringComparer.Ordinal);
+                foundSeatKeys = eventSeats.Select(es => es.ExternalSeatObjectKey).ToHashSet(StringComparer.Ordinal);
+            }
+            else if (bundle != null)
+            {
+                bundleSeats = await _dbContext.BundleSeats
+                    .Include(bs => bs.BundleSection)
+                    .Where(bs => requestedSeatKeys.Contains(bs.ExternalSeatObjectKey)
+                        && bs.BundleSection.BundleId == request.BundleId)
+                    .ToListAsync(ct);
+
+                foundSeatKeys = bundleSeats.Select(es => es.ExternalSeatObjectKey).ToHashSet(StringComparer.Ordinal);
+            }
+
             var missingSeatKeys = requestedSeatKeys.Where(k => !foundSeatKeys.Contains(k)).ToList();
             if (missingSeatKeys.Count > 0)
             {
                 throw new KeyNotFoundException(
-                    $"SeatKeys not found for this event: {string.Join(", ", missingSeatKeys)}");
+                    $"SeatKeys not found for this {(schedule != null ? "event" : "bundle")}: {string.Join(", ", missingSeatKeys)}");
+            }
+
+            if (schedule != null)
+            {
+                eventSchedulesIds.Add(schedule.Id);
+            }
+            else if (bundle != null)
+            {
+                eventSchedulesIds = await _dbContext.BundleEventSchedules
+                    .Where(bes => bes.BundleId == bundle.Id)
+                    .Select(bes => bes.EventScheduleId)
+                    .ToListAsync();
             }
 
             var inventoryBatchId = await _dbContext.InventoryBatches
-                .Where(b => b.EventScheduleId == request.EventScheduleId
+                .Where(b => eventSchedulesIds.Contains(b.EventScheduleId)
                             && b.Status == InventoryBatchStatus.Active)
                 .OrderBy(b => b.Id)
                 .Select(b => (long?)b.Id)
                 .FirstOrDefaultAsync(ct);
 
+            if (schedule != null)
+            {
             _logger.LogInformation(
                 "Initiating checkout. EventScheduleId={EventScheduleId} Seats={SeatCount} Total={Total} Currency={Currency}",
                 request.EventScheduleId, request.Seats.Count, amountStr, request.Currency);
+            }
+            else if (bundle != null)
+            {
+                _logger.LogInformation(
+                    "Initiating checkout. BundleId={BundleId} Seats={SeatCount} Total={Total} Currency={Currency}",
+                    bundle.Id, request.Seats.Count, amountStr, request.Currency);
+            }
 
             var orderRefId = Guid.NewGuid().ToString("N");
             var (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
                 orderRefId, total, request.Currency, request.ReturnUrl,
                 $"XBOL — {request.Seats.Count} ticket(s)", ct);
+
 
             var bookingSeats = request.Seats
                 .Select(s => new BookingSeatRequest
@@ -409,19 +499,35 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 .ToList();
 
             IReadOnlyList<string> bookedSeatKeys;
+            string? seatsIokey = schedule != null ? schedule.ExternalEventKey : bundle?.ExternalKey;
             try
             {
                 bookedSeatKeys = await _seatsIoBookingClient.BookSeatsAsync(
-                    schedule.ExternalEventKey, bookingSeats, request.HoldToken, ct);
+                    seatsIokey, bookingSeats, request.HoldToken, ct);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
-                    "Seats.io BookSeatsAsync failed. EventKey={EventKey} HoldToken={HoldToken}",
-                    schedule.ExternalEventKey, request.HoldToken);
+                if (schedule != null)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Seats.io BookSeatsAsync failed. EventScheduleId={EventScheduleId} HoldToken={HoldToken}",
+                        request.EventScheduleId,
+                        request.HoldToken);
+                }
+                else if (bundle != null)
+                {
+                    _logger.LogError(
+                        ex,
+                        "Seats.io BookSeatsAsync failed. BundleId={BundleId} HoldToken={HoldToken}",
+                        bundle.Id,
+                        request.HoldToken);
+                }
+
                 throw new InvalidOperationException(
                     "Could not confirm seat reservation. Please try again.", ex);
             }
+
 
             var now = DateTimeOffset.UtcNow;
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
@@ -441,7 +547,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     Total = total,
                     Status = OrderStatus.Pending,
                     SaleChannel = SaleChannel.Online,
-                    OrderType = OrderType.Ticket,
+                    OrderType = schedule != null ? OrderType.Ticket : OrderType.Bundle,
+                    RelatedOrderId = request.RelatedOrderId,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = Guid.Empty,
@@ -455,6 +562,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     PaymentType = PaymentType.Card,
                     Provider = "EVOPayments",
                     ProviderReference = orderRefId,
+                    ProviderSessionReference = successIndicator,
+                    PaymentStatus = PaymentStatus.Pending,
                     TransactionReference = Guid.NewGuid(),
                     AppliedAt = now,
                     CreatedAt = now,
@@ -462,6 +571,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     UpdatedBy = Guid.Empty
                 };
 
+                List<BundlePass> bundlePasses = new List<BundlePass>();
+                if (schedule != null)
+                {
                 var eventSeatByKey = eventSeats.ToDictionary(es => es.ExternalSeatObjectKey, StringComparer.Ordinal);
                 foreach (var seatReq in request.Seats)
                 {
@@ -470,7 +582,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
                     order.Tickets.Add(new ModelTicket
                     {
-                        EventScheduleId = request.EventScheduleId,
+                            EventScheduleId = (long)(request?.EventScheduleId.Value),
                         EventSectionId = eventSeat.EventSectionId,
                         EventSeatId = eventSeat.Id,
                         InventoryBatchId = inventoryBatchId,
@@ -480,22 +592,141 @@ namespace XBOL.Ticketing.Services.EvoPayment
                         TicketCode = eventSeat.ExternalSeatObjectKey,
                         TicketType = ItemType.Ticket.ToString(),
                         PrivateToken = null,
+                            SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
+                            SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
+                            IsDigital = true,
+                            PricePaid = pricePaid,
+                            Status = TicketStatus.PendingPayment,
+                            CreatedAt = now,
+                            UpdatedAt = now,
+                            CreatedBy = Guid.Empty,
+                            UpdatedBy = Guid.Empty
+                        });
+                    }
+                }
+                else if (bundle != null)
+                {
+                    var requestSeatByKey = request.Seats.ToDictionary(
+                        x => x.SeatKey,
+                        StringComparer.Ordinal);
+
+                    var seatKeys = request.Seats
+                        .Select(x => x.SeatKey)
+                        .ToList();
+
+                    // CREATE BUNDLE PASS
+                    var bundlePassSeats = await _dbContext.BundleSeats
+                        .Include(bs => bs.BundleSection)
+                            .ThenInclude(bs => bs.Bundle)
+                        .Where(bs =>
+                            bs.BundleSection.BundleId == bundle.Id &&
+                            seatKeys.Contains(bs.ExternalSeatObjectKey)
+                        )
+                        .ToListAsync();
+
+                    foreach (var seat in bundlePassSeats)
+                    {
+                        var seatReq = requestSeatByKey[seat.ExternalSeatObjectKey];
+                        var pricePaid = validPriceItems[seatReq.PriceListItemId].FinalPrice;
+
+                        var bundlePass = new BundlePass
+                        {
+                            ClientId = client.Id,
+                            UserId = null,
+                            BundleId = bundle.Id,
+                            BundleSeatId = seat.Id,
+                            Price = pricePaid,
+                            PurchasedAt = now, // TODO: Should it be nullable?
+                            BundlePassType = BundlePassType.Full,
+                            TrackingCode = seat.ExternalSeatObjectKey,
+                            PrivateToken = "",
+                            Status = BundlePassStatus.Active, // TODO: Should we add a Pending status?
+                            CreatedAt = now,
+                            CreatedBy = Guid.Empty,
+                            UpdatedAt = now,
+                            UpdatedBy = Guid.Empty
+                        };
+
+                        bundlePasses.Add(bundlePass);
+                    }
+
+                    _dbContext.BundlePasses.AddRange(bundlePasses);
+                    // CREATE BUNDLE PASS
+
+                    // CREATE BUNDLE TICKETS
+                    var scheduleIds = await _dbContext.BundleEventSchedules
+                        .Where(x => x.BundleId == bundle.Id)
+                        .Select(x => x.EventScheduleId)
+                        .ToListAsync(ct);
+
+                    var baseSeatIds = bundleSeats
+                        .Select(x => x.BaseSeatId)
+                        .ToList();
+
+                    eventSeats = await _dbContext.EventSeats
+                        .Include(es => es.EventSection)
+                        .Where(es =>
+                            scheduleIds.Contains(es.EventSection.EventScheduleId) &&
+                            baseSeatIds.Contains(es.BaseSeatId))
+                        .ToListAsync(ct);
+
+                    var eventSeatMap = eventSeats.ToDictionary(
+                        es => (ScheduleId: es.EventSection.EventScheduleId, BaseSeatId: es.BaseSeatId)
+                    );
+
+                    foreach (var bundleSeat in bundleSeats)
+                    {
+                        var seatReq = requestSeatByKey[bundleSeat.ExternalSeatObjectKey];
+                        var pricePaid = validPriceItems[seatReq.PriceListItemId].FinalPrice;
+
+                        foreach (var scheduleId in scheduleIds)
+                        {
+                            var key = (scheduleId, bundleSeat.BaseSeatId);
+
+                            if (!eventSeatMap.TryGetValue(key, out var eventSeat))
+                            {
+                                throw new InvalidOperationException(
+                                    $"EventSeat not found for Schedule={scheduleId}, BaseSeat={bundleSeat.BaseSeatId}");
+                            }
+
+                            order.Tickets.Add(new ModelTicket
+                            {
+                                EventScheduleId = scheduleId,
+                                EventSectionId = eventSeat.EventSectionId,
+                                EventSeatId = eventSeat.Id,
+
+                                InventoryBatchId = inventoryBatchId,
+                                OriginalClient = client,
+                                CurrentClient = client,
+                                OriginalOrder = order,
+
+                                TicketCode = eventSeat.ExternalSeatObjectKey,
+                                TicketType = ItemType.BundlePass.ToString(),
+                                PrivateToken = null,
+
                         SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                         SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
+
                         IsDigital = true,
                         PricePaid = pricePaid,
                         Status = TicketStatus.PendingPayment,
+
                         CreatedAt = now,
                         UpdatedAt = now,
                         CreatedBy = Guid.Empty,
                         UpdatedBy = Guid.Empty
                     });
                 }
+                    }
+                    // CREATE BUNDLE TICKETS
+                }
 
                 _dbContext.Orders.Add(order);
                 _dbContext.Payments.Add(payment);
                 await _dbContext.SaveChangesAsync(ct);
 
+                if (schedule != null)
+                {
                 foreach (var ticket in order.Tickets)
                 {
                     order.Items.Add(new ModelOrderItem
@@ -506,6 +737,44 @@ namespace XBOL.Ticketing.Services.EvoPayment
                         Price = ticket.PricePaid
                     });
                 }
+                }
+                else if (bundle != null)
+                {
+                    foreach (var pass in bundlePasses)
+                    {
+                        order.Items.Add(new ModelOrderItem
+                        {
+                            ItemType = ItemType.BundlePass,
+                            ItemReferenceId = pass.Id,
+                            IsCourtesy = false,
+                            Price = pass.Price
+                        });
+                    }
+                }
+
+                // CREATE BUNDLE PASS EVENT TICKET
+                if (bundle != null)
+                {
+                    var passByCode = bundlePasses.ToDictionary(bp => bp.TrackingCode);
+                    var joins = new List<BundlePassEventTicket>();
+
+                    foreach (var ticket in order.Tickets)
+                    {
+                        if (!passByCode.TryGetValue(ticket.TicketCode, out var pass))
+                        {
+                            continue;
+                        }
+
+                        var join = new BundlePassEventTicket
+                        {
+                            BundlePassId = pass.Id,
+                            TicketId = ticket.Id
+                        };
+
+                        _dbContext.BundlePassEventTickets.Add(join);
+                    }
+                }
+                // CREATE BUNDLE PASS EVENT TICKET
 
                 await _dbContext.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
@@ -532,6 +801,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             catch
             {
                 await transaction.RollbackAsync(ct);
+
 
                 try
                 {
@@ -592,7 +862,18 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 };
             }
 
+
+            if (!string.IsNullOrWhiteSpace(request.ResultIndicator)
+                && !string.Equals(request.ResultIndicator, payment.ProviderSessionReference, StringComparison.Ordinal))
+            {
+                _logger.LogWarning(
+                    "resultIndicator does not match ProviderSessionReference. OrderId={OrderId} ResultIndicator={RI} Expected={Expected}. Continuing with Retrieve Order.",
+                    order.Id, request.ResultIndicator, payment.ProviderSessionReference);
+            }
+
+
             var evoResult = await RetrieveOrderAsync(request.OrderRefId, ct);
+
 
             var isSuccess =
                 string.Equals(evoResult.Result, "SUCCESS", StringComparison.OrdinalIgnoreCase)
@@ -602,9 +883,11 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             if (isSuccess)
             {
+
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
+                    payment.PaymentStatus = PaymentStatus.Captured;
                     payment.AppliedAt = now;
 
                     order.Status = OrderStatus.Paid;
@@ -659,6 +942,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
             else
             {
+
                 var newPaymentStatus = DetermineFailedPaymentStatus(evoResult);
                 var newTicketStatus = newPaymentStatus == PaymentStatus.Expired
                     ? TicketStatus.Expired
@@ -667,6 +951,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
+                    payment.PaymentStatus = newPaymentStatus;
+
                     order.Status = OrderStatus.Cancelled;
                     order.UpdatedAt = now;
                     order.UpdatedBy = Guid.Empty;
@@ -676,6 +962,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                         ticket.Status = newTicketStatus;
                         ticket.UpdatedAt = now;
                         ticket.UpdatedBy = Guid.Empty;
+
                     }
 
                     await _dbContext.SaveChangesAsync(ct);
