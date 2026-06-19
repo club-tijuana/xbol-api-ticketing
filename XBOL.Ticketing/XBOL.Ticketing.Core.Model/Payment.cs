@@ -29,7 +29,5 @@ namespace XBOL.Ticketing.Core.Model
         public Guid UpdatedBy { get; set; }
 
         public string? ProviderSessionReference { get; set; }
-
-        public PaymentStatus PaymentStatus { get; set; }
     }
 }
