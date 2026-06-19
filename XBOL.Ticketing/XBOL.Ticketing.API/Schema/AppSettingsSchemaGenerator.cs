@@ -57,7 +57,7 @@ public static class AppSettingsSchemaGenerator
             customSchema,
             BuildConfiguration(configurationDirectory, SchemaEnvironmentName));
 
-        return new JsonObject
+        var schema = new JsonObject
         {
             ["allOf"] = new JsonArray
             {
@@ -69,6 +69,13 @@ public static class AppSettingsSchemaGenerator
             ["properties"] = customSchema["properties"]?.DeepClone(),
             ["type"] = "object"
         };
+
+        if (customSchema["required"] is not null)
+        {
+            schema["required"] = customSchema["required"]?.DeepClone();
+        }
+
+        return schema;
     }
 
     /// <summary>
@@ -287,7 +294,12 @@ public static class AppSettingsSchemaGenerator
         public CorsOptions? Cors { get; set; }
 
         [Description("Hangfire background-job storage configuration")]
-        public BackgroundJobsConsumerOptions? BackgroundJobs { get; set; }
+        [Required]
+        public BackgroundJobsConsumerOptions BackgroundJobs { get; set; } = null!;
+
+        [Description("Protected diagnostic producer endpoints for Hangfire connectivity probes")]
+        [Required]
+        public BackgroundJobDiagnosticsOptions BackgroundJobDiagnostics { get; set; } = null!;
 
         [Description("EVO Payments gateway configuration")]
         public EvoSettings? EvoSettings { get; set; }
