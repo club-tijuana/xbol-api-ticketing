@@ -322,9 +322,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 throw new ArgumentException($"Duplicate SeatKeys: {string.Join(", ", duplicateSeatKeys)}");
             }
 
-            if (string.IsNullOrWhiteSpace(request.ClientContact.Email))
+            if (string.IsNullOrWhiteSpace(request.ClientContact.PhoneNumber))
             {
-                throw new ArgumentException("Buyer email is required.", nameof(request));
+                throw new ArgumentException("Buyer phone is required.", nameof(request));
             }
 
             if (!Uri.TryCreate(request.ReturnUrl, UriKind.Absolute, out _))
@@ -337,23 +337,23 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 schedule = await _dbContext.EventSchedules
                 .FindAsync([request.EventScheduleId], ct);
 
-            if (schedule is null)
-            {
-                throw new KeyNotFoundException(
-                    $"EventSchedule {request.EventScheduleId} not found.");
-            }
+                if (schedule is null)
+                {
+                    throw new KeyNotFoundException(
+                        $"EventSchedule {request.EventScheduleId} not found.");
+                }
 
-            if (schedule.Status != ScheduleStatus.OnSale)
-            {
-                throw new InvalidOperationException(
-                    $"The event is not available for sale (status: {schedule.Status}).");
-            }
+                if (schedule.Status != ScheduleStatus.OnSale)
+                {
+                    throw new InvalidOperationException(
+                        $"The event is not available for sale (status: {schedule.Status}).");
+                }
 
-            if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
-            {
-                throw new InvalidOperationException(
-                    $"EventSchedule {request.EventScheduleId} does not have a published event in Seats.io.");
-            }
+                if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+                {
+                    throw new InvalidOperationException(
+                        $"EventSchedule {request.EventScheduleId} does not have a published event in Seats.io.");
+                }
             }
             else if (request.BundleId != null)
             {
@@ -472,9 +472,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             if (schedule != null)
             {
-            _logger.LogInformation(
-                "Initiating checkout. EventScheduleId={EventScheduleId} Seats={SeatCount} Total={Total} Currency={Currency}",
-                request.EventScheduleId, request.Seats.Count, amountStr, request.Currency);
+                _logger.LogInformation(
+                    "Initiating checkout. EventScheduleId={EventScheduleId} Seats={SeatCount} Total={Total} Currency={Currency}",
+                    request.EventScheduleId, request.Seats.Count, amountStr, request.Currency);
             }
             else if (bundle != null)
             {
@@ -574,24 +574,24 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 List<BundlePass> bundlePasses = new List<BundlePass>();
                 if (schedule != null)
                 {
-                var eventSeatByKey = eventSeats.ToDictionary(es => es.ExternalSeatObjectKey, StringComparer.Ordinal);
-                foreach (var seatReq in request.Seats)
-                {
-                    var eventSeat = eventSeatByKey[seatReq.SeatKey];
-                    var pricePaid = validPriceItems[seatReq.PriceListItemId].FinalPrice;
-
-                    order.Tickets.Add(new ModelTicket
+                    var eventSeatByKey = eventSeats.ToDictionary(es => es.ExternalSeatObjectKey, StringComparer.Ordinal);
+                    foreach (var seatReq in request.Seats)
                     {
+                        var eventSeat = eventSeatByKey[seatReq.SeatKey];
+                        var pricePaid = validPriceItems[seatReq.PriceListItemId].FinalPrice;
+
+                        order.Tickets.Add(new ModelTicket
+                        {
                             EventScheduleId = (long)(request?.EventScheduleId.Value),
-                        EventSectionId = eventSeat.EventSectionId,
-                        EventSeatId = eventSeat.Id,
-                        InventoryBatchId = inventoryBatchId,
-                        OriginalClient = client,
-                        CurrentClient = client,
-                        OriginalOrder = order,
-                        TicketCode = eventSeat.ExternalSeatObjectKey,
-                        TicketType = ItemType.Ticket.ToString(),
-                        PrivateToken = null,
+                            EventSectionId = eventSeat.EventSectionId,
+                            EventSeatId = eventSeat.Id,
+                            InventoryBatchId = inventoryBatchId,
+                            OriginalClient = client,
+                            CurrentClient = client,
+                            OriginalOrder = order,
+                            TicketCode = eventSeat.ExternalSeatObjectKey,
+                            TicketType = ItemType.Ticket.ToString(),
+                            PrivateToken = null,
                             SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                             SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
                             IsDigital = true,
@@ -704,19 +704,19 @@ namespace XBOL.Ticketing.Services.EvoPayment
                                 TicketType = ItemType.BundlePass.ToString(),
                                 PrivateToken = null,
 
-                        SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
-                        SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
+                                SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
+                                SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
 
-                        IsDigital = true,
-                        PricePaid = pricePaid,
-                        Status = TicketStatus.PendingPayment,
+                                IsDigital = true,
+                                PricePaid = pricePaid,
+                                Status = TicketStatus.PendingPayment,
 
-                        CreatedAt = now,
-                        UpdatedAt = now,
-                        CreatedBy = Guid.Empty,
-                        UpdatedBy = Guid.Empty
-                    });
-                }
+                                CreatedAt = now,
+                                UpdatedAt = now,
+                                CreatedBy = Guid.Empty,
+                                UpdatedBy = Guid.Empty
+                            });
+                        }
                     }
                     // CREATE BUNDLE TICKETS
                 }
@@ -727,16 +727,16 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
                 if (schedule != null)
                 {
-                foreach (var ticket in order.Tickets)
-                {
-                    order.Items.Add(new ModelOrderItem
+                    foreach (var ticket in order.Tickets)
                     {
-                        ItemType = ItemType.Ticket,
-                        ItemReferenceId = ticket.Id,
-                        IsCourtesy = false,
-                        Price = ticket.PricePaid
-                    });
-                }
+                        order.Items.Add(new ModelOrderItem
+                        {
+                            ItemType = ItemType.Ticket,
+                            ItemReferenceId = ticket.Id,
+                            IsCourtesy = false,
+                            Price = ticket.PricePaid
+                        });
+                    }
                 }
                 else if (bundle != null)
                 {
