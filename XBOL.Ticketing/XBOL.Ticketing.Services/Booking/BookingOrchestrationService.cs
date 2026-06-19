@@ -909,9 +909,13 @@ namespace XBOL.Ticketing.Services.Booking
                                                                         .Where(p => priceListIds.Contains(p.Id))
                                                                         .ToDictionaryAsync(p => p.Id);
 
-            decimal subTotal = request.Seats.Sum(seat => itemPriceDictionary[seat.PriceListItemId].BasePrice);
+            decimal subTotal = request.Seats
+                                .Sum(seat => itemPriceDictionary.ContainsKey(seat.PriceListItemId)
+                                    ? itemPriceDictionary[seat.PriceListItemId].BasePrice
+                                    : seat.SeatPrice);
 
             decimal fee = request.Seats
+                            .Where(s => itemPriceDictionary.ContainsKey(s.PriceListItemId))
                             .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
                             .Sum(f => f.FeeAmount);
 
@@ -960,6 +964,7 @@ namespace XBOL.Ticketing.Services.Booking
                         ExchangeRateId = 0,
                         ExchangeRate = 0,
                         PaymentType = PaymentType.Courtesy,
+                        PaymentStatus = PaymentStatus.Captured,
                         Provider = "",
                         ProviderReference = "",
                         TransactionReference = Guid.Empty,
@@ -978,6 +983,7 @@ namespace XBOL.Ticketing.Services.Booking
                 Discount: discount,
                 Total: total,
                 Fees: [.. request.Seats
+                                .Where(seat => itemPriceDictionary.ContainsKey(seat.PriceListItemId))
                                 .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
                                 .GroupBy(f => f.FeeName)
                                 .Select(g => new OrderFee
@@ -1044,6 +1050,7 @@ namespace XBOL.Ticketing.Services.Booking
                     ExchangeRateId = currentExchangeRate.Id,
                     ExchangeRate = currentExchangeRate.Rate,
                     PaymentType = PaymentType.Card,
+                    PaymentStatus = PaymentStatus.Captured,
                     Provider = "",
                     ProviderReference = "",
                     TransactionReference = Guid.NewGuid(),
@@ -1065,6 +1072,7 @@ namespace XBOL.Ticketing.Services.Booking
                     ExchangeRateId = currentExchangeRate.Id,
                     ExchangeRate = currentExchangeRate.Rate,
                     PaymentType = PaymentType.ClientCredit,
+                    PaymentStatus = PaymentStatus.Captured,
                     Provider = "",
                     ProviderReference = "",
                     TransactionReference = Guid.NewGuid(),
@@ -1086,6 +1094,7 @@ namespace XBOL.Ticketing.Services.Booking
                     ExchangeRateId = currentExchangeRate.Id,
                     ExchangeRate = currentExchangeRate.Rate,
                     PaymentType = PaymentType.Cash,
+                    PaymentStatus = PaymentStatus.Captured,
                     Provider = "",
                     ProviderReference = "",
                     TransactionReference = Guid.NewGuid(),
@@ -1107,6 +1116,7 @@ namespace XBOL.Ticketing.Services.Booking
                     ExchangeRateId = currentExchangeRate.Id,
                     ExchangeRate = currentExchangeRate.Rate,
                     PaymentType = PaymentType.Cash,
+                    PaymentStatus = PaymentStatus.Captured,
                     Provider = "",
                     ProviderReference = "",
                     TransactionReference = Guid.NewGuid(),
@@ -1128,6 +1138,7 @@ namespace XBOL.Ticketing.Services.Booking
                     ExchangeRateId = currentExchangeRate.Id,
                     ExchangeRate = currentExchangeRate.Rate,
                     PaymentType = PaymentType.Other,
+                    PaymentStatus = PaymentStatus.Captured,
                     Provider = "",
                     ProviderReference = "",
                     TransactionReference = Guid.NewGuid(),
