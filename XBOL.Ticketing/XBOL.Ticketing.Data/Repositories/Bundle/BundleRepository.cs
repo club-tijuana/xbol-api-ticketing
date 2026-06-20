@@ -20,8 +20,8 @@ namespace XBOL.Ticketing.Data.Repositories.Bundle
             return await dbContext.Bundles
                 .Include(bundle => bundle.VenueMap)
                 .Include(bundle => bundle.Categories)
-                .Include(bundle => bundle.BundleSections)
-                    .ThenInclude(section => section.BundleSeats)
+                //.Include(bundle => bundle.BundleSections)
+                //    .ThenInclude(section => section.BundleSeats)
                 .Include(bundle => bundle.BundleEventSchedules)
                 .ThenInclude(link => link.EventSchedule)
                 .ThenInclude(schedule => schedule.Sections)

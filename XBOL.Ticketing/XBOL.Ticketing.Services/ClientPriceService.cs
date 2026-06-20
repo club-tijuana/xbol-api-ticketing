@@ -61,6 +61,7 @@ namespace XBOL.Ticketing.Services
             var priceItems = await _dbContext.PriceListItems
                                     .Include(pli => pli.Price)
                                         .ThenInclude(p => p.PriceType)
+                                    .Include(pli => pli.FeeList)
                                     .AsNoTracking()
                                     .Where(pli => pli.PriceList.PriceReferenceId == priceReference.Id
                                         && pli.PriceList.Status == VersionStatus.Active)
@@ -286,7 +287,12 @@ namespace XBOL.Ticketing.Services
                         Name = zone.Name,
                         DisplayName = zone.Name,
                         Price = price,
-                        PriceListItemId = zonePli.Id
+                        PriceListItemId = zonePli.Id,
+                        Fees = zonePli.FeeList.Select(f => new FeeResponse
+                        {
+                            FeeName = f.FeeName,
+                            FeeAmount = f.FeeAmount
+                        }).ToList()
                     });
                 }
             }
@@ -345,7 +351,12 @@ namespace XBOL.Ticketing.Services
                         ExternalSeatObjectKey =
                             $"{seat.BaseRow.BaseSection.Name}-{seat.BaseRow.RowLabel}-{seat.SeatNumber}",
                         PriceOverride = price,
-                        PriceListItemId = matchedPriceItem.Id
+                        PriceListItemId = matchedPriceItem.Id,
+                        Fees = matchedPriceItem.FeeList.Select(f => new FeeResponse
+                        {
+                            FeeName = f.FeeName,
+                            FeeAmount = f.FeeAmount
+                        }).ToList()
                     });
                 }
             }
