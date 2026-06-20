@@ -9,9 +9,9 @@ namespace XBOL.Ticketing.Core.Model
         public string? FullName { get; set; }
         public string? BusinessName { get; set; }
         public string? Email { get; set; }
-        public long? PhoneRegionCodeId { get; set; }
-        public PhoneRegionCode? PhoneRegionCode { get; set; }
-        public string? PhoneNumber { get; set; }
+        public long PhoneRegionCodeId { get; set; }
+        public PhoneRegionCode PhoneRegionCode { get; set; } = null!;
+        public string PhoneNumber { get; set; } = null!;
         public bool IsActive { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }

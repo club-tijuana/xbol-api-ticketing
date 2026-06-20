@@ -22,7 +22,11 @@ public class ManageSeatsControllerTests
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
-            ClientContact = new ClientInfoRequest(),
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100"
+            },
             PaymentInfoRequest = new PaymentInfoRequest(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };

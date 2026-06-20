@@ -65,6 +65,7 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 }, new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 175m, PriceListItemId = 2 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
                 Email = "buyer@example.com",
                 FirstName = "Rita",
                 LastName = "Moreno",
@@ -167,6 +168,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "buyer@example.com",
                 FirstName = "Rita",
                 LastName = "Moreno"
@@ -225,6 +228,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -318,6 +323,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -374,6 +381,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -433,6 +442,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -507,6 +518,8 @@ public class BookingOrchestrationServiceTests
             ],
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -590,6 +603,8 @@ public class BookingOrchestrationServiceTests
             ],
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "buyer@example.com",
                 FirstName = "Rita",
                 LastName = "Moreno"
@@ -700,6 +715,8 @@ public class BookingOrchestrationServiceTests
             ],
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "buyer@example.com",
                 FirstName = "Rita",
                 LastName = "Moreno"
@@ -774,6 +791,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -853,6 +872,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FullName = "Ada Lovelace"
             },
@@ -902,6 +923,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-404", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -960,6 +983,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1012,6 +1037,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1064,6 +1091,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1116,6 +1145,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1169,6 +1200,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1235,6 +1268,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-2", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1291,6 +1326,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1346,6 +1383,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1393,6 +1432,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1453,6 +1494,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "new-buyer@example.com",
                 FirstName = "New",
                 LastName = "Buyer"
@@ -1506,6 +1549,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = sourceOrder.Client.Email!,
                 FirstName = "Existing",
                 LastName = "Buyer"
@@ -1561,6 +1606,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1616,6 +1663,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1667,6 +1716,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "season@example.com",
                 FirstName = "Ada",
                 LastName = "Lovelace"
@@ -1720,6 +1771,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 4 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "basic@example.com",
                 FirstName = "Grace",
                 LastName = "Hopper"
@@ -1796,6 +1849,8 @@ public class BookingOrchestrationServiceTests
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 100m, PriceListItemId = 4 } },
             ClientContact = new ClientInfoRequest
             {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
                 Email = "basic@example.com",
                 FirstName = "Grace",
                 LastName = "Hopper"
@@ -1890,6 +1945,8 @@ public class BookingOrchestrationServiceTests
         bool includeInventoryBatch = true)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var venue = new Venue
         {
             Name = "Arena",
@@ -2122,6 +2179,8 @@ public class BookingOrchestrationServiceTests
     private static async Task SeedSeasonPassBundleAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var venue = BuildVenue(now);
         var venueMap = new VenueMap
         {
@@ -2220,11 +2279,14 @@ public class BookingOrchestrationServiceTests
     private static async Task<Order> SeedSourceOrderAsync(XBOLDbContext context, string reference)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var client = new Client
         {
             ClientType = ClientType.Individual,
             Email = $"{reference.ToLowerInvariant()}@example.com",
             FullName = "Existing Buyer",
+            PhoneRegionCodeId = 1,
             PhoneNumber = "5550000100",
             IsActive = true,
             CreatedAt = now,
@@ -2259,11 +2321,14 @@ public class BookingOrchestrationServiceTests
         BundlePassStatus passStatus = BundlePassStatus.Active)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var client = new Client
         {
             ClientType = ClientType.Individual,
             Email = email,
             FullName = "Existing Buyer",
+            PhoneRegionCodeId = 1,
             PhoneNumber = "5550000100",
             IsActive = true,
             CreatedAt = now,
@@ -2318,6 +2383,8 @@ public class BookingOrchestrationServiceTests
     private static async Task SeedBasicBundleAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var venue = BuildVenue(now);
         var venueMap = new VenueMap
         {
@@ -2409,6 +2476,23 @@ public class BookingOrchestrationServiceTests
 
         context.Bundles.Add(bundle);
         SeedPriceListItem(context, SaleType.Bundle, bundle.Id, venueMap.Id, baseZone, baseSection, baseRow, baseSeat);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task EnsurePhoneRegionCodeAsync(XBOLDbContext context)
+    {
+        if (await context.Set<PhoneRegionCode>().AnyAsync(region => region.Id == 1))
+        {
+            return;
+        }
+
+        context.Set<PhoneRegionCode>().Add(new PhoneRegionCode
+        {
+            Id = 1,
+            RegionCode = "MX",
+            DialCode = "+52",
+            FlagEmoji = "MX"
+        });
         await context.SaveChangesAsync();
     }
 

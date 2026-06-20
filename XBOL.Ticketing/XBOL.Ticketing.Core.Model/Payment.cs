@@ -19,6 +19,7 @@ namespace XBOL.Ticketing.Core.Model
 
         public string Provider { get; set; } = null!;
         public string ProviderReference { get; set; } = null!;
+        public PaymentStatus PaymentStatus { get; set; }
 
         public Guid TransactionReference { get; set; }
         public DateTimeOffset? AppliedAt { get; set; }
@@ -28,7 +29,5 @@ namespace XBOL.Ticketing.Core.Model
         public Guid UpdatedBy { get; set; }
 
         public string? ProviderSessionReference { get; set; }
-
-        public PaymentStatus PaymentStatus { get; set; }
     }
 }

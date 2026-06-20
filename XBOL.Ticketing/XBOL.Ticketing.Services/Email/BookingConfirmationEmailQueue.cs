@@ -3,8 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Odasoft.XBOL.Commons.Email;
 using Odasoft.XBOL.Commons.Requests;
-using TicketingEmailTemplateOptions = XBOL.Ticketing.Core.Commons.Options.EmailTemplateOptions;
 using ModelClient = XBOL.Ticketing.Core.Model.Client;
+using TicketingEmailTemplateOptions = XBOL.Ticketing.Core.Commons.Options.EmailTemplateOptions;
 
 namespace XBOL.Ticketing.Services.Email;
 

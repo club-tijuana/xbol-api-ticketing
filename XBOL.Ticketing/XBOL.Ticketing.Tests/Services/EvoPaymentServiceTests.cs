@@ -12,6 +12,7 @@ using Odasoft.XBOL.Commons.Email;
 using Odasoft.XBOL.Commons.Requests;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.EvoPayment;
+using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
 using XBOL.Ticketing.Data.Repositories.Order;
@@ -28,6 +29,145 @@ namespace XBOL.Ticketing.Tests.Services;
 public sealed class EvoPaymentServiceTests
 {
     private const string SupportEmail = "soporte@pwrticket.mx";
+
+    [Fact]
+    public async Task InitiateCheckoutAsync_PersistsPendingHostedCheckoutOrderWithPaymentFields()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedHostedCheckoutCatalogAsync(context);
+
+        var seatsIoBookingClient = Substitute.For<ISeatsIoBookingClient>();
+        seatsIoBookingClient
+            .BookSeatsAsync("schedule-100", Arg.Any<List<BookingSeatRequest>>(), "hold-token-1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<string>>(new List<string> { "A-1" }));
+
+        var sut = CreateService(
+            context,
+            Substitute.For<IBackgroundJobClient>(),
+            seatsIoBookingClient,
+            """{"result":"SUCCESS","session":{"id":"SESSION000000000000000000000000001"},"successIndicator":"success-indicator-1"}""");
+
+        var result = await sut.InitiateCheckoutAsync(new InitiateCheckoutRequest
+        {
+            EventScheduleId = 100,
+            HoldToken = "hold-token-1",
+            Seats =
+            [
+                new CheckoutSeatRequest
+                {
+                    SeatKey = "A-1",
+                    PriceListItemId = 10
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                Id = 1,
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
+                Email = "buyer@example.com",
+                FullName = "Buyer Example"
+            },
+            ReturnUrl = "https://pwrticket.mx/client/booking/100/?source=evo",
+            Currency = "MXN"
+        });
+
+        result.Amount.Should().Be("125.00");
+
+        var order = await context.Orders
+            .Include(o => o.Payments)
+            .Include(o => o.Tickets)
+            .Include(o => o.Items)
+            .SingleAsync(o => o.Id == result.LocalOrderId);
+
+        order.Status.Should().Be(OrderStatus.Pending);
+        order.EventScheduleId.Should().Be(100);
+        order.HoldToken.Should().Be("hold-token-1");
+        order.Tickets.Should().ContainSingle(t => t.Status == TicketStatus.PendingPayment);
+        order.Items.Should().ContainSingle(i => i.ItemReferenceId == order.Tickets.Single().Id);
+
+        var payment = order.Payments.Should().ContainSingle().Subject;
+        payment.Currency.Should().Be(CurrencyType.MXN);
+        payment.Amount.Should().Be(125m);
+        payment.AmountMXN.Should().Be(125m);
+        payment.ReceivedAmount.Should().BeNull();
+        payment.ReceivedAmountMXN.Should().BeNull();
+        payment.ExchangeRateId.Should().Be(0);
+        payment.ExchangeRate.Should().Be(0);
+        payment.PaymentStatus.Should().Be(PaymentStatus.Pending);
+        payment.ProviderReference.Should().Be(result.OrderRefId);
+        payment.ProviderSessionReference.Should().Be(result.SuccessIndicator);
+    }
+
+    [Fact]
+    public async Task InitiateCheckoutAsync_WhenSeatsIoBookingFails_MarksLocalCheckoutFailed()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedHostedCheckoutCatalogAsync(context);
+
+        var seatsIoBookingClient = Substitute.For<ISeatsIoBookingClient>();
+        seatsIoBookingClient
+            .BookSeatsAsync("schedule-100", Arg.Any<List<BookingSeatRequest>>(), "hold-token-1", Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<IReadOnlyList<string>>(new InvalidOperationException("not held")));
+
+        var sut = CreateService(
+            context,
+            Substitute.For<IBackgroundJobClient>(),
+            seatsIoBookingClient,
+            """{"result":"SUCCESS","session":{"id":"SESSION000000000000000000000000001"},"successIndicator":"success-indicator-1"}""");
+
+        var act = () => sut.InitiateCheckoutAsync(new InitiateCheckoutRequest
+        {
+            EventScheduleId = 100,
+            HoldToken = "hold-token-1",
+            Seats =
+            [
+                new CheckoutSeatRequest
+                {
+                    SeatKey = "A-1",
+                    PriceListItemId = 10
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                Id = 1,
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
+                Email = "buyer@example.com",
+                FullName = "Buyer Example"
+            },
+            ReturnUrl = "https://pwrticket.mx/client/booking/100/?source=evo",
+            Currency = "MXN"
+        });
+
+        await act.Should()
+            .ThrowAsync<InvalidOperationException>()
+            .WithMessage("Could not confirm seat reservation. Please try again.");
+
+        var order = await context.Orders
+            .Include(o => o.Payments)
+            .Include(o => o.Tickets)
+            .SingleAsync();
+
+        order.Status.Should().Be(OrderStatus.Cancelled);
+        order.Payments.Should().ContainSingle().Subject.PaymentStatus.Should().Be(PaymentStatus.Failed);
+        order.Tickets.Should().ContainSingle().Subject.Status.Should().Be(TicketStatus.Expired);
+    }
 
     [Fact]
     public async Task ConfirmCheckoutAsync_WhenPaymentIsCaptured_EnqueuesConfirmationEmails()
@@ -300,6 +440,8 @@ public sealed class EvoPaymentServiceTests
     private static async Task SeedPendingCheckoutOrderAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var venue = new Venue
         {
             Name = "Arena",
@@ -385,6 +527,8 @@ public sealed class EvoPaymentServiceTests
             ClientType = ClientType.Individual,
             Email = "buyer@example.com",
             FullName = "Buyer Example",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5552220100",
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -455,14 +599,216 @@ public sealed class EvoPaymentServiceTests
         await context.SaveChangesAsync();
     }
 
+    private static async Task SeedHostedCheckoutCatalogAsync(XBOLDbContext context)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
+        var venue = new Venue
+        {
+            Id = 100,
+            Name = "Arena",
+            AddressLine = "1 Main St",
+            City = "Tijuana",
+            State = "BC",
+            Country = "MX",
+            Category = VenueCategory.Arena,
+            ShortDescription = "Arena",
+            LongDescription = "Arena",
+            LogoImageUrl = "logo.png",
+            BannerImageUrl = "banner.png",
+            LandingUrl = "https://example.test",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var venueMap = new VenueMap
+        {
+            Id = 100,
+            Venue = venue,
+            Name = "Main",
+            ExternalMapKey = "chart-100",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var baseZone = new BaseZone
+        {
+            Id = 100,
+            VenueMap = venueMap,
+            Name = "Lower Bowl"
+        };
+        var baseSection = new BaseSection
+        {
+            Id = 100,
+            BaseZone = baseZone,
+            Name = "Lower 101",
+            SectionType = SectionType.General
+        };
+        var baseRow = new BaseRow
+        {
+            Id = 100,
+            BaseSection = baseSection,
+            RowLabel = "A"
+        };
+        var baseSeat = new BaseSeat
+        {
+            Id = 100,
+            BaseRow = baseRow,
+            SeatNumber = "1",
+            SeatType = SeatType.Standard
+        };
+        var eventEntity = new Event
+        {
+            Id = 100,
+            VenueMap = venueMap,
+            Name = "Home Opener",
+            Status = EventStatus.Published,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var schedule = new EventSchedule
+        {
+            Id = 100,
+            Event = eventEntity,
+            StartDateTime = now.AddDays(7),
+            EndDateTime = now.AddDays(7).AddHours(3),
+            OnSaleDate = now.AddDays(-1),
+            OffSaleDate = now.AddDays(7),
+            Status = ScheduleStatus.OnSale,
+            ExternalEventKey = "schedule-100"
+        };
+        var eventSection = new EventSection
+        {
+            Id = 100,
+            EventSchedule = schedule,
+            BaseSection = baseSection,
+            DisplayName = "Lower 101",
+            TotalSeats = 1,
+            AvailableSeats = 1
+        };
+        var eventSeat = new EventSeat
+        {
+            Id = 100,
+            EventSection = eventSection,
+            BaseSeat = baseSeat,
+            ExternalSeatObjectKey = "A-1"
+        };
+        var client = new Client
+        {
+            Id = 1,
+            ClientType = ClientType.Individual,
+            Email = "buyer@example.com",
+            FullName = "Buyer Example",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5552220100",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var distributor = new Distributor
+        {
+            Id = 100,
+            Name = "Online",
+            Contact = "online@example.com"
+        };
+        var inventoryBatch = new InventoryBatch
+        {
+            Id = 100,
+            EventSchedule = schedule,
+            Distributor = distributor,
+            Quantity = 1,
+            CutoffDate = now.AddDays(7),
+            Status = InventoryBatchStatus.Active
+        };
+        var priceReference = new PriceReference
+        {
+            Id = 100,
+            ReferenceType = SaleType.Event,
+            ReferenceId = eventEntity.Id,
+            IsActive = true
+        };
+        var priceSegment = new PriceSegment
+        {
+            Id = 100,
+            PriceReference = priceReference,
+            BaseZone = baseZone,
+            VenueMap = venueMap,
+            PriceItemType = PriceItemType.Seat
+        };
+        var priceType = new PriceType
+        {
+            Id = 100,
+            PriceSegment = priceSegment,
+            Name = "General",
+            IsBasePrice = true,
+            Primary = true,
+            IsActive = true
+        };
+        var price = new Price
+        {
+            Id = 100,
+            PriceSegment = priceSegment,
+            PriceType = priceType,
+            PriceValue = 125m,
+            IsActive = true
+        };
+        var priceList = new PriceList
+        {
+            Id = 100,
+            PriceReference = priceReference,
+            VersionNumber = 1,
+            PublishedAt = now,
+            PublishBy = Guid.Empty,
+            Status = VersionStatus.Active
+        };
+        var priceListItem = new PriceListItem
+        {
+            Id = 10,
+            PriceList = priceList,
+            BaseSeat = baseSeat,
+            Price = price,
+            PriceType = priceType,
+            BasePrice = 125m,
+            FinalPrice = 125m
+        };
+
+        context.AddRange(
+            venue,
+            venueMap,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            eventEntity,
+            schedule,
+            eventSection,
+            eventSeat,
+            client,
+            distributor,
+            inventoryBatch,
+            priceReference,
+            priceSegment,
+            priceType,
+            price,
+            priceList,
+            priceListItem);
+        await context.SaveChangesAsync();
+    }
+
     private static async Task SeedPendingBundleCheckoutOrderAsync(XBOLDbContext context)
     {
         var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
         var client = new Client
         {
             ClientType = ClientType.Individual,
             Email = "bundle-buyer@example.com",
             FullName = "Bundle Buyer",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5553330100",
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now,
@@ -540,6 +886,23 @@ public sealed class EvoPaymentServiceTests
 
         context.Orders.Add(order);
         context.BundlePasses.Add(pass);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task EnsurePhoneRegionCodeAsync(XBOLDbContext context)
+    {
+        if (await context.Set<PhoneRegionCode>().AnyAsync(region => region.Id == 1))
+        {
+            return;
+        }
+
+        context.Set<PhoneRegionCode>().Add(new PhoneRegionCode
+        {
+            Id = 1,
+            RegionCode = "MX",
+            DialCode = "+52",
+            FlagEmoji = "MX"
+        });
         await context.SaveChangesAsync();
     }
 

@@ -1,4 +1,5 @@
 using XBOL.Ticketing.Core.Commons.Options;
+using XBOL.Ticketing.API.Options;
 using XBOL.Ticketing.Services.EvoPayment;
 using BackgroundJobsOptions = Odasoft.XBOL.Commons.Options.BackgroundJobsOptions;
 
@@ -16,6 +17,11 @@ public static class OptionsConfiguration
 
         services.AddOptions<BackgroundJobsOptions>()
             .BindConfiguration("BackgroundJobs")
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<BackgroundJobDiagnosticsOptions>()
+            .BindConfiguration("BackgroundJobDiagnostics")
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
