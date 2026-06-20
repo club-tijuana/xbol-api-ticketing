@@ -200,6 +200,7 @@ namespace XBOL.Ticketing.Services.Event
                 ItemType = EventCatalogItemType.Event,
                 Status = eventItem.Status,
                 ScheduledStartDate = schedule?.StartDateTime ?? eventItem.CreatedAt,
+                ScheduledEndDate = schedule?.EndDateTime,
                 Name = eventItem.Name,
                 Categories = Categories(eventItem.Categories),
                 VenueMapId = eventItem.VenueMapId,
@@ -231,7 +232,8 @@ namespace XBOL.Ticketing.Services.Event
                 ItemType = EventCatalogItemType.Bundle,
                 BundleType = bundle.BundleType,
                 Status = bundle.Status,
-                ScheduledStartDate = schedule?.StartDateTime ?? bundle.StartDate ?? bundle.CreatedAt,
+                ScheduledStartDate = GetEarlierDate(bundle.StartDate, schedule?.StartDateTime) ?? bundle.CreatedAt,
+                ScheduledEndDate = GetGreaterDate(bundle.EndDate, schedule?.EndDateTime),
                 Name = bundle.Name,
                 Code = bundle.Code,
                 Categories = Categories(bundle.Categories),
@@ -248,6 +250,36 @@ namespace XBOL.Ticketing.Services.Event
                 IsSeason = bundle.BundleType == BundleType.SeasonPass,
                 IsBookable = BundleBookability.IsBookable(bundle)
             };
+        }
+
+        public static DateTimeOffset? GetGreaterDate(DateTimeOffset? date1, DateTimeOffset? date2)
+        {
+            if (date1 is null)
+            {
+                return date2;
+            }
+
+            if (date2 is null)
+            {
+                return date1;
+            }
+
+            return date1 > date2 ? date1 : date2;
+        }
+
+        public static DateTimeOffset? GetEarlierDate(DateTimeOffset? date1, DateTimeOffset? date2)
+        {
+            if (date1 is null)
+            {
+                return date2;
+            }
+
+            if (date2 is null)
+            {
+                return date1;
+            }
+
+            return date1 < date2 ? date1 : date2;
         }
 
         private static string? MediaUrl(
@@ -268,6 +300,7 @@ namespace XBOL.Ticketing.Services.Event
                 EventId = schedule.EventId,
                 EventScheduleId = schedule.Id,
                 ScheduledStartDate = schedule.StartDateTime,
+                ScheduledEndDate = schedule.EndDateTime,
                 Name = schedule.Event.Name,
                 Categories = Categories(schedule.Event.Categories),
                 VenueMapId = schedule.Event.VenueMapId,
@@ -320,7 +353,7 @@ namespace XBOL.Ticketing.Services.Event
         {
             if (!MatchesSearch(item.Name, queryParams.SearchTerm) ||
                 !MatchesVenue(item.VenueName, queryParams.Venue) ||
-                !MatchesDateRange(item.ScheduledStartDate, queryParams.StartDate, queryParams.EndDate))
+                !MatchesDateRange(item.ScheduledStartDate, item.ScheduledEndDate, queryParams.StartDate, queryParams.EndDate))
             {
                 return false;
             }
@@ -336,8 +369,8 @@ namespace XBOL.Ticketing.Services.Event
             }
 
             return queryParams.Upcoming.Value
-                ? item.ScheduledStartDate >= DateTimeOffset.UtcNow
-                : item.ScheduledStartDate < DateTimeOffset.UtcNow;
+                ? item.ScheduledEndDate >= DateTimeOffset.UtcNow
+                : item.ScheduledEndDate < DateTimeOffset.UtcNow;
         }
 
         private static bool MatchesSearch(string value, string? searchTerm)
@@ -354,16 +387,17 @@ namespace XBOL.Ticketing.Services.Event
         }
 
         private static bool MatchesDateRange(
-            DateTimeOffset value,
-            DateTimeOffset? startDate,
-            DateTimeOffset? endDate)
+            DateTimeOffset? eventStart,
+            DateTimeOffset? eventEnd,
+            DateTimeOffset? queryStartDate,
+            DateTimeOffset? queryEndDate)
         {
-            if (startDate is not null && value < startDate.Value)
+            if (queryStartDate is not null && eventEnd < queryStartDate.Value)
             {
                 return false;
             }
 
-            if (endDate is not null && value > endDate.Value)
+            if (queryEndDate is not null && eventStart > queryEndDate.Value)
             {
                 return false;
             }
@@ -374,13 +408,17 @@ namespace XBOL.Ticketing.Services.Event
         private static bool MatchesCatalogScheduleFilters(EventCatalogItemDTO item, EventCatalogQueryParams queryParams)
         {
             var now = DateTimeOffset.UtcNow;
+            var schedules = CatalogScheduleDateRanges(item);
 
-            return CatalogScheduleDates(item).Any(date =>
-                MatchesDateRange(date, queryParams.StartDate, queryParams.EndDate) &&
-                MatchesUpcoming(date, queryParams.Upcoming, now));
+            DateTimeOffset? earliestScheduleDate = schedules.Any() ? schedules.Min(i => i.Start) : null;
+            DateTimeOffset? latestScheduleDate = schedules.Any() ? schedules.Max(i => i.End) : null;
+            var earliestDate = GetEarlierDate(earliestScheduleDate, item.ScheduledStartDate);
+            var latestDate = GetGreaterDate(latestScheduleDate, item.ScheduledEndDate);
+
+            return MatchesDateRange(earliestDate, latestDate, queryParams.StartDate, queryParams.EndDate) && MatchesUpcoming(latestDate ?? earliestDate, queryParams.Upcoming, now);
         }
 
-        private static bool MatchesUpcoming(DateTimeOffset value, bool? upcoming, DateTimeOffset now)
+        private static bool MatchesUpcoming(DateTimeOffset? value, bool? upcoming, DateTimeOffset now)
         {
             if (upcoming is null)
             {
@@ -392,11 +430,11 @@ namespace XBOL.Ticketing.Services.Event
                 : value < now;
         }
 
-        private static IEnumerable<DateTimeOffset> CatalogScheduleDates(EventCatalogItemDTO item)
+        private static IEnumerable<(DateTimeOffset Start, DateTimeOffset End)> CatalogScheduleDateRanges(EventCatalogItemDTO item)
         {
             return item.Schedules.Count > 0
-                ? item.Schedules.Select(schedule => schedule.StartDateTime)
-                : [item.ScheduledStartDate];
+                ? item.Schedules.Select(schedule => (schedule.StartDateTime, schedule.EndDateTime))
+                : [];
         }
 
         private static IEnumerable<EventSchedule> BundleSchedules(Core.Model.Bundle bundle)

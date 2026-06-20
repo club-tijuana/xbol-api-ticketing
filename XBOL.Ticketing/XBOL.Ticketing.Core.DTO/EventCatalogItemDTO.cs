@@ -10,6 +10,7 @@ namespace XBOL.Ticketing.Core.DTO
         public BundleType? BundleType { get; set; }
         public required EventStatus Status { get; set; }
         public required DateTimeOffset ScheduledStartDate { get; set; }
+        public DateTimeOffset? ScheduledEndDate { get; set; }
         public required string Name { get; set; }
         public string? Code { get; set; }
         public List<EventCategoryResult> Categories { get; set; } = [];
