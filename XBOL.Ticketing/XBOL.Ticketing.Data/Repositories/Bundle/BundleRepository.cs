@@ -18,6 +18,7 @@ namespace XBOL.Ticketing.Data.Repositories.Bundle
         public async Task<Core.Model.Bundle?> GetByIdWithVenueMapAndSchedulesAsync(long id)
         {
             return await dbContext.Bundles
+                .AsSplitQuery()
                 .Include(bundle => bundle.VenueMap)
                 .Include(bundle => bundle.Categories)
                 .Include(bundle => bundle.BundleSections)
