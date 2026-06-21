@@ -11,6 +11,7 @@ namespace XBOL.Ticketing.Services.Bundle;
 public class CreateSeatsIoSeasonHandler(
     IBundleRepository bundleRepository,
     ISeatsIoSeasonLifecycleClient seatsIo,
+    IBundlePassTicketMaterializationService ticketMaterializer,
     ILogger<CreateSeatsIoSeasonHandler> logger)
 {
     [Transactional]
@@ -58,6 +59,11 @@ public class CreateSeatsIoSeasonHandler(
                     now);
             }
 
+            await ticketMaterializer.MaterializeIssuedTicketsAsync(
+                bundle.Id,
+                links.Select(link => link.EventScheduleId).ToArray(),
+                command.UserId);
+
             bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);
         }
@@ -84,6 +90,7 @@ public class CreateSeatsIoSeasonHandler(
 public class AddEventsToSeasonHandler(
     IBundleRepository bundleRepository,
     ISeatsIoSeasonLifecycleClient seatsIo,
+    IBundlePassTicketMaterializationService ticketMaterializer,
     ILogger<AddEventsToSeasonHandler> logger)
 {
     [Transactional]
@@ -137,6 +144,11 @@ public class AddEventsToSeasonHandler(
                     eventKeys[index],
                     now);
             }
+
+            await ticketMaterializer.MaterializeIssuedTicketsAsync(
+                bundle.Id,
+                links.Select(link => link.EventScheduleId).ToArray(),
+                Guid.Empty);
 
             bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);

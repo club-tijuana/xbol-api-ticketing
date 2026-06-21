@@ -31,6 +31,7 @@ namespace XBOL.Ticketing.Services.Extensions
             services.AddScoped<IBundleLifecycleService, BundleLifecycleService>();
             services.AddScoped<BundlePassService>();
             services.AddScoped<BundlePassEventTicketService>();
+            services.AddScoped<IBundlePassTicketMaterializationService, BundlePassTicketMaterializationService>();
             services.AddScoped<BundleService>();
             services.AddScoped<ClientCreditAccountService>();
             services.AddScoped<ClientCreditTransactionService>();

@@ -18,6 +18,7 @@ public class BundleSeatsIoHandlerTests
 {
     private readonly IBundleRepository _bundleRepository = Substitute.For<IBundleRepository>();
     private readonly ISeatsIoSeasonLifecycleClient _seatsIo = Substitute.For<ISeatsIoSeasonLifecycleClient>();
+    private readonly IBundlePassTicketMaterializationService _ticketMaterializer = Substitute.For<IBundlePassTicketMaterializationService>();
 
     [Fact]
     public async Task CreateSeatsIoSeasonHandler_CreatesSeasonAndPersistsBundleAndScheduleKeys()
@@ -52,6 +53,11 @@ public class BundleSeatsIoHandlerTests
             .Should().Equal(ScheduleStatus.OnSale, ScheduleStatus.OnSale);
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.PublishedDate)
             .Should().OnlyContain(publishedDate => publishedDate.HasValue);
+        await _ticketMaterializer.Received(1).MaterializeIssuedTicketsAsync(
+            20,
+            Arg.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L, 11L })),
+            Guid.Empty,
+            Arg.Any<CancellationToken>());
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
 
@@ -166,6 +172,11 @@ public class BundleSeatsIoHandlerTests
             .Should().Equal(ScheduleStatus.OnSale, ScheduleStatus.OnSale);
         bundle.BundleEventSchedules.Select(link => link.EventSchedule.PublishedDate)
             .Should().OnlyContain(publishedDate => publishedDate.HasValue);
+        await _ticketMaterializer.Received(1).MaterializeIssuedTicketsAsync(
+            20,
+            Arg.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L, 11L })),
+            Guid.Empty,
+            Arg.Any<CancellationToken>());
         await _bundleRepository.Received(1).UpdateAsync(bundle);
     }
 
@@ -270,6 +281,7 @@ public class BundleSeatsIoHandlerTests
         var sut = new AddEventsToSeasonHandler(
             new BundleRepository(context),
             seatsIo,
+            Substitute.For<IBundlePassTicketMaterializationService>(),
             NullLogger<AddEventsToSeasonHandler>.Instance);
 
         var act = () => sut.Handle(new AddEventsToSeasonCommand(20, [10]));
@@ -366,6 +378,7 @@ public class BundleSeatsIoHandlerTests
         return new CreateSeatsIoSeasonHandler(
             _bundleRepository,
             _seatsIo,
+            _ticketMaterializer,
             NullLogger<CreateSeatsIoSeasonHandler>.Instance);
     }
 
@@ -374,6 +387,7 @@ public class BundleSeatsIoHandlerTests
         return new AddEventsToSeasonHandler(
             _bundleRepository,
             _seatsIo,
+            _ticketMaterializer,
             NullLogger<AddEventsToSeasonHandler>.Instance);
     }
 
