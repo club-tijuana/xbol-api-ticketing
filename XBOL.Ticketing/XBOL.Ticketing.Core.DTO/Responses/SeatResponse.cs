@@ -6,5 +6,6 @@ namespace XBOL.Ticketing.Core.DTO.Responses
         public string ExternalSeatObjectKey { get; set; } = string.Empty;
         public decimal? PriceOverride { get; set; }
         public long? PriceListItemId { get; set; }
+        public List<FeeResponse> Fees { get; set; } = new List<FeeResponse>();
     }
 }
