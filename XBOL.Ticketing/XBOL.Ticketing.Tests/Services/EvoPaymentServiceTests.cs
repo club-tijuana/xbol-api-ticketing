@@ -88,9 +88,9 @@ public sealed class EvoPaymentServiceTests
             .SingleAsync(o => o.Id == result.LocalOrderId);
 
         order.Status.Should().Be(OrderStatus.Pending);
-        order.EventScheduleId.Should().Be(100);
-        order.HoldToken.Should().Be("hold-token-1");
-        order.Tickets.Should().ContainSingle(t => t.Status == TicketStatus.PendingPayment);
+        order.Tickets.Should().ContainSingle(t =>
+            t.EventScheduleId == 100 &&
+            t.Status == TicketStatus.PendingPayment);
         order.Items.Should().ContainSingle(i => i.ItemReferenceId == order.Tickets.Single().Id);
 
         var payment = order.Payments.Should().ContainSingle().Subject;
@@ -104,6 +104,14 @@ public sealed class EvoPaymentServiceTests
         payment.PaymentStatus.Should().Be(PaymentStatus.Pending);
         payment.ProviderReference.Should().Be(result.OrderRefId);
         payment.ProviderSessionReference.Should().Be(result.SuccessIndicator);
+        await seatsIoBookingClient.Received(1).BookSeatsAsync(
+            "schedule-100",
+            Arg.Is<List<BookingSeatRequest>>(seats =>
+                seats.Count == 1 &&
+                seats[0].SeatKey == "A-1" &&
+                seats[0].PriceListItemId == 10),
+            "hold-token-1",
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

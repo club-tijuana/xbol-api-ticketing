@@ -520,8 +520,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     SaleChannel = SaleChannel.Online,
                     OrderType = schedule != null ? OrderType.Ticket : OrderType.Bundle,
                     RelatedOrderId = request.RelatedOrderId,
-                    EventScheduleId = schedule?.Id,
-                    HoldToken = request.HoldToken,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = Guid.Empty,
