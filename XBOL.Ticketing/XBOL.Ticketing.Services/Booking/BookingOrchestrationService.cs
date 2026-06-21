@@ -281,6 +281,7 @@ namespace XBOL.Ticketing.Services.Booking
                 CreatedBy = actorUserId,
                 UpdatedBy = actorUserId,
                 Fees = breakDown.Fees,
+                Taxes = breakDown.Taxes,
                 Payments = breakDown.Payments,
                 OrderTags = isPaymentLink ? [OrderTag.PaymentLink] : []
             };
@@ -387,6 +388,7 @@ namespace XBOL.Ticketing.Services.Booking
                 UpdatedBy = actorUserId,
                 RelatedOrderId = request.ReferenceOrderId,
                 Payments = breakDown.Payments,
+                Taxes = breakDown.Taxes,
                 OrderTags = isPaymentLink ? [OrderTag.PaymentLink] : []
             };
 
@@ -914,12 +916,13 @@ namespace XBOL.Ticketing.Services.Booking
                                     ? itemPriceDictionary[seat.PriceListItemId].BasePrice
                                     : seat.SeatPrice);
 
-            decimal fee = request.Seats
-                            .Where(s => itemPriceDictionary.ContainsKey(s.PriceListItemId))
-                            .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
-                            .Sum(f => f.FeeAmount);
+            var allFeeItems = request.Seats
+                .Where(s => itemPriceDictionary.ContainsKey(s.PriceListItemId))
+                .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
+                .ToList();
 
-            decimal tax = 0;
+            decimal fee = allFeeItems.Where(f => f.ChargeCategory != "Tax").Sum(f => f.FeeAmount);
+            decimal tax = allFeeItems.Where(f => f.ChargeCategory == "Tax").Sum(f => f.FeeAmount);
             decimal discount = isCourtesy ? (subTotal + fee + tax) : 0;
             decimal total = (subTotal + fee + tax) - discount;
 
@@ -982,15 +985,22 @@ namespace XBOL.Ticketing.Services.Booking
                 Tax: tax,
                 Discount: discount,
                 Total: total,
-                Fees: [.. request.Seats
-                                .Where(seat => itemPriceDictionary.ContainsKey(seat.PriceListItemId))
-                                .SelectMany(seat => itemPriceDictionary[seat.PriceListItemId].FeeList)
-                                .GroupBy(f => f.FeeName)
-                                .Select(g => new OrderFee
-                                {
-                                    FeeType = g.Key,
-                                Amount = g.Sum(f => f.FeeAmount)
-                            })],
+                Fees: [.. allFeeItems
+                    .Where(f => f.ChargeCategory != "Tax")
+                    .GroupBy(f => f.FeeName)
+                    .Select(g => new OrderFee
+                    {
+                        FeeType = g.Key,
+                        Amount = g.Sum(f => f.FeeAmount)
+                    })],
+                Taxes: [.. allFeeItems
+                    .Where(f => f.ChargeCategory == "Tax")
+                    .GroupBy(f => f.FeeName)
+                    .Select(g => new OrderTax
+                    {
+                        TaxType = g.Key,
+                        Amount = g.Sum(f => f.FeeAmount)
+                    })],
                 Payments: payments
             );
         }
@@ -1150,6 +1160,6 @@ namespace XBOL.Ticketing.Services.Booking
             return (payments, currentExchangeRate);
         }
 
-        private sealed record OrderTotalBreakDown(decimal SubTotal, decimal Fee, decimal Tax, decimal Discount, decimal Total, List<OrderFee> Fees, List<Payment> Payments);
+        private sealed record OrderTotalBreakDown(decimal SubTotal, decimal Fee, decimal Tax, decimal Discount, decimal Total, List<OrderFee> Fees, List<OrderTax> Taxes, List<Payment> Payments);
     }
 }

@@ -291,7 +291,8 @@ namespace XBOL.Ticketing.Services
                         Fees = zonePli.FeeList.Select(f => new FeeResponse
                         {
                             FeeName = f.FeeName,
-                            FeeAmount = f.FeeAmount
+                            FeeAmount = f.FeeAmount,
+                            ChargeCategory = string.IsNullOrEmpty(f.ChargeCategory) ? "Fee" : f.ChargeCategory
                         }).ToList()
                     });
                 }
@@ -355,7 +356,8 @@ namespace XBOL.Ticketing.Services
                         Fees = matchedPriceItem.FeeList.Select(f => new FeeResponse
                         {
                             FeeName = f.FeeName,
-                            FeeAmount = f.FeeAmount
+                            FeeAmount = f.FeeAmount,
+                            ChargeCategory = string.IsNullOrEmpty(f.ChargeCategory) ? "Fee" : f.ChargeCategory
                         }).ToList()
                     });
                 }

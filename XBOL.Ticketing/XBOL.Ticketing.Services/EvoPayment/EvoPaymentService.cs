@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Globalization;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.EvoPayment;
@@ -188,7 +189,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             var (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
                 orderRefId, request.Amount, request.Currency,
-                request.ReturnUrl, request.Description ?? "XBOL Ticketing", ct);
+                request.ReturnUrl, request.Description ?? "PWR Ticket",
+                merchantOrderReference: null, ct);
 
             var gatewayBaseUrl = $"{_httpClient.BaseAddress!.Scheme}://{_httpClient.BaseAddress.Host}";
 
@@ -338,7 +340,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
             if (request.EventScheduleId != null)
             {
                 schedule = await _dbContext.EventSchedules
-                .FindAsync([request.EventScheduleId], ct);
+                .Include(s => s.Event)
+                .FirstOrDefaultAsync(s => s.Id == request.EventScheduleId, ct);
 
                 if (schedule is null)
                 {
@@ -372,8 +375,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 }
 
                 if (
-                    bundle.Status != EventStatus.Published ||
-                    bundle.BundleEventSchedules.All(s => s.EventSchedule.Status != ScheduleStatus.OnSale)
+                    bundle.Status != EventStatus.Published
                 )
                 {
                     throw new InvalidOperationException(
@@ -776,9 +778,11 @@ namespace XBOL.Ticketing.Services.EvoPayment
             string successIndicator;
             try
             {
+                var description = BuildOrderDescription(schedule, bundle, request.Seats.Count);
+
                 (sessionId, successIndicator) = await CallInitiateCheckoutAsync(
                     orderRefId, total, currencyCode, request.ReturnUrl,
-                    $"XBOL — {request.Seats.Count} ticket(s)", ct);
+                    description, reference, ct);
             }
             catch
             {
@@ -1088,6 +1092,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
             string currency,
             string returnUrl,
             string description,
+            string? merchantOrderReference,
             CancellationToken ct)
         {
             var body = new
@@ -1096,12 +1101,15 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 interaction = new
                 {
                     operation = "PURCHASE",
-                    merchant = new { name = "XBOL Ticketing" },
+                    locale = "es_MX",
+                    timeout = 600,
+                    merchant = new { name = "PWR Ticket" },
                     returnUrl
                 },
                 order = new
                 {
                     id = orderRefId,
+                    reference = merchantOrderReference,
                     amount = amount.ToString("F2", CultureInfo.InvariantCulture),
                     currency,
                     description
@@ -1109,8 +1117,8 @@ namespace XBOL.Ticketing.Services.EvoPayment
             };
 
             _logger.LogInformation(
-                "Calling INITIATE_CHECKOUT. orderRefId={OrderRefId} amount={Amount} returnUrl={ReturnUrl}",
-                orderRefId, amount, returnUrl);
+                "Calling INITIATE_CHECKOUT. orderRefId={OrderRefId} orderReference={OrderReference} amount={Amount} currency={Currency} returnUrl={ReturnUrl} description={Description}",
+                orderRefId, merchantOrderReference, amount, currency, returnUrl, description);
 
             var httpResponse = await _httpClient.PostAsJsonAsync("session", body, ct);
 
@@ -1178,10 +1186,12 @@ namespace XBOL.Ticketing.Services.EvoPayment
                     throw new KeyNotFoundException($"Client {contact.Id.Value} not found.");
                 }
             }
-            else if (!string.IsNullOrWhiteSpace(contact.Email))
+            else if (!string.IsNullOrWhiteSpace(contact.PhoneNumber) && contact.PhoneRegionCodeId > 0)
             {
-                var email = contact.Email.Trim();
-                client = await _dbContext.Clients.FirstOrDefaultAsync(c => c.Email == email, ct);
+                var normalizedPhone = NormalizePhoneNumber(contact.PhoneNumber);
+                client = await _dbContext.Clients.FirstOrDefaultAsync(
+                    c => c.PhoneNumber == normalizedPhone && c.PhoneRegionCodeId == contact.PhoneRegionCodeId,
+                    ct);
             }
 
             if (client is null)
@@ -1208,8 +1218,6 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 client.Email = contact.Email.Trim();
             }
 
-            client.PhoneRegionCodeId = contact.PhoneRegionCodeId;
-            client.PhoneNumber = NormalizePhoneNumber(contact.PhoneNumber);
             client.FullName = ResolveFullName(contact, client.FullName);
             client.UpdatedAt = now;
             client.UpdatedBy = Guid.Empty;
@@ -1299,6 +1307,78 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
             var trimmed = body.Length > 800 ? body[..800] + "…(truncated)" : body;
             return trimmed.Replace(Environment.NewLine, " ").Replace("\n", " ");
+        }
+
+        internal const int OrderDescriptionMaxLength = 100;
+        internal const string OrderDescriptionBrand = "PWR Ticket";
+        
+        internal static string BuildOrderDescription(
+            EventSchedule? schedule, ModelBundle? bundle, int seatCount)
+        {
+            var culture = new CultureInfo("es-MX");
+
+            if (schedule?.Event != null)
+            {
+                var name = SanitizeForGateway(schedule.Event.Name);
+                var date = schedule.StartDateTime.ToString("dd/MM/yy", culture);
+                var unit = seatCount == 1 ? "ticket" : "tickets";
+                var suffix = $" - {date} - {seatCount} {unit}";
+                return ComposeWithTruncatedName(name, suffix);
+            }
+
+            if (bundle != null)
+            {
+                var name = SanitizeForGateway(bundle.Name);
+                var unit = seatCount == 1 ? "pase" : "pases";
+                var suffix = $" - {seatCount} {unit}";
+                return ComposeWithTruncatedName(name, suffix);
+            }
+
+            var unitFallback = seatCount == 1 ? "ticket" : "tickets";
+            return $"{OrderDescriptionBrand} - {seatCount} {unitFallback}";
+        }
+
+        private static string ComposeWithTruncatedName(string name, string suffix)
+        {
+            var prefix = $"{OrderDescriptionBrand} - ";
+            var available = OrderDescriptionMaxLength - prefix.Length - suffix.Length;
+
+            if (available > 0 && name.Length > available)
+            {
+                name = name[..available].TrimEnd();
+            }
+
+            return $"{prefix}{name}{suffix}";
+        }
+
+        internal static string SanitizeForGateway(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+
+            var sb = new StringBuilder(input.Length);
+            foreach (var c in input)
+            {
+                if (c == '—' || c == '–')
+                {
+                    sb.Append('-');
+                    continue;
+                }
+                if (char.IsSurrogate(c) || char.IsControl(c))
+                {
+                    continue;
+                }
+                if (char.IsLetterOrDigit(c) || c == ' ' || "-.,:;()'".Contains(c))
+                {
+                    sb.Append(c);
+                }
+            }
+
+            var result = sb.ToString().Trim();
+            while (result.Contains("  "))
+            {
+                result = result.Replace("  ", " ");
+            }
+            return result;
         }
     }
 }

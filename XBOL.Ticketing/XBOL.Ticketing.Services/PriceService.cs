@@ -111,7 +111,10 @@ namespace XBOL.Ticketing.Services
             var feesDict = await _dbContext.PriceListItemFees
                 .Where(f => validItemIds.Contains(f.PriceListItemId))
                 .GroupBy(f => f.PriceListItemId)
-                .ToDictionaryAsync(g => g.Key, g => g.Sum(f => (decimal?)f.FeeAmount) ?? 0);
+                .ToDictionaryAsync(
+                    g => g.Key,
+                    g => g.Select(f => new SeatFeeDTO { FeeName = f.FeeName, FeeType = f.FeeType, ChargeCategory = f.ChargeCategory, FeeAmount = f.FeeAmount }).ToList()
+                );
 
             var rawSeatsIoPrices = new List<SeatsIoPriceDTO>();
 
@@ -126,7 +129,7 @@ namespace XBOL.Ticketing.Services
                 }
                 else
                 {
-                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, 0));
+                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, []));
                 }
                 rawSeatsIoPrices.Add(dto);
             }
@@ -146,7 +149,7 @@ namespace XBOL.Ticketing.Services
                 }
                 else
                 {
-                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, 0));
+                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, []));
                 }
                 rawSeatsIoPrices.Add(dto);
             }
@@ -165,8 +168,9 @@ namespace XBOL.Ticketing.Services
                     Category = null,
                     PriceListItemId = g.First().PriceListItemId,
                     Price = g.Key.Price,
-                    OriginalPrice = null,
+                    OriginalPrice = g.First().OriginalPrice,
                     Fee = g.First().Fee,
+                    Fees = g.First().Fees,
                     TicketTypes = g.First().TicketTypes,
                     Objects = g.SelectMany(x => x.Objects!).Distinct().ToArray()
                 });
@@ -187,12 +191,13 @@ namespace XBOL.Ticketing.Services
             Unavailable = false
         };
 
-        private void AssignSinglePrice(SeatsIoPriceDTO dto, PriceListItem item, decimal fee)
+        private void AssignSinglePrice(SeatsIoPriceDTO dto, PriceListItem item, List<SeatFeeDTO> fees)
         {
             dto.PriceListItemId = item.Id;
             dto.Price = item.FinalPrice;
-            dto.OriginalPrice = null;
-            dto.Fee = fee;
+            dto.OriginalPrice = item.BasePrice;
+            dto.Fee = fees.Sum(f => f.FeeAmount);
+            dto.Fees = fees;
         }
     }
 }

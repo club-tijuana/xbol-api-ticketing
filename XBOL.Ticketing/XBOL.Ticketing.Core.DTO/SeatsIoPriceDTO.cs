@@ -8,7 +8,16 @@ namespace XBOL.Ticketing.Core.DTO
         public long? Category { get; set; }
         public decimal? OriginalPrice { get; set; }
         public decimal? Fee { get; set; }
+        public List<SeatFeeDTO> Fees { get; set; } = [];
         public TicketTypeDTO[]? TicketTypes { get; set; }
+    }
+
+    public class SeatFeeDTO
+    {
+        public string FeeName { get; set; } = string.Empty;
+        public string FeeType { get; set; } = string.Empty;
+        public string ChargeCategory { get; set; } = "Fee";
+        public decimal FeeAmount { get; set; }
     }
 
     public class TicketTypeDTO
