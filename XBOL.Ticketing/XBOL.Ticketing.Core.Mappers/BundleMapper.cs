@@ -93,6 +93,7 @@ namespace XBOL.Ticketing.Core.Mappers
             {
                 BundleScheduleKey = $"bundle-sale-window:{entity.Id}",
                 BundleId = entity.Id,
+                PreviousBundleId = entity.PreviousBundleId,
                 StartDate = entity.StartDate,
                 EndDate = entity.EndDate,
                 PublishedDate = entity.PublishedDate,

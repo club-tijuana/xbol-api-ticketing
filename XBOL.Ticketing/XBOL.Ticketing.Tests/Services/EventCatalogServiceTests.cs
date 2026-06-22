@@ -359,6 +359,106 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetItemsAsync_BuyableOnlyExcludesFirstSaleSeasonPassWithRenewalDates()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        database.Context.BaseSections.Add(TestDatabase.BaseSection(90, 1));
+        var publicSale = TestDatabase.Bundle(
+            90,
+            "Public Sale Season",
+            1,
+            BundleType.SeasonPass,
+            EventStatus.Published,
+            now,
+            1,
+            1);
+        publicSale.PublishedDate = now.AddDays(-1);
+        publicSale.OnSaleDate = now.AddDays(-1);
+        publicSale.OffSaleDate = now.AddDays(30);
+        publicSale.RenewalStartDate = now.AddDays(-5);
+        publicSale.RenewalEndDate = now.AddDays(-1);
+        publicSale.ExternalKey = "season-90";
+        database.Context.Bundles.Add(publicSale);
+        await database.Context.SaveChangesAsync();
+        await database.AddForSaleBundleSeatAsync(90, 9000, now);
+
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Bundle,
+            BundleType = BundleType.SeasonPass,
+            Status = EventStatus.Published,
+            BuyableOnly = true,
+            SearchTerm = "Public Sale Season",
+            Page = 1,
+            PageSize = 10
+        });
+
+        result.TotalCount.Should().Be(0);
+        result.Items.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetItemsAsync_BuyableOnlyIncludesRenewalSeasonPassAfterRenewalWindow()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        database.Context.BaseSections.AddRange(
+            TestDatabase.BaseSection(90, 1),
+            TestDatabase.BaseSection(91, 1));
+        var previous = TestDatabase.Bundle(
+            90,
+            "Previous Season",
+            1,
+            BundleType.SeasonPass,
+            EventStatus.Published,
+            now.AddMonths(-8),
+            1,
+            1);
+        previous.OffSaleDate = now.AddMonths(-2);
+
+        var publicSale = TestDatabase.Bundle(
+            91,
+            "Public Renewal Season",
+            1,
+            BundleType.SeasonPass,
+            EventStatus.Published,
+            now,
+            1,
+            1);
+        publicSale.PublishedDate = now.AddDays(-10);
+        publicSale.OnSaleDate = now.AddDays(-1);
+        publicSale.OffSaleDate = now.AddDays(30);
+        publicSale.RenewalStartDate = now.AddDays(-5);
+        publicSale.RenewalEndDate = now.AddDays(-1);
+        publicSale.PreviousBundleId = previous.Id;
+        publicSale.ExternalKey = "season-91";
+        database.Context.Bundles.AddRange(previous, publicSale);
+        await database.Context.SaveChangesAsync();
+        await database.AddForSaleBundleSeatAsync(91, 9100, now);
+
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Bundle,
+            BundleType = BundleType.SeasonPass,
+            Status = EventStatus.Published,
+            BuyableOnly = true,
+            SearchTerm = "Public Renewal Season",
+            Page = 1,
+            PageSize = 10
+        });
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle().Which.Id.Should().Be(91);
+    }
+
+    [Fact]
     public async Task GetBundleScheduleItemsAsync_FiltersByVenueAndDateRangeAndPaginates()
     {
         await using var database = await TestDatabase.CreateAsync();

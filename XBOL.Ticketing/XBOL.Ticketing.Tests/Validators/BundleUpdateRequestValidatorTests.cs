@@ -140,4 +140,59 @@ public class BundleUpdateRequestValidatorTests
         var result = await _sut.TestValidateAsync(request);
         result.ShouldHaveValidationErrorFor(x => x.OffSaleDate);
     }
+
+    [Fact]
+    public async Task FirstSaleSeasonPass_WithRenewalWindow_WhenProvided_Fails()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = new BundleUpdateRequest
+        {
+            BundleType = BundleType.SeasonPass,
+            PreviousBundleId = null,
+            RenewalStartDate = now.AddDays(2),
+            RenewalEndDate = now.AddDays(5)
+        };
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.RenewalStartDate);
+        result.ShouldHaveValidationErrorFor(x => x.RenewalEndDate);
+    }
+
+    [Fact]
+    public async Task RenewalBundle_OnSaleBeforeRenewalEnd_WhenProvided_Fails()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = new BundleUpdateRequest
+        {
+            BundleType = BundleType.SeasonPass,
+            PreviousBundleId = 10,
+            RenewalStartDate = now.AddDays(2),
+            RenewalEndDate = now.AddDays(5),
+            OnSaleDate = now.AddDays(1)
+        };
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.OnSaleDate);
+    }
+
+    [Fact]
+    public async Task RenewalBundle_PreSaleBeforeRenewalEnd_WhenProvided_Fails()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = new BundleUpdateRequest
+        {
+            BundleType = BundleType.SeasonPass,
+            PreviousBundleId = 10,
+            RenewalStartDate = now.AddDays(2),
+            RenewalEndDate = now.AddDays(5),
+            PreSaleDate = now.AddDays(4),
+            OnSaleDate = now.AddDays(6)
+        };
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.PreSaleDate);
+    }
 }

@@ -367,6 +367,11 @@ namespace XBOL.Ticketing.Services.Event
                 return false;
             }
 
+            if (!IsValidSeasonPassSaleWindow(item, saleWindow))
+            {
+                return false;
+            }
+
             var now = DateTimeOffset.UtcNow;
             if (now < saleWindow.OnSaleDate.Value || now >= saleWindow.OffSaleDate.Value)
             {
@@ -375,6 +380,44 @@ namespace XBOL.Ticketing.Services.Event
 
             return !HasRenewalWindow(saleWindow)
                 || (saleWindow.RenewalEndDate.HasValue && now >= saleWindow.RenewalEndDate.Value);
+        }
+
+        private static bool IsValidSeasonPassSaleWindow(EventCatalogItemDTO item, BundleSaleWindowDTO saleWindow)
+        {
+            if (item.BundleType != BundleType.SeasonPass)
+            {
+                return true;
+            }
+
+            var hasRenewalWindow = HasRenewalWindow(saleWindow);
+            if (hasRenewalWindow && saleWindow.PreviousBundleId is null)
+            {
+                return false;
+            }
+
+            if (hasRenewalWindow && saleWindow.RenewalEndDate is null)
+            {
+                return false;
+            }
+
+            if (!hasRenewalWindow)
+            {
+                return true;
+            }
+
+            if (saleWindow.RenewalStartDate is null ||
+                saleWindow.RenewalStartDate >= saleWindow.RenewalEndDate)
+            {
+                return false;
+            }
+
+            if (saleWindow.OnSaleDate < saleWindow.RenewalEndDate)
+            {
+                return false;
+            }
+
+            return saleWindow.PreSaleDate is null ||
+                (saleWindow.PreSaleDate >= saleWindow.RenewalEndDate && saleWindow.PreSaleDate < saleWindow.OnSaleDate);
         }
 
         private static bool HasRenewalWindow(BundleSaleWindowDTO saleWindow)
@@ -514,6 +557,7 @@ namespace XBOL.Ticketing.Services.Event
             {
                 BundleScheduleKey = $"bundle-sale-window:{bundle.Id}",
                 BundleId = bundle.Id,
+                PreviousBundleId = bundle.PreviousBundleId,
                 StartDate = bundle.StartDate,
                 EndDate = bundle.EndDate,
                 PublishedDate = bundle.PublishedDate,
