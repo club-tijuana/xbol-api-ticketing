@@ -730,6 +730,80 @@ public class BookingOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task BookAsync_SeasonPassBundlePaymentLinkRequest_DoesNotEnqueueConfirmationEmails()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedSeasonPassBundleAsync(context);
+        var sourceOrder = await SeedSourceOrderAsync(context, "ORD-B-OLD-000001");
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        AllowSeasonPassRemoteReadiness(bookingClient);
+        bookingClient.BookSeatsAsync(
+                "season-20",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        var createdJobs = new List<Job>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
+        var sut = CreateService(context, bookingClient, backgroundJobs);
+        var request = new BookSeatsActionRequest
+        {
+            BundleId = 20,
+            EventKey = "season-20",
+            EventScheduleId = 0,
+            HoldToken = "hold-123",
+            TicketType = ItemType.BundlePass,
+            Localizer = "ORD-B-20-000001",
+            ReferenceOrderId = sourceOrder.Id,
+            IsPaymentLink = true,
+            PaymentLinkRequest = new PaymentLinkRequest { ExpiresAt = DateTimeOffset.UtcNow.AddDays(1) },
+            Seats =
+            [
+                new BookingSeatRequest
+                {
+                    SeatKey = "A-1",
+                    SeatPrice = 500m,
+                    PriceListItemId = 3
+                }
+            ],
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
+                Email = "season@example.com",
+                FirstName = "Ada",
+                LastName = "Lovelace"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+
+        createdJobs.Should().BeEmpty();
+        var order = await context.Orders
+            .Include(o => o.Tickets)
+            .SingleAsync(o => o.Id == result.OrderId);
+        order.Status.Should().Be(OrderStatus.Pending);
+        order.Tickets.Should().OnlyContain(ticket =>
+            ticket.Status == TicketStatus.PendingPayment &&
+            ticket.PrivateToken == null);
+    }
+
+    [Fact]
     public async Task BookAsync_WhenBuyerConfirmationEmailEnqueueFails_StillEnqueuesSellerAndReturnsSuccess()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");

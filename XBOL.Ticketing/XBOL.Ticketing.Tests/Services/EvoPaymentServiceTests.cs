@@ -264,6 +264,60 @@ public sealed class EvoPaymentServiceTests
     }
 
     [Fact]
+    public async Task ConfirmCheckoutAsync_WhenPaymentLinkBundlePaymentIsCaptured_CreatesPaymentAndIssuesPendingTickets()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedPendingBundlePaymentLinkOrderAsync(context);
+
+        var createdJobs = new List<Job>();
+        var backgroundJobs = Substitute.For<IBackgroundJobClient>();
+        backgroundJobs
+            .Create(Arg.Do<Job>(createdJobs.Add), Arg.Any<EnqueuedState>())
+            .Returns(_ => $"job-{createdJobs.Count}");
+        var sut = CreateService(context, backgroundJobs);
+
+        var result = await sut.ConfirmCheckoutAsync(new ConfirmCheckoutRequest
+        {
+            LocalOrderId = 3,
+            OrderRefId = "evo-order-bundle-payment-link-1",
+            ResultIndicator = "success-indicator-bundle-payment-link-1"
+        });
+
+        result.OrderStatus.Should().Be(OrderStatus.Paid.ToString());
+        result.PaymentStatus.Should().Be(PaymentStatus.Captured.ToString());
+        result.TicketsIssued.Should().Be(1);
+
+        var order = await context.Orders
+            .Include(o => o.Payments)
+            .Include(o => o.Tickets)
+            .SingleAsync(o => o.Id == 3);
+
+        order.Status.Should().Be(OrderStatus.Paid);
+        order.Payments.Should().ContainSingle().Which.Should().Match<Payment>(payment =>
+            payment.Provider == "EVOPayments" &&
+            payment.ProviderReference == "evo-order-bundle-payment-link-1" &&
+            payment.PaymentStatus == PaymentStatus.Captured &&
+            payment.Amount == 500m &&
+            payment.AmountMXN == 500m &&
+            payment.Currency == CurrencyType.MXN);
+        order.Tickets.Should().ContainSingle().Which.Should().Match<Ticket>(ticket =>
+            ticket.Status == TicketStatus.Issued &&
+            !string.IsNullOrWhiteSpace(ticket.PrivateToken));
+
+        var emailModels = ExtractOrderConfirmationModels(createdJobs);
+        emailModels.Should().HaveCount(2);
+        emailModels.Should().OnlyContain(model => model.IsBundle);
+    }
+
+    [Fact]
     public async Task ConfirmCheckoutAsync_WhenPaymentIsCaptured_LogsCheckoutConfirmationWithEvoPaymentCategory()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
@@ -894,6 +948,234 @@ public sealed class EvoPaymentServiceTests
 
         context.Orders.Add(order);
         context.BundlePasses.Add(pass);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedPendingBundlePaymentLinkOrderAsync(XBOLDbContext context)
+    {
+        var now = DateTimeOffset.UtcNow;
+        await EnsurePhoneRegionCodeAsync(context);
+
+        var venue = new Venue
+        {
+            Id = 300,
+            Name = "Arena",
+            AddressLine = "1 Main St",
+            City = "Tijuana",
+            State = "BC",
+            Country = "MX",
+            Category = VenueCategory.Arena,
+            ShortDescription = "Arena",
+            LongDescription = "Arena",
+            LogoImageUrl = "logo.png",
+            BannerImageUrl = "banner.png",
+            LandingUrl = "https://example.test",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var venueMap = new VenueMap
+        {
+            Id = 300,
+            Venue = venue,
+            Name = "Main",
+            ExternalMapKey = "chart-300",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var baseZone = new BaseZone
+        {
+            Id = 300,
+            VenueMap = venueMap,
+            Name = "Lower Bowl",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var baseSection = new BaseSection
+        {
+            Id = 300,
+            BaseZone = baseZone,
+            Name = "Lower 101",
+            SectionType = SectionType.General,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var baseRow = new BaseRow
+        {
+            Id = 300,
+            BaseSection = baseSection,
+            RowLabel = "A",
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var baseSeat = new BaseSeat
+        {
+            Id = 300,
+            BaseRow = baseRow,
+            SeatNumber = "1",
+            SeatType = SeatType.Standard,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        var eventEntity = new Event
+        {
+            Id = 300,
+            VenueMap = venueMap,
+            Name = "Bundle Game",
+            Status = EventStatus.Published,
+            BannerImageUrl = "event-banner.png",
+            LandingUrl = "https://example.test/event",
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var schedule = new EventSchedule
+        {
+            Id = 300,
+            Event = eventEntity,
+            StartDateTime = now.AddDays(7),
+            EndDateTime = now.AddDays(7).AddHours(2),
+            OnSaleDate = now.AddDays(-1),
+            OffSaleDate = now.AddDays(6),
+            Status = ScheduleStatus.OnSale,
+            ExternalEventKey = "schedule-300",
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var eventSection = new EventSection
+        {
+            Id = 300,
+            EventSchedule = schedule,
+            BaseSection = baseSection,
+            DisplayName = "Lower 101",
+            TotalSeats = 1,
+            AvailableSeats = 1
+        };
+        var eventSeat = new EventSeat
+        {
+            Id = 300,
+            EventSection = eventSection,
+            BaseSeat = baseSeat,
+            ExternalSeatObjectKey = "A-1"
+        };
+        var client = new Client
+        {
+            ClientType = ClientType.Individual,
+            Email = "bundle-link-buyer@example.com",
+            FullName = "Bundle Link Buyer",
+            PhoneRegionCodeId = 1,
+            PhoneNumber = "5553330101",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var bundle = new Bundle
+        {
+            Id = 3,
+            Name = "Season Bundle Link",
+            Status = EventStatus.Published,
+            BundleType = BundleType.SeasonPass,
+            BundlePricingType = BundlePricingType.Single,
+            BannerImageUrl = "bundle-banner.png",
+            LandingUrl = "https://example.test/bundle",
+            StartDate = now.AddDays(7),
+            EndDate = now.AddMonths(6),
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var pass = new BundlePass
+        {
+            Id = 3,
+            Bundle = bundle,
+            Client = client,
+            TrackingCode = "A-1",
+            PrivateToken = "bundle-pass-private-token",
+            BundlePassType = BundlePassType.Full,
+            Status = BundlePassStatus.Active,
+            IsDigital = true,
+            Price = 500m,
+            PurchasedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var order = new Order
+        {
+            Id = 3,
+            Client = client,
+            Reference = "ORD-BUNDLE-LINK-1",
+            SubTotal = 500m,
+            TotalFees = 0m,
+            TotalTaxes = 0m,
+            Total = 500m,
+            Status = OrderStatus.Pending,
+            SaleChannel = SaleChannel.Online,
+            OrderType = OrderType.Bundle,
+            OrderTags = [OrderTag.PaymentLink],
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+        var ticket = new Ticket
+        {
+            Id = 300,
+            EventSchedule = schedule,
+            EventSection = eventSection,
+            EventSeat = eventSeat,
+            OriginalClient = client,
+            CurrentClient = client,
+            OriginalOrder = order,
+            TicketCode = "A-1",
+            TicketType = ItemType.BundlePass.ToString(),
+            PrivateToken = null,
+            SectionLabelSnapshot = "Lower 101",
+            SeatLabelSnapshot = "A-1",
+            IsDigital = true,
+            PricePaid = 0m,
+            Status = TicketStatus.PendingPayment,
+            CreatedAt = now,
+            UpdatedAt = now,
+            CreatedBy = Guid.Empty,
+            UpdatedBy = Guid.Empty
+        };
+
+        order.Tickets.Add(ticket);
+        order.Items.Add(new OrderItem
+        {
+            ItemType = ItemType.BundlePass,
+            ItemReferenceId = pass.Id,
+            Price = 500m
+        });
+
+        context.AddRange(
+            venue,
+            venueMap,
+            baseZone,
+            baseSection,
+            baseRow,
+            baseSeat,
+            eventEntity,
+            schedule,
+            eventSection,
+            eventSeat,
+            client,
+            bundle,
+            pass,
+            order,
+            new BundlePassEventTicket
+            {
+                BundlePass = pass,
+                Ticket = ticket
+            });
         await context.SaveChangesAsync();
     }
 

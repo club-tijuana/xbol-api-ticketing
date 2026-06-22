@@ -881,7 +881,9 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 .FirstOrDefaultAsync(
                     p => p.OrderId == order.Id && p.ProviderReference == request.OrderRefId, ct);
 
-            if (payment is null)
+            var isPaymentLinkOrder = order.OrderTags.Contains(OrderTag.PaymentLink);
+
+            if (payment is null && !isPaymentLinkOrder)
             {
                 throw new KeyNotFoundException(
                     $"Payment not found for OrderId={order.Id} with ProviderReference={request.OrderRefId}.");
@@ -904,6 +906,7 @@ namespace XBOL.Ticketing.Services.EvoPayment
 
 
             if (!string.IsNullOrWhiteSpace(request.ResultIndicator)
+                && payment is not null
                 && !string.Equals(request.ResultIndicator, payment.ProviderSessionReference, StringComparison.Ordinal))
             {
                 _logger.LogWarning(
@@ -927,6 +930,18 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
+                    if (payment is null)
+                    {
+                        payment = CreatePaymentFromCheckoutResult(
+                            order,
+                            request.OrderRefId,
+                            request.ResultIndicator,
+                            PaymentStatus.Captured,
+                            now,
+                            evoResult);
+                        _dbContext.Payments.Add(payment);
+                    }
+
                     payment.PaymentStatus = PaymentStatus.Captured;
                     payment.AppliedAt = now;
 
@@ -991,6 +1006,18 @@ namespace XBOL.Ticketing.Services.EvoPayment
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(ct);
                 try
                 {
+                    if (payment is null)
+                    {
+                        payment = CreatePaymentFromCheckoutResult(
+                            order,
+                            request.OrderRefId,
+                            request.ResultIndicator,
+                            newPaymentStatus,
+                            now,
+                            evoResult);
+                        _dbContext.Payments.Add(payment);
+                    }
+
                     payment.PaymentStatus = newPaymentStatus;
 
                     order.Status = OrderStatus.Cancelled;
@@ -1084,6 +1111,43 @@ namespace XBOL.Ticketing.Services.EvoPayment
             }
 
             return PaymentStatus.Failed;
+        }
+
+        private static Payment CreatePaymentFromCheckoutResult(
+            ModelOrder order,
+            string providerReference,
+            string? providerSessionReference,
+            PaymentStatus paymentStatus,
+            DateTimeOffset now,
+            RetrieveOrderResponse evoResult)
+        {
+            var receivedAmount = evoResult.TotalCapturedAmount ?? evoResult.TotalAuthorizedAmount;
+            var currency = string.IsNullOrWhiteSpace(evoResult.Currency)
+                ? CurrencyType.MXN
+                : ParseCheckoutCurrency(evoResult.Currency);
+
+            return new Payment
+            {
+                Order = order,
+                OrderId = order.Id,
+                Currency = currency,
+                Amount = order.Total,
+                AmountMXN = order.Total,
+                ReceivedAmount = receivedAmount,
+                ReceivedAmountMXN = receivedAmount,
+                ExchangeRateId = 0,
+                ExchangeRate = 0,
+                PaymentType = PaymentType.Card,
+                Provider = "EVOPayments",
+                ProviderReference = providerReference,
+                ProviderSessionReference = providerSessionReference,
+                PaymentStatus = paymentStatus,
+                TransactionReference = Guid.NewGuid(),
+                AppliedAt = now,
+                CreatedAt = now,
+                CreatedBy = Guid.Empty,
+                UpdatedBy = Guid.Empty
+            };
         }
 
         private async Task<(string SessionId, string SuccessIndicator)> CallInitiateCheckoutAsync(

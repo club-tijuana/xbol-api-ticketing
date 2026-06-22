@@ -473,9 +473,12 @@ namespace XBOL.Ticketing.Services.Booking
             await _dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
-            LogStartingConfirmationEmailEnqueue("bundle", order);
-            var emailResults = await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
-            LogCompletedConfirmationEmailEnqueue("bundle", order, emailResults);
+            if (!isPaymentLink)
+            {
+                LogStartingConfirmationEmailEnqueue("bundle", order);
+                var emailResults = await _confirmationEmailQueue.EnqueueAsync(order.Id, client, cancellationToken);
+                LogCompletedConfirmationEmailEnqueue("bundle", order, emailResults);
+            }
 
             return new BookingResultResponse
             {
