@@ -30,15 +30,7 @@ public class CreateSeatsIoSeasonHandler(
         var seasonKey = string.IsNullOrWhiteSpace(bundle.ExternalKey)
             ? CreateSeasonKey(bundle.Id)
             : bundle.ExternalKey;
-        var links = bundle.BundleEventSchedules
-            .OrderBy(link => link.SortOrder ?? int.MaxValue)
-            .ThenBy(link => link.EventScheduleId)
-            .ToList();
-        var eventKeys = links
-            .Select(link => $"{seasonKey}-schedule-{link.EventScheduleId}")
-            .ToArray();
-
-        await seatsIo.CreateSeatsIoSeasonAsync(chartKey, seasonKey, eventKeys);
+        await seatsIo.CreateSeatsIoSeasonAsync(chartKey, seasonKey);
         logger.LogInformation(
             "Created Seats.io season {SeasonKey} for Bundle {BundleId}.",
             seasonKey,
@@ -50,20 +42,6 @@ public class CreateSeatsIoSeasonHandler(
             bundle.ExternalKey = seasonKey;
             bundle.Status = EventStatus.Published;
             bundle.PublishedDate ??= now;
-
-            for (var index = 0; index < links.Count; index++)
-            {
-                BundleSeatsIoSchedulePublisher.PublishSeasonSchedule(
-                    links[index].EventSchedule,
-                    eventKeys[index],
-                    now);
-            }
-
-            await ticketMaterializer.MaterializeIssuedTicketsAsync(
-                bundle.Id,
-                links.Select(link => link.EventScheduleId).ToArray(),
-                command.UserId);
-
             bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);
         }
@@ -123,7 +101,16 @@ public class AddEventsToSeasonHandler(
                 $"Bundle {bundle.Id} does not contain EventSchedule(s): {string.Join(", ", missingIds)}.");
         }
 
-        var eventKeys = links
+        var unpublishedLinks = links
+            .Where(link => string.IsNullOrWhiteSpace(link.EventSchedule.ExternalEventKey))
+            .ToList();
+
+        if (unpublishedLinks.Count == 0)
+        {
+            return;
+        }
+
+        var eventKeys = unpublishedLinks
             .Select(link => $"{seasonKey}-schedule-{link.EventScheduleId}")
             .ToArray();
 
@@ -137,18 +124,18 @@ public class AddEventsToSeasonHandler(
         try
         {
             var now = DateTimeOffset.UtcNow;
-            for (var index = 0; index < links.Count; index++)
+            for (var index = 0; index < unpublishedLinks.Count; index++)
             {
                 BundleSeatsIoSchedulePublisher.PublishSeasonSchedule(
-                    links[index].EventSchedule,
+                    unpublishedLinks[index].EventSchedule,
                     eventKeys[index],
                     now);
             }
 
             await ticketMaterializer.MaterializeIssuedTicketsAsync(
                 bundle.Id,
-                links.Select(link => link.EventScheduleId).ToArray(),
-                Guid.Empty);
+                unpublishedLinks.Select(link => link.EventScheduleId).ToArray(),
+                command.UserId);
 
             bundle.UpdatedAt = now;
             await bundleRepository.UpdateAsync(bundle);

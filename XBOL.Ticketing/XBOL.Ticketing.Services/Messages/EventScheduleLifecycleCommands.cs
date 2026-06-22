@@ -17,7 +17,7 @@ public record DeleteSeatsIoEventCommand(
 
 public record CreateSeatsIoSeasonCommand(long BundleId, Guid UserId);
 
-public record AddEventsToSeasonCommand(long BundleId, long[] EventScheduleIds);
+public record AddEventsToSeasonCommand(long BundleId, long[] EventScheduleIds, Guid UserId);
 
 public record DeleteSeatsIoSeasonCommand(long BundleId, Guid UserId);
 

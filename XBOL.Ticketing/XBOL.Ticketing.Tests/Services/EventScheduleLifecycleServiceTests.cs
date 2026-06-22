@@ -28,8 +28,9 @@ public class EventScheduleLifecycleServiceTests
     }
 
     [Fact]
-    public async Task PublishAsync_SeasonPassLinkedSchedule_RejectsStandalonePublish()
+    public async Task PublishAsync_SeasonPassLinkedSchedule_InvokesAddEventsToSeasonCommand()
     {
+        var userId = Guid.NewGuid();
         _eventScheduleRepository.GetByIdWithEventAndVenueMapAsync(10)
             .Returns(Schedule(10, ScheduleStatus.Draft));
         _bundleEventScheduleRepository.GetByEventScheduleIdAsync(10).Returns(
@@ -37,15 +38,27 @@ public class EventScheduleLifecycleServiceTests
             new BundleEventSchedule
             {
                 BundleId = 20,
-                Bundle = new Core.Model.Bundle { Id = 20, BundleType = BundleType.SeasonPass }
+                EventScheduleId = 10,
+                Bundle = new Core.Model.Bundle
+                {
+                    Id = 20,
+                    BundleType = BundleType.SeasonPass,
+                    Status = EventStatus.Published,
+                    ExternalKey = "season-20"
+                }
             }
         ]);
 
-        var act = () => _sut.PublishAsync(10, Guid.Empty);
+        await _sut.PublishAsync(10, userId);
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*SeasonPass*");
-        await _bus.DidNotReceiveWithAnyArgs().InvokeAsync(default!, default, default);
+        await _bus.Received(1).InvokeAsync(
+            Arg.Is<AddEventsToSeasonCommand>(command =>
+                command.BundleId == 20 &&
+                command.EventScheduleIds.SequenceEqual(new[] { 10L }) &&
+                command.UserId == userId),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<TimeSpan?>());
+        await _eventScheduleRepository.DidNotReceive().UpdateAsync(Arg.Any<EventSchedule>());
     }
 
     [Fact]

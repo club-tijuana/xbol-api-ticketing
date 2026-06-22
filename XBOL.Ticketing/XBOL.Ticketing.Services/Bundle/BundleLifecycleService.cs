@@ -112,7 +112,7 @@ public class BundleLifecycleService(
             throw new InvalidOperationException($"Bundle {bundle.Id} has no Seats.io season key.");
         }
 
-        await bus.InvokeAsync(new AddEventsToSeasonCommand(bundleId, eventScheduleIds.ToArray()), cancellation);
+        await bus.InvokeAsync(new AddEventsToSeasonCommand(bundleId, eventScheduleIds.ToArray(), Guid.Empty), cancellation);
     }
 
     private async Task PublishMissingLinkedSchedulesAsync(

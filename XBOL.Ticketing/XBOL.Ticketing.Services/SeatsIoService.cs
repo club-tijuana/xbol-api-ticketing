@@ -549,7 +549,7 @@ namespace XBOL.Ticketing.Services
             await DeleteEventAsync(eventKey);
         }
 
-        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[] eventKeys)
+        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[]? eventKeys = null)
         {
             await CreateSeasonAsync(chartKey, seasonKey, eventKeys);
         }
