@@ -346,7 +346,40 @@ namespace XBOL.Ticketing.Services.Event
                 return false;
             }
 
+            if (queryParams.BuyableOnly == true && !IsBuyableCatalogItem(item))
+            {
+                return false;
+            }
+
             return MatchesCatalogScheduleFilters(item, queryParams);
+        }
+
+        private static bool IsBuyableCatalogItem(EventCatalogItemDTO item)
+        {
+            if (item.ItemType != EventCatalogItemType.Bundle)
+            {
+                return true;
+            }
+
+            var saleWindow = item.BundleSaleWindow;
+            if (!item.IsBookable || saleWindow?.OnSaleDate is null || saleWindow.OffSaleDate is null)
+            {
+                return false;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (now < saleWindow.OnSaleDate.Value || now >= saleWindow.OffSaleDate.Value)
+            {
+                return false;
+            }
+
+            return !HasRenewalWindow(saleWindow)
+                || (saleWindow.RenewalEndDate.HasValue && now >= saleWindow.RenewalEndDate.Value);
+        }
+
+        private static bool HasRenewalWindow(BundleSaleWindowDTO saleWindow)
+        {
+            return saleWindow.RenewalStartDate.HasValue || saleWindow.RenewalEndDate.HasValue;
         }
 
         private static bool MatchesBundleScheduleFilters(BundleScheduleItemDTO item, BundleScheduleQueryParams queryParams)

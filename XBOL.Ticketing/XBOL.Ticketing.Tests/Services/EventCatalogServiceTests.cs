@@ -309,6 +309,56 @@ public class EventCatalogServiceTests
     }
 
     [Fact]
+    public async Task GetItemsAsync_BuyableOnlyFiltersSeasonPassesBeforePagination()
+    {
+        await using var database = await TestDatabase.CreateAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        var bookable = await database.Context.Bundles.SingleAsync(bundle => bundle.Id == 30);
+        bookable.OnSaleDate = now.AddDays(-1);
+        bookable.OffSaleDate = now.AddDays(1);
+        bookable.ExternalKey = "season-30";
+        await database.AddForSaleBundleSeatAsync(30, 3000, now);
+
+        var notBookable = await database.Context.Bundles.SingleAsync(bundle => bundle.Id == 60);
+        notBookable.OnSaleDate = now.AddDays(-1);
+        notBookable.OffSaleDate = now.AddDays(1);
+        notBookable.ExternalKey = "season-60";
+
+        database.Context.BaseSections.Add(TestDatabase.BaseSection(90, 1));
+        var futureSale = TestDatabase.Bundle(
+            90,
+            "Future Sale",
+            1,
+            BundleType.SeasonPass,
+            EventStatus.Published,
+            now,
+            1,
+            1);
+        futureSale.OnSaleDate = now.AddDays(1);
+        futureSale.OffSaleDate = now.AddDays(30);
+        futureSale.ExternalKey = "season-90";
+        database.Context.Bundles.Add(futureSale);
+        await database.Context.SaveChangesAsync();
+        await database.AddForSaleBundleSeatAsync(90, 9000, now);
+
+        var sut = new EventCatalogService(database.Context);
+
+        var result = await sut.GetItemsAsync(new EventCatalogQueryParams
+        {
+            ItemType = EventCatalogItemType.Bundle,
+            BundleType = BundleType.SeasonPass,
+            Status = EventStatus.Published,
+            BuyableOnly = true,
+            Page = 1,
+            PageSize = 1
+        });
+
+        result.TotalCount.Should().Be(1);
+        result.Items.Should().ContainSingle().Which.Id.Should().Be(30);
+    }
+
+    [Fact]
     public async Task GetBundleScheduleItemsAsync_FiltersByVenueAndDateRangeAndPaginates()
     {
         await using var database = await TestDatabase.CreateAsync();
