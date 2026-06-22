@@ -303,12 +303,12 @@ namespace XBOL.Ticketing.Services.Booking
                     OriginalOrder = order,
                     TicketCode = eventSeat.ExternalSeatObjectKey,
                     TicketType = request.TicketType.ToString(),
-                    PrivateToken = Guid.NewGuid().ToString("N"),
+                    PrivateToken = isPaymentLink ? null : Guid.NewGuid().ToString("N"),
                     SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                     SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
                     IsDigital = true,
                     PricePaid = request.Seats.First(s => s.SeatKey == eventSeat.ExternalSeatObjectKey).SeatPrice,
-                    Status = TicketStatus.Issued,
+                    Status = isPaymentLink ? TicketStatus.PendingPayment : TicketStatus.Issued,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = actorUserId,
@@ -434,12 +434,12 @@ namespace XBOL.Ticketing.Services.Booking
                     OriginalOrder = order,
                     TicketCode = eventSeat.ExternalSeatObjectKey,
                     TicketType = ItemType.BundlePass.ToString(),
-                    PrivateToken = Guid.NewGuid().ToString("N"),
+                    PrivateToken = isPaymentLink ? null : Guid.NewGuid().ToString("N"),
                     SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                     SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
                     IsDigital = true,
                     PricePaid = 0,
-                    Status = TicketStatus.Issued,
+                    Status = isPaymentLink ? TicketStatus.PendingPayment : TicketStatus.Issued,
                     CreatedAt = now,
                     UpdatedAt = now,
                     CreatedBy = actorUserId,
@@ -795,7 +795,10 @@ namespace XBOL.Ticketing.Services.Booking
                 .OrderBy(link => link.SortOrder ?? int.MaxValue)
                 .ThenBy(link => link.EventScheduleId)
                 .Select(link => link.EventSchedule)
-                .Where(schedule => request.EventScheduleId == 0 || schedule.Id == request.EventScheduleId)
+                .Where(schedule =>
+                    bundle.BundleType == BundleType.SeasonPass ||
+                    request.EventScheduleId == 0 ||
+                    schedule.Id == request.EventScheduleId)
                 .ToList();
 
             if (schedules.Count == 0 && bundle.BundleType != BundleType.SeasonPass)

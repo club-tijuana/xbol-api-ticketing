@@ -136,6 +136,62 @@ public class BookingOrchestrationServiceTests
     }
 
     [Fact]
+    public async Task BookAsync_TicketPaymentLinkRequest_PersistsPendingTicketsWithoutPrivateTokens()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedStandaloneEventAsync(context);
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        bookingClient.BookSeatsAsync(
+                "schedule-100",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var sut = CreateService(context, bookingClient);
+        var request = new BookSeatsActionRequest
+        {
+            EventKey = "schedule-100",
+            EventScheduleId = 100,
+            HoldToken = "hold-123",
+            TicketType = ItemType.Ticket,
+            Localizer = "ORD-E-100-000001",
+            IsPaymentLink = true,
+            PaymentLinkRequest = new PaymentLinkRequest { ExpiresAt = DateTimeOffset.UtcNow.AddDays(1) },
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                Email = "buyer@example.com",
+                FirstName = "Rita",
+                LastName = "Moreno",
+                PhoneNumber = "(555) 222-0100"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+
+        var order = await context.Orders
+            .Include(o => o.Tickets)
+            .SingleAsync(o => o.Id == result.OrderId);
+
+        order.Status.Should().Be(OrderStatus.Pending);
+        order.Tickets.Should().ContainSingle().Which.Status.Should().Be(TicketStatus.PendingPayment);
+        order.Tickets.Should().OnlyContain(ticket => ticket.PrivateToken == null);
+    }
+
+    [Fact]
     public async Task BookAsync_WhenInventoryBatchIsMissing_PersistsTicketWithoutInventoryBatch()
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
@@ -285,6 +341,125 @@ public class BookingOrchestrationServiceTests
         joins.Select(j => j.Ticket.EventScheduleId).Should().BeEquivalentTo([201L, 202L]);
         joins.Select(j => j.Ticket.TicketCode).Should().OnlyContain(code => code == "A-1");
         order.Tickets.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task BookAsync_SeasonPassBundleRequest_WithScheduleContext_StillCreatesTicketsForAllBundleSchedules()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedSeasonPassBundleAsync(context);
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        AllowSeasonPassRemoteReadiness(bookingClient);
+        bookingClient.BookSeatsAsync(
+                "season-20",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+
+        var sut = CreateService(context, bookingClient);
+        var request = new BookSeatsActionRequest
+        {
+            BundleId = 20,
+            EventKey = "season-20-schedule-201",
+            EventScheduleId = 201,
+            HoldToken = "hold-123",
+            TicketType = ItemType.BundlePass,
+            Localizer = "ORD-B-20-000001",
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
+                Email = "season@example.com",
+                FirstName = "Ada",
+                LastName = "Lovelace"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+
+        result.BundlePassIds.Should().ContainSingle();
+        result.TicketIds.Should().HaveCount(2);
+
+        var joins = await context.BundlePassEventTickets
+            .Include(j => j.Ticket)
+            .ToListAsync();
+
+        joins.Should().HaveCount(2);
+        joins.Select(j => j.Ticket.EventScheduleId).Should().BeEquivalentTo([201L, 202L]);
+    }
+
+    [Fact]
+    public async Task BookAsync_SeasonPassBundleRequest_WithoutLinkedSchedules_CreatesBundlePassWithoutTickets()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        await SeedSeasonPassBundleAsync(context);
+        context.BundleEventSchedules.RemoveRange(context.BundleEventSchedules);
+        await context.SaveChangesAsync();
+
+        var bookingClient = Substitute.For<ISeatsIoBookingClient>();
+        AllowSeasonPassRemoteReadiness(bookingClient);
+        bookingClient.BookSeatsAsync(
+                "season-20",
+                Arg.Any<List<BookingSeatRequest>>(),
+                "hold-123",
+                Arg.Any<CancellationToken>())
+            .Returns(["A-1"]);
+        var sut = CreateService(context, bookingClient);
+        var request = new BookSeatsActionRequest
+        {
+            BundleId = 20,
+            EventKey = "season-20",
+            EventScheduleId = 0,
+            HoldToken = "hold-123",
+            TicketType = ItemType.BundlePass,
+            Localizer = "ORD-B-20-000001",
+            Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 500m, PriceListItemId = 3 } },
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100",
+                Email = "season@example.com",
+                FirstName = "Ada",
+                LastName = "Lovelace"
+            },
+            PaymentInfoRequest = PaidInCash(),
+            ChangeInfoRequest = new ChangeInfoRequest()
+        };
+
+        var result = await sut.BookAsync(request, Guid.NewGuid());
+
+        result.BundlePassIds.Should().ContainSingle();
+        result.TicketIds.Should().BeEmpty();
+        context.Orders.Should().ContainSingle(order => order.Status == OrderStatus.Paid);
+        context.BundlePasses.Should().ContainSingle();
+        context.Tickets.Should().BeEmpty();
+        context.BundlePassEventTickets.Should().BeEmpty();
+        await bookingClient.Received(1).BookSeatsAsync(
+            "season-20",
+            Arg.Is<List<BookingSeatRequest>>(seats => seats.Count == 1 && seats[0].SeatKey == "A-1"),
+            "hold-123",
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
