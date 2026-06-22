@@ -371,11 +371,74 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<bool> DeleteAsync(long id)
         {
-            var bundle = await Repository.GetByIdAsync(id);
+            var bundle = await Repository.GetByIdWithVenueMapAndSchedulesAsync(id);
             if (bundle is null) { return false; }
+
+            await ValidateBundleDeleteAsync(bundle);
+            await SoftDeleteExclusiveLinkedEventsAsync(bundle);
 
             await Repository.HardDeleteAsync(bundle);
             return true;
+        }
+
+        private async Task ValidateBundleDeleteAsync(Core.Model.Bundle bundle)
+        {
+            if (bundle.Status == EventStatus.Published)
+            {
+                throw new InvalidOperationException("Published bundles cannot be deleted.");
+            }
+
+            if (bundle.BundlePasses.Count > 0)
+            {
+                throw new InvalidOperationException("Bundles with bundle passes cannot be deleted.");
+            }
+
+            foreach (var link in bundle.BundleEventSchedules)
+            {
+                var schedule = link.EventSchedule;
+                if (schedule.Status == ScheduleStatus.OnSale ||
+                    !string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+                {
+                    throw new InvalidOperationException("Bundles with published linked event schedules cannot be deleted.");
+                }
+
+                if (schedule.Tickets.Count > 0)
+                {
+                    throw new InvalidOperationException("Bundles with linked event schedule tickets cannot be deleted.");
+                }
+
+                var linksForSchedule = await bundleEventScheduleRepository.GetByEventScheduleIdAsync(link.EventScheduleId);
+                if (linksForSchedule.Any(otherLink => otherLink.BundleId != bundle.Id))
+                {
+                    throw new InvalidOperationException("Bundles with shared linked event schedules cannot be deleted.");
+                }
+            }
+        }
+
+        private async Task SoftDeleteExclusiveLinkedEventsAsync(Core.Model.Bundle bundle)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var linkedScheduleIds = bundle.BundleEventSchedules
+                .Select(link => link.EventScheduleId)
+                .ToHashSet();
+
+            foreach (var link in bundle.BundleEventSchedules)
+            {
+                var schedule = link.EventSchedule;
+                schedule.DeletedAt ??= now;
+
+                if (schedule.Event is not null
+                    && schedule.Event is not Core.Model.Bundle
+                    && schedule.Event.DeletedAt is null
+                    && schedule.Event.Schedules.All(eventSchedule =>
+                        linkedScheduleIds.Contains(eventSchedule.Id)
+                        || eventSchedule.DeletedAt is not null))
+                {
+                    schedule.Event.DeletedAt = now;
+                }
+
+                await eventScheduleRepository.UpdateAsync(schedule);
+            }
         }
     }
 }
