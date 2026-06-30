@@ -277,6 +277,8 @@ namespace XBOL.Ticketing.Services.Booking
 
             foreach (var eventSeat in eventSeats)
             {
+                BookingSeatRequest seat = request.Seats.First(s => s.SeatKey == eventSeat.ExternalSeatObjectKey);
+
                 order.Tickets.Add(new ModelTicket
                 {
                     EventScheduleId = eventSeat.EventSection.EventScheduleId,
@@ -292,7 +294,9 @@ namespace XBOL.Ticketing.Services.Booking
                     SectionLabelSnapshot = eventSeat.EventSection.DisplayName,
                     SeatLabelSnapshot = eventSeat.ExternalSeatObjectKey,
                     IsDigital = true,
-                    PricePaid = request.Seats.First(s => s.SeatKey == eventSeat.ExternalSeatObjectKey).SeatPrice,
+                    PricePaid = breakDown.ItemsPriceList.ContainsKey(seat.PriceListItemId)
+                        ? breakDown.ItemsPriceList[seat.PriceListItemId].BasePrice
+                        : seat.SeatPrice,
                     Status = isPaymentLink ? TicketStatus.PendingPayment : TicketStatus.Issued,
                     CreatedAt = now,
                     UpdatedAt = now,
@@ -398,7 +402,9 @@ namespace XBOL.Ticketing.Services.Booking
                     BundlePassType = BundlePassType.Full,
                     Status = BundlePassStatus.Active,
                     IsDigital = true,
-                    Price = seat.SeatPrice,
+                    Price = breakDown.ItemsPriceList.ContainsKey(seat.PriceListItemId)
+                        ? breakDown.ItemsPriceList[seat.PriceListItemId].BasePrice
+                        : seat.SeatPrice,
                     PurchasedAt = now,
                     CreatedAt = now,
                     UpdatedAt = now,
