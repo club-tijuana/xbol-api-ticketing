@@ -14,11 +14,17 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public string HoldToken { get; set; } = "";
         public long? BundleId { get; set; }
         public long EventScheduleId { get; set; }
+        public Guid? UserProfileId { get; set; }
         public required ItemType TicketType { get; set; }
         public required ClientInfoRequest ClientContact { get; set; }
         public required PaymentInfoRequest PaymentInfoRequest { get; set; }
-        public required ChangeInfoRequest ChangeInfoRequest { get; set; }
+        public required ChangeInfoRequest? ChangeInfoRequest { get; set; }
         public string? Localizer { get; set; }
         public long? ReferenceOrderId { get; set; }
+        public bool OverrideSaleWindow { get; set; }
+
+        public bool IsPaymentLink { get; set; }
+        public PaymentLinkRequest? PaymentLinkRequest { get; set; }
+        public Guid TransactionRefId { get; set; }
     }
 }

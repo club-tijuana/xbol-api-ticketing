@@ -1,12 +1,11 @@
-using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using Odasoft.XBOL.Commons.Requests;
+using System.Data;
+using System.Globalization;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Data;
-using XBOL.Ticketing.Core.Model;
+using XBOL.Ticketing.Data.Queries;
 using ModelOrder = XBOL.Ticketing.Core.Model.Order;
-using ModelTicket = XBOL.Ticketing.Core.Model.Ticket;
-using ModelBundlePass = XBOL.Ticketing.Core.Model.BundlePass;
 
 namespace XBOL.Ticketing.Services.Email;
 
@@ -64,8 +63,6 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
             .Where(t => ticketIds.Contains(t.Id))
             .Include(t => t.EventSchedule)
                 .ThenInclude(es => es.Event)
-                    .ThenInclude(e => e!.VenueMap)
-                        .ThenInclude(vm => vm!.Venue)
             .Include(t => t.EventSeat)
                 .ThenInclude(es => es.BaseSeat)
                     .ThenInclude(bs => bs.BaseRow)
@@ -78,7 +75,7 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
 
         var schedule = firstTicket.EventSchedule;
         var @event = schedule.Event;
-        var venue = @event.VenueMap?.Venue;
+        var venue = await GetVenueEmailInfoAsync(@event.VenueMapId, cancellationToken);
 
         var eventImage = await GetEventMediaUrlAsync(@event.Id, "Banner", cancellationToken);
 
@@ -103,7 +100,7 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
                 Venue = new VenueInfo
                 {
                     Name = venue?.Name ?? "",
-                    Address = venue is null ? "" : $"{venue.AddressLine}, {venue.City}, {venue.State}"
+                    Address = venue?.Address ?? ""
                 },
                 Fees = order.Fees.Select(f => new OrderFeeInfo
                 {
@@ -161,7 +158,7 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
             ?? throw new InvalidOperationException($"Order {order.Id} has no bundle passes");
 
         var bundle = firstPass.Bundle;
-        var bundleImage = await GetEventMediaUrlAsync(bundle.Id, "Facade", cancellationToken);
+        var bundleImage = await GetBundleMediaUrlAsync(bundle.Id, cancellationToken);
 
         return new OrderEmailModel
         {
@@ -212,7 +209,8 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
             AppleWalletUrl = "#",
             EntryInstructions = EntryInstructions,
             PromoBannerImageUrl = "",
-            PromoBannerLinkUrl = bundle.LandingUrl
+            PromoBannerLinkUrl = bundle.LandingUrl,
+            IsBundle = true
         };
     }
 
@@ -227,4 +225,84 @@ public class BookingEmailModelBuilder(XBOLDbContext dbContext)
             .Select(m => m.Url)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    private async Task<string?> GetBundleMediaUrlAsync(
+        long bundleId,
+        CancellationToken cancellationToken)
+    {
+        return await dbContext.Media
+            .Where(m => m.ReferenceId == bundleId
+                && m.ReferenceType == SaleType.Bundle
+                && m.MediaType == MediaType.Banner)
+            .AvailableBlobMedia()
+            .OrderBy(m => m.Order)
+            .ThenBy(m => m.Id)
+            .Select(m => m.BlobAsset.Url)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<VenueEmailInfo?> GetVenueEmailInfoAsync(
+        long? venueMapId,
+        CancellationToken cancellationToken)
+    {
+        if (!venueMapId.HasValue)
+        {
+            return null;
+        }
+
+        var connection = dbContext.Database.GetDbConnection();
+        var shouldCloseConnection = connection.State != ConnectionState.Open;
+
+        try
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.OpenAsync(cancellationToken);
+            }
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = """
+                select
+                    v."Name",
+                    concat_ws(
+                        ', ',
+                        nullif(v."StreetAddress", ''),
+                        nullif(v."City", ''),
+                        nullif(v."State", '')
+                    ) as "Address"
+                from "VenueMap" vm
+                join "Venue" v on v."Id" = vm."VenueId"
+                where vm."Id" = @venueMapId
+                limit 1
+                """;
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "venueMapId";
+            parameter.Value = venueMapId.Value;
+            command.Parameters.Add(parameter);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            return new VenueEmailInfo(
+                reader.IsDBNull(0) ? "" : reader.GetString(0),
+                reader.IsDBNull(1) ? "" : reader.GetString(1));
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            if (shouldCloseConnection)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private sealed record VenueEmailInfo(string Name, string Address);
 }

@@ -21,13 +21,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Hangfire.Core" Version="1.8.23" />
         <PackageReference Include="SeatsioDotNet" Version="107.7.0" />
         <PackageReference Include="Hangfire.AspNetCore" Version="1.8.23" />
         <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.1" />
         <PackageReference Include="Swashbuckle.AspNetCore.Newtonsoft" Version="10.2.1" />
-        <PackageReference Include="WolverineFx" Version="6.3.2" />
-        <PackageReference Include="WolverineFx.Postgresql" Version="6.3.2" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.3.2" />
+        <PackageReference Include="WolverineFx" Version="6.12.0" />
+        <PackageReference Include="WolverineFx.Postgresql" Version="6.12.0" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" Version="6.12.0" />
         <!-- Container environment variables -->
         <ContainerEnvironmentVariable Include="ASPNETCORE_HTTP_PORTS" Value="8080" />
         <ContainerEnvironmentVariable Include="ASPNETCORE_URLS" Value="http://+:8080" />

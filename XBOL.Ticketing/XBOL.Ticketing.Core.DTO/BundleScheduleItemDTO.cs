@@ -8,6 +8,7 @@ namespace XBOL.Ticketing.Core.DTO
         public required long EventId { get; set; }
         public required long EventScheduleId { get; set; }
         public required DateTimeOffset ScheduledStartDate { get; set; }
+        public DateTimeOffset? ScheduledEndDate { get; set; }
         public required string Name { get; set; }
         public List<EventCategoryResult> Categories { get; set; } = [];
         public long? VenueMapId { get; set; }

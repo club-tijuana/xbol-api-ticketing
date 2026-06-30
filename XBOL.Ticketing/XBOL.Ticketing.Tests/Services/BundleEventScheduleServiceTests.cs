@@ -95,7 +95,7 @@ namespace XBOL.Ticketing.Tests.Services;
     }
 
     [Fact]
-    public async Task AddAsync_PublishedSeasonPass_AddsScheduleAndInvokesLifecycle()
+    public async Task AddAsync_PublishedSeasonPass_AddsScheduleWithoutInvokingLifecycle()
     {
         _bundleRepo.GetByIdAsync(1).Returns(Bundle(EventStatus.Published, BundleType.SeasonPass, "season-1"));
         _eventScheduleRepo.GetByIdWithEventAndVenueMapAsync(10).Returns(Schedule(10));
@@ -112,10 +112,10 @@ namespace XBOL.Ticketing.Tests.Services;
             link.BundleId == 1 &&
             link.EventScheduleId == 10));
         await _scheduleRepo.Received(1).CommitAsync();
-        await _bundleLifecycleService.Received(1).AddSchedulesAsync(
-            1,
-            Arg.Is<IReadOnlyCollection<long>>(ids => ids.SequenceEqual(new[] { 10L })),
-            Arg.Any<CancellationToken>());
+        await _bundleLifecycleService.DidNotReceiveWithAnyArgs().AddSchedulesAsync(
+            default,
+            default!,
+            default);
     }
 
     [Fact]

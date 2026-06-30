@@ -5,6 +5,7 @@ namespace XBOL.Ticketing.Services;
 public static class SeatsIoErrorCodes
 {
     public const string UserNotFound = "USER_NOT_FOUND";
+    public const string EventKeyAlreadyExists = "EVENT_KEY_ALREADY_EXISTS";
 
     private static readonly HashSet<string> UpstreamFailureCodes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -30,4 +31,9 @@ public static class SeatsIoErrorCodes
         && !IsHoldTokenStaleOrMissing(ex)
         && ex.Errors is { Count: > 0 }
         && ex.Errors.Any(e => (e?.Code ?? string.Empty).Contains("NOT_FOUND", StringComparison.OrdinalIgnoreCase));
+
+    public static bool IsEventKeyAlreadyExists(SeatsioException ex) =>
+        ex.Errors is { Count: > 0 }
+        && ex.Errors.Any(e => (e?.Code ?? string.Empty)
+            .Equals(EventKeyAlreadyExists, StringComparison.OrdinalIgnoreCase));
 }

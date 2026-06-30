@@ -15,11 +15,13 @@ namespace XBOL.Ticketing.Core.Model
         public decimal SubTotal { get; set; }
         public decimal TotalFees { get; set; }
         public decimal TotalTaxes { get; set; }
+        public decimal Discount { get; set; }
         public decimal Total { get; set; }
 
         public OrderStatus Status { get; set; }
         public OrderType OrderType { get; set; }
         public SaleChannel SaleChannel { get; set; }
+        public DateTimeOffset PaidAt { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset UpdatedAt { get; set; }
@@ -33,7 +35,10 @@ namespace XBOL.Ticketing.Core.Model
         public IList<OrderFee> Fees { get; set; } = [];
         public IList<OrderTax> Taxes { get; set; } = [];
         public IList<Payment> Payments { get; set; } = [];
+        public IList<PaymentChangeDetail> PaymentChangeDetails { get; set; } = [];
         public IList<Ticket> Tickets { get; set; } = [];
         public IList<PromoCodeRedemption> PromoRedemptions { get; set; } = [];
+        public IList<OrderActionLog> ActionLogs { get; set; } = [];
+        public IList<OrderTag> OrderTags { get; set; } = [];
     }
 }

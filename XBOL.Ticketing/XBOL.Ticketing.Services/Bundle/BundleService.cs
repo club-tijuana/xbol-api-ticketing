@@ -23,18 +23,29 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<PagedResponse<BundleDTO>> GetPagedAsync(BundleQueryParams queryParams)
         {
+            var page = Math.Max(1, queryParams.Page);
+            var pageSize = Math.Max(1, queryParams.PageSize);
+            var skip = (page - 1) * pageSize;
             var searchTerm = queryParams.SearchTerm?.Trim().ToLower() ?? "";
+            var filter = string.IsNullOrEmpty(searchTerm)
+                ? null
+                : (System.Linq.Expressions.Expression<Func<Core.Model.Bundle, bool>>)(b => b.Name.ToLower().Contains(searchTerm));
 
             var bundles = Repository.Get(
-                filter: string.IsNullOrEmpty(searchTerm)
-                    ? null
-                    : b => b.Name.ToLower().Contains(searchTerm),
+                filter: filter,
                 orderBy: q => q.OrderBy(b => b.Id),
-                pageSize: queryParams.PageSize,
-                currentPage: queryParams.Page
+                pageSize: skip,
+                currentPage: pageSize,
+                includedProperties:
+                [
+                    "VenueMap.Venue",
+                    "Categories",
+                    "BundleSections.BundleSeats",
+                    "BundleEventSchedules.EventSchedule.Sections"
+                ]
             ).ToList();
 
-            var totalCount = Repository.Get().Count();
+            var totalCount = Repository.Get(filter: filter).Count();
 
             var bundleIds = bundles.Select(b => b.Id).ToList();
 
@@ -80,8 +91,8 @@ namespace XBOL.Ticketing.Services.Bundle
             {
                 Items = dtos,
                 TotalCount = totalCount,
-                Page = queryParams.Page,
-                PageSize = queryParams.PageSize
+                Page = page,
+                PageSize = pageSize
             };
         }
 
@@ -151,30 +162,28 @@ namespace XBOL.Ticketing.Services.Bundle
                 UpdatedBy = userId
             };
 
-            if (request.EventScheduleIds is not { Count: > 0 })
-            {
-                throw new InvalidOperationException("At least one event schedule must be selected for this Bundle.");
-            }
-
-            var duplicateEventScheduleId = request.EventScheduleIds
-                .GroupBy(id => id)
-                .FirstOrDefault(group => group.Count() > 1)
-                ?.Key;
-            if (duplicateEventScheduleId is not null)
-            {
-                throw new InvalidOperationException(
-                    $"EventSchedule {duplicateEventScheduleId} is already selected for this Bundle.");
-            }
-
             var eventSchedules = new List<Core.Model.EventSchedule>();
-            foreach (var eventScheduleId in request.EventScheduleIds)
+            if (request.EventScheduleIds is { Count: > 0 })
             {
-                var eventSchedule = await BundleEventScheduleValidator.ValidateAdditionAsync(
-                    bundle,
-                    eventScheduleId,
-                    bundleEventScheduleRepository,
-                    eventScheduleRepository);
-                eventSchedules.Add(eventSchedule);
+                var duplicateEventScheduleId = request.EventScheduleIds
+                    .GroupBy(id => id)
+                    .FirstOrDefault(group => group.Count() > 1)
+                    ?.Key;
+                if (duplicateEventScheduleId is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"EventSchedule {duplicateEventScheduleId} is already selected for this Bundle.");
+                }
+
+                foreach (var eventScheduleId in request.EventScheduleIds)
+                {
+                    var eventSchedule = await BundleEventScheduleValidator.ValidateAdditionAsync(
+                        bundle,
+                        eventScheduleId,
+                        bundleEventScheduleRepository,
+                        eventScheduleRepository);
+                    eventSchedules.Add(eventSchedule);
+                }
             }
 
             bundle.BundleEventSchedules = eventSchedules
@@ -362,11 +371,74 @@ namespace XBOL.Ticketing.Services.Bundle
 
         public async Task<bool> DeleteAsync(long id)
         {
-            var bundle = await Repository.GetByIdAsync(id);
+            var bundle = await Repository.GetByIdWithVenueMapAndSchedulesAsync(id);
             if (bundle is null) { return false; }
+
+            await ValidateBundleDeleteAsync(bundle);
+            await SoftDeleteExclusiveLinkedEventsAsync(bundle);
 
             await Repository.HardDeleteAsync(bundle);
             return true;
+        }
+
+        private async Task ValidateBundleDeleteAsync(Core.Model.Bundle bundle)
+        {
+            if (bundle.Status == EventStatus.Published)
+            {
+                throw new InvalidOperationException("Published bundles cannot be deleted.");
+            }
+
+            if (bundle.BundlePasses.Count > 0)
+            {
+                throw new InvalidOperationException("Bundles with bundle passes cannot be deleted.");
+            }
+
+            foreach (var link in bundle.BundleEventSchedules)
+            {
+                var schedule = link.EventSchedule;
+                if (schedule.Status == ScheduleStatus.OnSale ||
+                    !string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+                {
+                    throw new InvalidOperationException("Bundles with published linked event schedules cannot be deleted.");
+                }
+
+                if (schedule.Tickets.Count > 0)
+                {
+                    throw new InvalidOperationException("Bundles with linked event schedule tickets cannot be deleted.");
+                }
+
+                var linksForSchedule = await bundleEventScheduleRepository.GetByEventScheduleIdAsync(link.EventScheduleId);
+                if (linksForSchedule.Any(otherLink => otherLink.BundleId != bundle.Id))
+                {
+                    throw new InvalidOperationException("Bundles with shared linked event schedules cannot be deleted.");
+                }
+            }
+        }
+
+        private async Task SoftDeleteExclusiveLinkedEventsAsync(Core.Model.Bundle bundle)
+        {
+            var now = DateTimeOffset.UtcNow;
+            var linkedScheduleIds = bundle.BundleEventSchedules
+                .Select(link => link.EventScheduleId)
+                .ToHashSet();
+
+            foreach (var link in bundle.BundleEventSchedules)
+            {
+                var schedule = link.EventSchedule;
+                schedule.DeletedAt ??= now;
+
+                if (schedule.Event is not null
+                    && schedule.Event is not Core.Model.Bundle
+                    && schedule.Event.DeletedAt is null
+                    && schedule.Event.Schedules.All(eventSchedule =>
+                        linkedScheduleIds.Contains(eventSchedule.Id)
+                        || eventSchedule.DeletedAt is not null))
+                {
+                    schedule.Event.DeletedAt = now;
+                }
+
+                await eventScheduleRepository.UpdateAsync(schedule);
+            }
         }
     }
 }

@@ -14,12 +14,10 @@ public static class BundleBookability
             return false;
         }
 
-        var hasBookableSchedule = bundle.BundleEventSchedules.Any(link =>
-            !string.IsNullOrWhiteSpace(link.EventSchedule?.ExternalEventKey));
         var hasForSaleSeat = bundle.BundleSections
             .SelectMany(section => section.BundleSeats)
             .Any(seat => seat.ForSale);
 
-        return hasBookableSchedule && hasForSaleSeat;
+        return hasForSaleSeat;
     }
 }

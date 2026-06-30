@@ -6,7 +6,8 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Schema;
 using XBOL.Ticketing.API.Options;
-using XBOL.Ticketing.Services;
+using XBOL.Ticketing.Core.Commons.Options;
+using XBOL.Ticketing.Services.EvoPayment;
 
 namespace XBOL.Ticketing.API.Schema;
 
@@ -56,7 +57,7 @@ public static class AppSettingsSchemaGenerator
             customSchema,
             BuildConfiguration(configurationDirectory, SchemaEnvironmentName));
 
-        return new JsonObject
+        var schema = new JsonObject
         {
             ["allOf"] = new JsonArray
             {
@@ -68,6 +69,13 @@ public static class AppSettingsSchemaGenerator
             ["properties"] = customSchema["properties"]?.DeepClone(),
             ["type"] = "object"
         };
+
+        if (customSchema["required"] is not null)
+        {
+            schema["required"] = customSchema["required"]?.DeepClone();
+        }
+
+        return schema;
     }
 
     /// <summary>
@@ -284,5 +292,32 @@ public static class AppSettingsSchemaGenerator
 
         [Description("Cross-origin policy registered in the HTTP pipeline")]
         public CorsOptions? Cors { get; set; }
+
+        [Description("Hangfire background-job storage configuration")]
+        [Required]
+        public BackgroundJobsConsumerOptions BackgroundJobs { get; set; } = null!;
+
+        [Description("Protected diagnostic producer endpoints for Hangfire connectivity probes")]
+        [Required]
+        public BackgroundJobDiagnosticsOptions BackgroundJobDiagnostics { get; set; } = null!;
+
+        [Description("EVO Payments gateway configuration")]
+        public EvoSettings? EvoSettings { get; set; }
+
+        [Description("Default exchange rate fallback configuration")]
+        public DefaultExchangeRateOptions? DefaultExchangeRate { get; set; }
+
+        [Description("Payment-link URL configuration")]
+        public PaymentLinkOptions? PaymentLink { get; set; }
+
+        [Description("Order-confirmation email template configuration")]
+        public EmailTemplateOptions? EmailTemplate { get; set; }
+    }
+
+    public sealed class BackgroundJobsConsumerOptions
+    {
+        [Required]
+        [Description("PostgreSQL connection string for Hangfire storage")]
+        public string ConnectionString { get; set; } = "";
     }
 }

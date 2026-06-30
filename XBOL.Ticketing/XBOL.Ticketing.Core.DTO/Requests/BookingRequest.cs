@@ -15,5 +15,9 @@ namespace XBOL.Ticketing.Core.DTO.Requests
         public string? Localizer { get; set; }
         public Guid? UserProfileId { get; set; }
         public bool IsPaymentLink { get; set; }
+
+        public string SessionId { get; set; } = string.Empty;
+        public Guid OrderRefId { get; set; }
+        public Guid TransactionRefId { get; set; }
     }
 }

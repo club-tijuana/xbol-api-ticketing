@@ -6,11 +6,13 @@ namespace Odasoft.XBOL.Commons.BackgroundJobs;
 
 public static class BackgroundJobsServiceCollectionExtensions
 {
-    public static IGlobalConfiguration UseDefaultStorage(this IGlobalConfiguration config, BackgroundJobsOptions options)
+    public static IGlobalConfiguration UseDefaultStorage(
+        this IGlobalConfiguration config,
+        BackgroundJobsOptions options)
     {
         return config.UseDefaultStorage(
             options.ConnectionString,
-            options.PrepareSchemaIfNecessary);
+            prepareSchemaIfNecessary: false);
     }
 
     public static IGlobalConfiguration UseDefaultStorage(

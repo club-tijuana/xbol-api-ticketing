@@ -1,11 +1,14 @@
 using System.Linq.Expressions;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Abstractions;
 using XBOL.Ticketing.Data;
+using XBOL.Ticketing.Data.Repositories.Bundle;
 using XBOL.Ticketing.Data.Repositories.Media;
 using XBOL.Ticketing.Services.Bundle;
 using XBOL.Ticketing.Services.Media;
@@ -79,6 +82,125 @@ public class BundleServiceTests
     {
         _repository.Get(Arg.Any<Expression<Func<Bundle, bool>>>())
             .Returns(bundles.AsQueryable());
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_SetsSeasonPassBookabilityFromForSaleSeats()
+    {
+        await using var connection = new SqliteConnection("DataSource=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<XBOLDbContext>()
+            .UseSqlite(connection)
+            .Options;
+        await using var context = new XBOLDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        var now = DateTimeOffset.UtcNow;
+
+        context.Venues.Add(new Venue
+        {
+            Id = 1,
+            Name = "Main Venue",
+            AddressLine = "123 Main",
+            City = "Tijuana",
+            State = "BC",
+            Country = "MX",
+            ShortDescription = "Main",
+            LongDescription = "Main venue",
+            LogoImageUrl = string.Empty,
+            BannerImageUrl = string.Empty,
+            LandingUrl = string.Empty,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.VenueMaps.Add(new VenueMap
+        {
+            Id = 1,
+            VenueId = 1,
+            Name = "Main chart",
+            ExternalMapKey = "chart-main",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.BaseZones.Add(new BaseZone
+        {
+            Id = 1,
+            VenueMapId = 1,
+            Name = "Zone",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.BaseSections.Add(new BaseSection
+        {
+            Id = 1,
+            BaseZoneId = 1,
+            Name = "A",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.BaseSeats.Add(new BaseSeat
+        {
+            Id = 1,
+            BaseRowId = 1,
+            SeatNumber = "1",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.BaseRows.Add(new BaseRow
+        {
+            Id = 1,
+            BaseSectionId = 1,
+            RowLabel = "1",
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.Bundles.Add(new Bundle
+        {
+            Id = 1,
+            VenueMapId = 1,
+            Name = "Season Pass",
+            BundleType = BundleType.SeasonPass,
+            BundlePricingType = BundlePricingType.Single,
+            Status = EventStatus.Published,
+            ExternalKey = "season-1",
+            StartDate = now.AddDays(-1),
+            EndDate = now.AddDays(1),
+            OnSaleDate = now.AddDays(-1),
+            OffSaleDate = now.AddDays(1),
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        context.BundleSections.Add(new BundleSection
+        {
+            Id = 1,
+            BundleId = 1,
+            BaseSectionId = 1,
+            DisplayName = "A",
+            TotalSeats = 1,
+            AvailableSeats = 1
+        });
+        context.BundleSeats.Add(new BundleSeat
+        {
+            Id = 1,
+            BundleSectionId = 1,
+            BaseSeatId = 1,
+            ExternalSeatObjectKey = "A-1-1",
+            ForSale = true
+        });
+        await context.SaveChangesAsync();
+
+        var sut = new BundleService(
+            new BundleRepository(context),
+            _baseSectionRepository,
+            _bundleEventScheduleRepository,
+            _eventScheduleRepository,
+            new MediaRepository(context),
+            new MediaService(new MediaRepository(context)),
+            _bundleLifecycleService);
+
+        var result = await sut.GetPagedAsync(new BundleQueryParams { Page = 1, PageSize = 10 });
+
+        result.Items.Should().ContainSingle().Which.IsBookable.Should().BeTrue();
     }
 
     [Fact]
@@ -301,17 +423,19 @@ public class BundleServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_RejectsMissingEventScheduleIds()
+    public async Task CreateAsync_SeasonPassAllowsMissingEventScheduleIds()
     {
         var request = ValidCreateRequest(BundlePricingType.Composite);
-        request.BundleType = BundleType.Basic;
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Single;
         request.EventScheduleIds = [];
 
-        var act = async () => await _sut.CreateAsync(request, Guid.NewGuid());
+        var result = await _sut.CreateAsync(request, Guid.NewGuid());
 
-        await act.Should().ThrowAsync<InvalidOperationException>()
-            .WithMessage("*At least one event schedule*");
-        await _repository.DidNotReceive().InsertAsync(Arg.Any<Bundle>());
+        result.Schedules.Should().BeEmpty();
+        await _repository.Received(1).InsertAsync(Arg.Is<Bundle>(bundle =>
+            bundle.BundleType == BundleType.SeasonPass &&
+            bundle.BundleEventSchedules.Count == 0));
     }
 
     [Fact]
@@ -794,10 +918,151 @@ public class BundleServiceTests
     [Fact]
     public async Task DeleteAsync_NotFound_DoesNotAttemptDelete()
     {
-        _repository.GetByIdAsync(999).Returns((Bundle?)null);
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(999).Returns((Bundle?)null);
 
         await _sut.DeleteAsync(999);
 
         await _repository.DidNotReceive().HardDeleteAsync(Arg.Any<Bundle>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DeletesExclusiveUnbookedUnpublishedLinkedEvents()
+    {
+        var bundle = DeletableBundleWithSchedule(1, 101);
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(1).Returns(bundle);
+        _bundleEventScheduleRepository.GetByEventScheduleIdAsync(101).Returns(
+        [
+            new BundleEventSchedule { BundleId = 1, EventScheduleId = 101, Bundle = bundle }
+        ]);
+
+        var result = await _sut.DeleteAsync(1);
+
+        result.Should().BeTrue();
+        bundle.BundleEventSchedules[0].EventSchedule.DeletedAt.Should().NotBeNull();
+        bundle.BundleEventSchedules[0].EventSchedule.Event.DeletedAt.Should().NotBeNull();
+        await _eventScheduleRepository.Received(1).UpdateAsync(bundle.BundleEventSchedules[0].EventSchedule);
+        await _repository.Received(1).HardDeleteAsync(bundle);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_DeletesParentEventWhenAllExclusiveSchedulesAreLinked()
+    {
+        var bundle = DeletableBundleWithSchedule(1, 101);
+        var linkedEvent = bundle.BundleEventSchedules[0].EventSchedule.Event;
+        var secondSchedule = Schedule(102);
+        secondSchedule.Event = linkedEvent;
+        linkedEvent.Schedules.Add(secondSchedule);
+        bundle.BundleEventSchedules.Add(new BundleEventSchedule
+        {
+            BundleId = 1,
+            EventScheduleId = 102,
+            Bundle = bundle,
+            EventSchedule = secondSchedule
+        });
+
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(1).Returns(bundle);
+        _bundleEventScheduleRepository.GetByEventScheduleIdAsync(101).Returns(
+        [
+            new BundleEventSchedule { BundleId = 1, EventScheduleId = 101, Bundle = bundle }
+        ]);
+        _bundleEventScheduleRepository.GetByEventScheduleIdAsync(102).Returns(
+        [
+            new BundleEventSchedule { BundleId = 1, EventScheduleId = 102, Bundle = bundle }
+        ]);
+
+        var result = await _sut.DeleteAsync(1);
+
+        result.Should().BeTrue();
+        bundle.BundleEventSchedules.Select(link => link.EventSchedule.DeletedAt)
+            .Should().NotContain(deletedAt => deletedAt == null);
+        linkedEvent.DeletedAt.Should().NotBeNull();
+        await _eventScheduleRepository.Received(1).UpdateAsync(bundle.BundleEventSchedules[0].EventSchedule);
+        await _eventScheduleRepository.Received(1).UpdateAsync(secondSchedule);
+        await _repository.Received(1).HardDeleteAsync(bundle);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_BlocksPublishedBundle()
+    {
+        var bundle = DeletableBundleWithSchedule(1, 101);
+        bundle.Status = EventStatus.Published;
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(1).Returns(bundle);
+
+        var act = async () => await _sut.DeleteAsync(1);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*published*");
+        await _repository.DidNotReceive().HardDeleteAsync(Arg.Any<Bundle>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_BlocksLinkedScheduleWithTickets()
+    {
+        var bundle = DeletableBundleWithSchedule(1, 101);
+        bundle.BundleEventSchedules[0].EventSchedule.Tickets.Add(new Ticket
+        {
+            Id = 500,
+            TicketCode = "T-500",
+            TicketType = "General",
+            SectionLabelSnapshot = "A",
+            SeatLabelSnapshot = "1"
+        });
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(1).Returns(bundle);
+
+        var act = async () => await _sut.DeleteAsync(1);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*tickets*");
+        await _repository.DidNotReceive().HardDeleteAsync(Arg.Any<Bundle>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_BlocksLinkedScheduleSharedWithAnotherBundle()
+    {
+        var bundle = DeletableBundleWithSchedule(1, 101);
+        _repository.GetByIdWithVenueMapAndSchedulesAsync(1).Returns(bundle);
+        _bundleEventScheduleRepository.GetByEventScheduleIdAsync(101).Returns(
+        [
+            new BundleEventSchedule { BundleId = 1, EventScheduleId = 101, Bundle = bundle },
+            new BundleEventSchedule { BundleId = 2, EventScheduleId = 101, Bundle = new Bundle { Id = 2 } }
+        ]);
+
+        var act = async () => await _sut.DeleteAsync(1);
+
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*shared*");
+        await _repository.DidNotReceive().HardDeleteAsync(Arg.Any<Bundle>());
+    }
+
+    private static Bundle DeletableBundleWithSchedule(long bundleId, long scheduleId)
+    {
+        var linkedEvent = new Event
+        {
+            Id = scheduleId * 10,
+            Name = "Linked Event",
+            Status = EventStatus.Draft
+        };
+        var schedule = Schedule(scheduleId);
+        schedule.Event = linkedEvent;
+        linkedEvent.Schedules = [schedule];
+
+        var bundle = new Bundle
+        {
+            Id = bundleId,
+            Name = "Season Pass",
+            Status = EventStatus.Draft,
+            BundleType = BundleType.SeasonPass,
+            BundlePricingType = BundlePricingType.Single,
+            BundleEventSchedules = []
+        };
+        bundle.BundleEventSchedules.Add(new BundleEventSchedule
+        {
+            BundleId = bundleId,
+            EventScheduleId = scheduleId,
+            Bundle = bundle,
+            EventSchedule = schedule
+        });
+
+        return bundle;
     }
 }

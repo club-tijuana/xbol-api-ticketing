@@ -4,6 +4,7 @@ namespace XBOL.Ticketing.Core.DTO
     {
         public required string BundleScheduleKey { get; set; }
         public long BundleId { get; set; }
+        public long? PreviousBundleId { get; set; }
         public DateTimeOffset? StartDate { get; set; }
         public DateTimeOffset? EndDate { get; set; }
         public DateTimeOffset? PublishedDate { get; set; }

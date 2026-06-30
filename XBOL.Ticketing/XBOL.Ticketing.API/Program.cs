@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Options;
+using System.Text;
 using XBOL.Ticketing.API.Extensions;
 using XBOL.Ticketing.API.Schema;
 using XBOL.Ticketing.Data.Extensions;
+using XBOL.Ticketing.Services.EvoPayment;
 using XBOL.Ticketing.Services.Extensions;
 
 if (args.Contains("--generate-schema"))
@@ -33,7 +36,32 @@ builder.Services.ConfigureMvc();
 builder.Services.AddHealthChecks();
 builder.Services.ConfigureSwagger();
 
+builder.Services.AddHttpClient<IEvoPaymentService, EvoPaymentService>(
+    (sp, client) =>
+    {
+        var settings = sp
+            .GetRequiredService<IOptions<EvoSettings>>()
+            .Value;
+
+        client.BaseAddress = new Uri(
+            $"https://evopaymentsmexico.gateway.mastercard.com/api/rest/version/{settings.Version}/merchant/{settings.MerchantId}/"
+        );
+
+        var credentials = Convert.ToBase64String(
+            Encoding.ASCII.GetBytes(
+                $"merchant.{settings.MerchantId}:{settings.APIPassword}"
+            )
+        );
+
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+    });
+
 var app = builder.Build();
+
+app.Logger.LogInformation(
+    "Ticketing BackgroundJobs configuration present. Hangfire storage registered for producer. ConnectionStringConfigured={ConnectionStringConfigured}",
+    !string.IsNullOrWhiteSpace(builder.Configuration["BackgroundJobs:ConnectionString"]));
 
 app.UseExceptionHandler();
 app.UseConfiguredCors(corsOptions);

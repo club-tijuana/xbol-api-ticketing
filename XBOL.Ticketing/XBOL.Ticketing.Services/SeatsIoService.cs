@@ -8,6 +8,7 @@ using SeatsioDotNet.Events;
 using SeatsioDotNet.HoldTokens;
 using SeatsioDotNet.Reports.Events;
 using SeatsioDotNet.Util;
+using XBOL.Ticketing.Core.Commons.Options;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Services.Event;
 
@@ -548,7 +549,7 @@ namespace XBOL.Ticketing.Services
             await DeleteEventAsync(eventKey);
         }
 
-        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[] eventKeys)
+        public async Task CreateSeatsIoSeasonAsync(string chartKey, string seasonKey, string[]? eventKeys = null)
         {
             await CreateSeasonAsync(chartKey, seasonKey, eventKeys);
         }

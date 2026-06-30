@@ -219,7 +219,24 @@ namespace XBOL.Ticketing.API.Controllers
         [ProducesResponseType(StatusCodes.Status502BadGateway, Type = typeof(SeatsIoProblemDetails))]
         public async Task<IActionResult> BookSeatsActionAsync([FromBody] BookSeatsActionRequest request)
         {
-            var result = await bookingOrchestrationService.BookAsync(request, GetUserId());
+            var actorUserId = request.UserProfileId ?? GetUserId();
+            if (actorUserId == Guid.Empty)
+            {
+                return BadRequest(new SeatsIoProblemDetails
+                {
+                    Detail = "UserProfileId is required for box office bookings.",
+                    Errors =
+                    [
+                        new SeatsIoProblemError
+                        {
+                            Code = "USER_PROFILE_REQUIRED",
+                            Message = "UserProfileId is required for box office bookings."
+                        }
+                    ]
+                });
+            }
+
+            var result = await bookingOrchestrationService.BookAsync(request, actorUserId);
             return Ok(result);
         }
 

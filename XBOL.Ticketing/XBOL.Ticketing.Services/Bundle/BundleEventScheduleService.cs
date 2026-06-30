@@ -1,6 +1,7 @@
 using XBOL.Ticketing.Core.DTO;
 using XBOL.Ticketing.Core.DTO.Requests;
 using XBOL.Ticketing.Core.Mappers;
+using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data.Abstractions;
 
@@ -50,9 +51,13 @@ namespace XBOL.Ticketing.Services.Bundle
 
             await bundleEventScheduleRepository.CommitAsync();
 
-            await lifecycleService.AddSchedulesAsync(
-                bundleId,
-                request.Items.Select(item => item.EventScheduleId).ToArray());
+            if (bundle.BundleType != BundleType.SeasonPass ||
+                bundle.Status != EventStatus.Published)
+            {
+                await lifecycleService.AddSchedulesAsync(
+                    bundleId,
+                    request.Items.Select(item => item.EventScheduleId).ToArray());
+            }
 
             var entries = await bundleEventScheduleRepository.GetByBundleIdWithSchedulesAsync(bundleId);
             return entries.ToDto();

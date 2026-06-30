@@ -21,13 +21,14 @@ namespace XBOL.Ticketing.API.Controllers
         /// </summary>
         /// <param name="referenceType">Reference type (Event, Season, Bundle)</param>
         /// <param name="referenceId">Id of the reference</param>
+        /// <param name="useBasePrice">Indicates whether to use base prices</param>
         /// <returns>Seats.io price structure</returns>
         [HttpGet]
         [EndpointName("GetSeatsIoPricesAsync")]
         [ProducesResponseType(typeof(List<SeatsIoPriceDTO>), StatusCodes.Status200OK)]
-        public async Task<ActionResult> GetSeatsIoPrices([FromQuery] SaleType referenceType, [FromQuery] long referenceId)
+        public async Task<ActionResult> GetSeatsIoPrices([FromQuery] SaleType referenceType, [FromQuery] long referenceId, [FromQuery] bool useBasePrice = false)
         {
-            var prices = await _priceService.GetSeatsIoPricesAsync(referenceType, referenceId);
+            var prices = await _priceService.GetSeatsIoPricesAsync(referenceType, referenceId, useBasePrice);
 
             if (prices == null)
             {

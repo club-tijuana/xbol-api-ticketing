@@ -1,4 +1,4 @@
-﻿using XBOL.Ticketing.Core.Commons.Enums;
+using XBOL.Ticketing.Core.Commons.Enums;
 
 namespace XBOL.Ticketing.Core.Model
 {
@@ -7,15 +7,26 @@ namespace XBOL.Ticketing.Core.Model
         public long ClientCreditAccountId { get; set; }
         public ClientCreditAccount ClientCreditAccount { get; set; } = null!;
 
-        public decimal Amount { get; set; }
+        // Core data
         public CreditTransactionType TransactionType { get; set; }
-        public string Description { get; set; } = null!;
-        public string Details { get; set; } = null!; // JSON
-        public Guid Reference { get; set; }
 
-        public CreditTransactionStatus Status { get; set; }
+        public PaymentType PaymentType { get; set; }
 
+        public decimal Amount { get; set; }
+        public DateTimeOffset TransactionDate { get; set; }
+
+        // The "Localizer" / Reference
+        public string Description { get; set; } = "";
+
+        public string ReferenceId { get; set; } = "";
+
+        public string? OrderReference { get; set; }
+
+        // Audit
         public DateTimeOffset CreatedAt { get; set; }
+
         public Guid CreatedBy { get; set; }
+        public DateTimeOffset UpdatedAt { get; set; }
+        public Guid UpdatedBy { get; set; }
     }
 }

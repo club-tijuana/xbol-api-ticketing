@@ -18,6 +18,8 @@ public class BundleCreateRequestValidatorTests
         BundleType = BundleType.Basic,
         BundlePricingType = BundlePricingType.Composite,
         EventScheduleIds = [101],
+        StartDate = DateTimeOffset.UtcNow.AddDays(7),
+        EndDate = DateTimeOffset.UtcNow.AddDays(8),
         OnSaleDate = DateTimeOffset.UtcNow.AddDays(-1),
         OffSaleDate = DateTimeOffset.UtcNow.AddDays(30)
     };
@@ -117,12 +119,14 @@ public class BundleCreateRequestValidatorTests
     }
 
     [Fact]
-    public async Task EventScheduleIds_Empty_Fails()
+    public async Task EventScheduleIds_Empty_Passes()
     {
         var request = ValidRequest();
         request.EventScheduleIds = [];
+
         var result = await _sut.TestValidateAsync(request);
-        result.ShouldHaveValidationErrorFor(x => x.EventScheduleIds);
+
+        result.ShouldNotHaveValidationErrorFor(x => x.EventScheduleIds);
     }
 
     [Fact]
@@ -168,6 +172,28 @@ public class BundleCreateRequestValidatorTests
         request.StartDate = DateTimeOffset.UtcNow;
         request.EndDate = DateTimeOffset.UtcNow.AddDays(-1);
         var result = await _sut.TestValidateAsync(request);
+        result.ShouldHaveValidationErrorFor(x => x.EndDate);
+    }
+
+    [Fact]
+    public async Task StartDate_Missing_Fails()
+    {
+        var request = ValidRequest();
+        request.StartDate = null;
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.StartDate);
+    }
+
+    [Fact]
+    public async Task EndDate_Missing_Fails()
+    {
+        var request = ValidRequest();
+        request.EndDate = null;
+
+        var result = await _sut.TestValidateAsync(request);
+
         result.ShouldHaveValidationErrorFor(x => x.EndDate);
     }
 
@@ -247,5 +273,56 @@ public class BundleCreateRequestValidatorTests
 
         result.ShouldHaveValidationErrorFor(x => x.RenewalStartDate);
         result.ShouldHaveValidationErrorFor(x => x.RenewalEndDate);
+    }
+
+    [Fact]
+    public async Task FirstSaleSeasonPass_WithRenewalWindow_Fails()
+    {
+        var request = ValidRequest();
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Single;
+        request.PreviousBundleId = null;
+        request.RenewalStartDate = DateTimeOffset.UtcNow.AddDays(2);
+        request.RenewalEndDate = DateTimeOffset.UtcNow.AddDays(5);
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.RenewalStartDate);
+        result.ShouldHaveValidationErrorFor(x => x.RenewalEndDate);
+    }
+
+    [Fact]
+    public async Task RenewalBundle_OnSaleBeforeRenewalEnd_Fails()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = ValidRequest();
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Single;
+        request.PreviousBundleId = 10;
+        request.RenewalStartDate = now.AddDays(2);
+        request.RenewalEndDate = now.AddDays(5);
+        request.OnSaleDate = now.AddDays(1);
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.OnSaleDate);
+    }
+
+    [Fact]
+    public async Task RenewalBundle_PreSaleBeforeRenewalEnd_Fails()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var request = ValidRequest();
+        request.BundleType = BundleType.SeasonPass;
+        request.BundlePricingType = BundlePricingType.Single;
+        request.PreviousBundleId = 10;
+        request.RenewalStartDate = now.AddDays(2);
+        request.RenewalEndDate = now.AddDays(5);
+        request.PreSaleDate = now.AddDays(4);
+        request.OnSaleDate = now.AddDays(6);
+
+        var result = await _sut.TestValidateAsync(request);
+
+        result.ShouldHaveValidationErrorFor(x => x.PreSaleDate);
     }
 }

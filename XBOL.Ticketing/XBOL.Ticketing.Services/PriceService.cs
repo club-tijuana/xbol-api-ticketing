@@ -15,7 +15,7 @@ namespace XBOL.Ticketing.Services
             _dbContext = dbContext;
         }
 
-        public async Task<List<SeatsIoPriceDTO>?> GetSeatsIoPricesAsync(SaleType referenceType, long referenceId)
+        public async Task<List<SeatsIoPriceDTO>?> GetSeatsIoPricesAsync(SaleType referenceType, long referenceId, bool useBasePrice = false)
         {
             var priceListQuery = await (from pr in _dbContext.PriceReferences
                                         join pl in _dbContext.PriceLists on pr.Id equals pl.PriceReferenceId
@@ -37,7 +37,11 @@ namespace XBOL.Ticketing.Services
             var categoryPrices = await (from pli in validItemsQuery
                                         join pt in _dbContext.PriceTypes on pli.PriceTypeId equals pt.Id
                                         join bz in _dbContext.BaseZones on pli.BaseZoneId equals bz.Id
-                                        where pli.BaseSectionId == null && pli.BaseRowId == null && pli.BaseSeatId == null
+                                        where
+                                        pli.BaseSectionId == null &&
+                                        pli.BaseRowId == null &&
+                                        pli.BaseSeatId == null
+                                        && (!useBasePrice || pt.IsBasePrice)
                                         select new
                                         {
                                             Item = pli,
@@ -50,6 +54,8 @@ namespace XBOL.Ticketing.Services
                                     join bst in _dbContext.BaseSeats on pli.BaseSeatId equals bst.Id
                                     join br in _dbContext.BaseRows on bst.BaseRowId equals br.Id
                                     join bs in _dbContext.BaseSections on br.BaseSectionId equals bs.Id
+                                    where pli.BaseSeatId != null
+                                    && (!useBasePrice || pt.IsBasePrice)
                                     select new
                                     {
                                         Item = pli,
@@ -66,6 +72,7 @@ namespace XBOL.Ticketing.Services
                                    join bs in _dbContext.BaseSections on br.BaseSectionId equals bs.Id
                                    join bst in _dbContext.BaseSeats on br.Id equals bst.BaseRowId
                                    where pli.BaseSeatId == null
+                                   && (!useBasePrice || pt.IsBasePrice)
                                    select new
                                    {
                                        Item = pli,
@@ -81,7 +88,9 @@ namespace XBOL.Ticketing.Services
                                        join bs in _dbContext.BaseSections on pli.BaseSectionId equals bs.Id
                                        join br in _dbContext.BaseRows on bs.Id equals br.BaseSectionId
                                        join bst in _dbContext.BaseSeats on br.Id equals bst.BaseRowId // Join expansivo doble
-                                       where pli.BaseRowId == null && pli.BaseSeatId == null
+                                       where pli.BaseRowId == null
+                                        && pli.BaseSeatId == null
+                                        && (!useBasePrice || pt.IsBasePrice)
                                        select new
                                        {
                                            Item = pli,
@@ -111,42 +120,47 @@ namespace XBOL.Ticketing.Services
             var feesDict = await _dbContext.PriceListItemFees
                 .Where(f => validItemIds.Contains(f.PriceListItemId))
                 .GroupBy(f => f.PriceListItemId)
-                .ToDictionaryAsync(g => g.Key, g => g.Sum(f => (decimal?)f.FeeAmount) ?? 0);
+                .ToDictionaryAsync(
+                    g => g.Key,
+                    g => g.Select(f => new SeatFeeDTO { FeeName = f.FeeName, FeeType = f.FeeType, ChargeCategory = f.ChargeCategory, FeeAmount = f.FeeAmount }).ToList()
+                );
 
             var rawSeatsIoPrices = new List<SeatsIoPriceDTO>();
 
             foreach (var group in categoryPrices.GroupBy(x => x.ExternalZoneKey))
             {
-                var baseItem = group.FirstOrDefault(x => x.Type.IsBasePrice == true) ?? group.First();
+                var baseItem = SelectBasePriceItem(group, x => x.Type);
                 var dto = new SeatsIoPriceDTO { Category = group.Key };
+                AssignBasePrice(dto, baseItem.Item);
 
                 if (group.Count() > 1)
                 {
-                    dto.TicketTypes = group.Select(x => CreateTicketTypeDTO(x.Item, x.Type)).ToArray();
+                    dto.TicketTypes = group.Select(x => CreateTicketTypeDTO(x.Item, x.Type, feesDict.GetValueOrDefault(x.Item.Id, []))).ToArray();
                 }
                 else
                 {
-                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, 0));
+                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, []));
                 }
                 rawSeatsIoPrices.Add(dto);
             }
 
             foreach (var group in uniqueObjectOverrides.GroupBy(x => new { x.SectionName, x.RowLabel, x.SeatNumber }))
             {
-                var baseItem = group.FirstOrDefault(x => x.Type.IsBasePrice == true) ?? group.First();
+                var baseItem = SelectBasePriceItem(group, x => x.Type);
 
                 var keyParts = new[] { group.Key.SectionName, group.Key.RowLabel, group.Key.SeatNumber }
                                     .Where(s => !string.IsNullOrWhiteSpace(s));
 
                 var dto = new SeatsIoPriceDTO { Objects = new[] { string.Join("-", keyParts) } };
+                AssignBasePrice(dto, baseItem.Item);
 
                 if (group.Count() > 1)
                 {
-                    dto.TicketTypes = group.Select(x => CreateTicketTypeDTO(x.Item, x.Type)).ToArray();
+                    dto.TicketTypes = group.Select(x => CreateTicketTypeDTO(x.Item, x.Type, feesDict.GetValueOrDefault(x.Item.Id, []))).ToArray();
                 }
                 else
                 {
-                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, 0));
+                    AssignSinglePrice(dto, baseItem.Item, feesDict.GetValueOrDefault(baseItem.Item.Id, []));
                 }
                 rawSeatsIoPrices.Add(dto);
             }
@@ -165,8 +179,11 @@ namespace XBOL.Ticketing.Services
                     Category = null,
                     PriceListItemId = g.First().PriceListItemId,
                     Price = g.Key.Price,
-                    OriginalPrice = null,
+                    BasePriceListItemId = g.First().BasePriceListItemId,
+                    BasePrice = g.First().BasePrice,
+                    OriginalPrice = g.First().OriginalPrice,
                     Fee = g.First().Fee,
+                    Fees = g.First().Fees,
                     TicketTypes = g.First().TicketTypes,
                     Objects = g.SelectMany(x => x.Objects!).Distinct().ToArray()
                 });
@@ -176,7 +193,7 @@ namespace XBOL.Ticketing.Services
         }
 
         // Métodos auxiliares para no repetir código en el if/else
-        private TicketTypeDTO CreateTicketTypeDTO(PriceListItem item, PriceType type) => new()
+        private TicketTypeDTO CreateTicketTypeDTO(PriceListItem item, PriceType type, List<SeatFeeDTO> fees) => new()
         {
             PriceListItemId = item.Id,
             TicketType = type.Name,
@@ -184,15 +201,35 @@ namespace XBOL.Ticketing.Services
             Label = type.Label,
             Description = type.Description,
             Primary = type.Primary,
-            Unavailable = false
+            Unavailable = false,
+            OriginalPrice = item.BasePrice,
+            Fee = fees.Sum(f => f.FeeAmount),
+            Fees = fees
         };
 
-        private void AssignSinglePrice(SeatsIoPriceDTO dto, PriceListItem item, decimal fee)
+        private static T SelectBasePriceItem<T>(IEnumerable<T> items, Func<T, PriceType> getPriceType)
+        {
+            return items
+                .OrderByDescending(item => getPriceType(item).IsBasePrice)
+                .ThenByDescending(item => getPriceType(item).Primary)
+                .ThenByDescending(item => string.Equals(getPriceType(item).Name, "General", StringComparison.OrdinalIgnoreCase))
+                .First();
+        }
+
+        private void AssignBasePrice(SeatsIoPriceDTO dto, PriceListItem item)
+        {
+            dto.BasePriceListItemId = item.Id;
+            dto.BasePrice = item.FinalPrice;
+        }
+
+        private void AssignSinglePrice(SeatsIoPriceDTO dto, PriceListItem item, List<SeatFeeDTO> fees)
         {
             dto.PriceListItemId = item.Id;
             dto.Price = item.FinalPrice;
-            dto.OriginalPrice = null;
-            dto.Fee = fee;
+            AssignBasePrice(dto, item);
+            dto.OriginalPrice = item.BasePrice;
+            dto.Fee = fees.Sum(f => f.FeeAmount);
+            dto.Fees = fees;
         }
     }
 }

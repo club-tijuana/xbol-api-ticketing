@@ -8,12 +8,29 @@ namespace XBOL.Ticketing.Data.Repositories.Bundle
     public class BundleRepository(XBOLDbContext dbContext)
         : BaseRepository<Core.Model.Bundle>(dbContext), IBundleRepository
     {
+        public new async Task<Core.Model.Bundle?> GetByIdAsync(long id)
+        {
+            return await dbContext.Bundles
+                .Include(bundle => bundle.Categories)
+                .FirstOrDefaultAsync(bundle => bundle.Id == id);
+        }
+
         public async Task<Core.Model.Bundle?> GetByIdWithVenueMapAndSchedulesAsync(long id)
         {
             return await dbContext.Bundles
+                .AsSplitQuery()
                 .Include(bundle => bundle.VenueMap)
-                .Include(bundle => bundle.BundleSections)
-                .ThenInclude(section => section.BundleSeats)
+                .Include(bundle => bundle.Categories)
+                .Include(bundle => bundle.BundlePasses)
+                //.Include(bundle => bundle.BundleSections)
+                //    .ThenInclude(section => section.BundleSeats)
+                .Include(bundle => bundle.BundleEventSchedules)
+                .ThenInclude(link => link.EventSchedule)
+                .ThenInclude(schedule => schedule.Event)
+                .ThenInclude(@event => @event.Schedules)
+                .Include(bundle => bundle.BundleEventSchedules)
+                .ThenInclude(link => link.EventSchedule)
+                .ThenInclude(schedule => schedule.Tickets)
                 .Include(bundle => bundle.BundleEventSchedules)
                 .ThenInclude(link => link.EventSchedule)
                 .ThenInclude(schedule => schedule.Sections)

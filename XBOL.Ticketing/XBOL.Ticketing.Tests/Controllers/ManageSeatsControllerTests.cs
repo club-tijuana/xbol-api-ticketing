@@ -15,14 +15,20 @@ public class ManageSeatsControllerTests
     public async Task BookSeatsActionAsync_DelegatesToBookingOrchestrationAndReturnsResult()
     {
         var bookingService = Substitute.For<IBookingOrchestrationService>();
+        var sellerUserId = Guid.NewGuid();
         var request = new BookSeatsActionRequest
         {
             EventKey = "schedule-100",
             EventScheduleId = 100,
+            UserProfileId = sellerUserId,
             HoldToken = "hold-123",
             TicketType = ItemType.Ticket,
             Seats = new List<BookingSeatRequest> { new BookingSeatRequest { SeatKey = "A-1", SeatPrice = 125m, PriceListItemId = 1 } },
-            ClientContact = new ClientInfoRequest(),
+            ClientContact = new ClientInfoRequest
+            {
+                PhoneRegionCodeId = 1,
+                PhoneNumber = "5552220100"
+            },
             PaymentInfoRequest = new PaymentInfoRequest(),
             ChangeInfoRequest = new ChangeInfoRequest()
         };
@@ -35,7 +41,7 @@ public class ManageSeatsControllerTests
             ClientId = 56,
             Total = 125m
         };
-        bookingService.BookAsync(request, Guid.Empty, Arg.Any<CancellationToken>())
+        bookingService.BookAsync(request, sellerUserId, Arg.Any<CancellationToken>())
             .Returns(response);
 
         var controller = new ManageSeatsController(null!, bookingService);
@@ -46,7 +52,7 @@ public class ManageSeatsControllerTests
         ok.Value.Should().Be(response);
         await bookingService.Received(1).BookAsync(
             request,
-            Guid.Empty,
+            sellerUserId,
             Arg.Any<CancellationToken>());
     }
 }

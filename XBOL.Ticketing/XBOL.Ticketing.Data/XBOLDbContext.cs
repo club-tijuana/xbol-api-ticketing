@@ -68,6 +68,7 @@ namespace XBOL.Ticketing.Data
         public DbSet<PriceReference> PriceReferences => Set<PriceReference>();
         public DbSet<PriceSegment> PriceSegments => Set<PriceSegment>();
         public DbSet<PriceType> PriceTypes => Set<PriceType>();
+        public DbSet<ExchangeRate> ExchangeRates => Set<ExchangeRate>();
 
         public XBOLDbContext() : base()
         {
@@ -116,6 +117,8 @@ namespace XBOL.Ticketing.Data
             modelBuilder.ApplyConfiguration(new UserConfiguration());
             modelBuilder.ApplyConfiguration(new BlobAssetConfiguration());
             modelBuilder.ApplyConfiguration(new MediaConfiguration());
+            modelBuilder.ApplyConfiguration(new ClientCreditAccountConfiguration());
+            modelBuilder.ApplyConfiguration(new ClientCreditTransactionConfiguration());
         }
     }
 }

@@ -14,6 +14,7 @@ public class OrderEmailModel : EmailModelBase
     public string? PromoBannerImageUrl { get; set; }
     public string? PromoBannerLinkUrl { get; set; }
     public string? LogoImageUrl { get; set; }
+    public bool IsBundle { get; set; } = false;
 }
 
 public class OrderDetailsInfo

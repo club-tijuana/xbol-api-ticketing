@@ -25,7 +25,7 @@ namespace XBOL.Ticketing.Services
             if (filters.SeasonId.HasValue)
             {
                 referenceId = filters.SeasonId.Value;
-                referenceType = SaleType.SeasonPass;
+                referenceType = SaleType.Bundle;
             }
             else if (filters.ScheduleId.HasValue)
             {
@@ -61,6 +61,7 @@ namespace XBOL.Ticketing.Services
             var priceItems = await _dbContext.PriceListItems
                                     .Include(pli => pli.Price)
                                         .ThenInclude(p => p.PriceType)
+                                    .Include(pli => pli.FeeList)
                                     .AsNoTracking()
                                     .Where(pli => pli.PriceList.PriceReferenceId == priceReference.Id
                                         && pli.PriceList.Status == VersionStatus.Active)
@@ -120,8 +121,14 @@ namespace XBOL.Ticketing.Services
                 .Select(section =>
                 {
                     PriceListItem? matchedPriceItem = null;
-                    if (sectionPrices.TryGetValue(section.Id, out var sPli)) matchedPriceItem = sPli;
-                    else if (zonePrices.TryGetValue(section.BaseZoneId, out var zPli)) matchedPriceItem = zPli;
+                    if (sectionPrices.TryGetValue(section.Id, out var sPli))
+                    {
+                        matchedPriceItem = sPli;
+                    }
+                    else if (zonePrices.TryGetValue(section.BaseZoneId, out var zPli))
+                    {
+                        matchedPriceItem = zPli;
+                    }
 
                     return new
                     {
@@ -211,78 +218,104 @@ namespace XBOL.Ticketing.Services
             return groupedZonesPrices;
         }
 
-        private async Task<SeatAvailabilityResponse> GenerateSeatAvailabilityAsync(List<PriceListItem> priceItems, ReservationFiltersRequest filters)
+        private async Task<SeatAvailabilityResponse> GenerateSeatAvailabilityAsync(
+            List<PriceListItem> priceItems,
+            ReservationFiltersRequest filters)
         {
-            // We should only bring for now the base prices, since the current structure can't handle multiple price types
-            var zonePrices = priceItems.Where(p => p.BaseZoneId != null && p.BaseSectionId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseZoneId!.Value);
-            //var sectionPrices = priceItems.Where(p => p.BaseSectionId != null && p.BaseRowId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseSectionId!.Value);
-            var rowPrices = priceItems.Where(p => p.BaseRowId != null && p.BaseSeatId == null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseRowId!.Value);
-            var seatPrices = priceItems.Where(p => p.BaseSeatId != null && p.Price.PriceType.IsBasePrice).ToDictionary(p => p.BaseSeatId!.Value);
+            var zonePrices = priceItems
+                .Where(p =>
+                    p.BaseZoneId != null &&
+                    p.BaseSectionId == null &&
+                    p.Price.PriceType.IsBasePrice)
+                .GroupBy(p => p.BaseZoneId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var sectionPrices = priceItems
+                .Where(p =>
+                    p.BaseSectionId != null &&
+                    p.BaseRowId == null &&
+                    p.BaseSeatId == null &&
+                    p.Price.PriceType.IsBasePrice)
+                .GroupBy(p => p.BaseSectionId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var rowPrices = priceItems
+                .Where(p =>
+                    p.BaseRowId != null &&
+                    p.BaseSeatId == null &&
+                    p.Price.PriceType.IsBasePrice)
+                .GroupBy(p => p.BaseRowId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var seatPrices = priceItems
+                .Where(p =>
+                    p.BaseSeatId != null &&
+                    p.Price.PriceType.IsBasePrice)
+                .GroupBy(p => p.BaseSeatId!.Value)
+                .ToDictionary(g => g.Key, g => g.First());
 
             decimal min = filters.MinimumPrice ?? 0;
             decimal? max = filters.MaximumPrice;
 
             var activeZoneIds = zonePrices.Keys.ToList();
-            //var activeSectionIds = sectionPrices.Keys.ToList();
 
             var zoneQuery = _dbContext.Set<BaseZone>()
-                                .Where(s => activeZoneIds.Contains(s.Id));
+                .Where(z => activeZoneIds.Contains(z.Id));
 
             if (filters.ZoneId.HasValue)
             {
-                zoneQuery = zoneQuery.Where(s => s.Id == filters.ZoneId.Value);
+                zoneQuery = zoneQuery.Where(z => z.Id == filters.ZoneId.Value);
             }
-            //if (filters.SectionId.HasValue)
-            //{
-            //    zoneQuery = zoneQuery.Where(s => s.Id == filters.SectionId.Value);
-            //}
 
             var dbZones = await zoneQuery.ToListAsync();
             var zones = new List<ZoneResponse>();
 
             foreach (var zone in dbZones)
             {
-                PriceListItem? matchedPriceItem = null;
-                if (zonePrices.TryGetValue(zone.Id, out var zPli))
+                if (!zonePrices.TryGetValue(zone.Id, out var zonePli))
                 {
-                    matchedPriceItem = zPli;
+                    continue;
                 }
 
-                if (matchedPriceItem != null)
+                decimal price = zonePli.FinalPrice;
+
+                if (price >= min && (max == null || price <= max.Value))
                 {
-                    decimal price = matchedPriceItem.FinalPrice;
-                    if (price >= min && (max == null || price <= max.Value))
+                    zones.Add(new ZoneResponse
                     {
-                        zones.Add(new ZoneResponse
+                        Id = zone.Id,
+                        Name = zone.Name,
+                        DisplayName = zone.Name,
+                        Price = price,
+                        PriceListItemId = zonePli.Id,
+                        Fees = zonePli.FeeList.Select(f => new FeeResponse
                         {
-                            Id = zone.Id,
-                            Name = zone.Name,
-                            DisplayName = zone.Name,
-                            Price = price,
-                            PriceListItemId = matchedPriceItem.Id
-                        });
-                    }
+                            FeeName = f.FeeName,
+                            FeeAmount = f.FeeAmount,
+                            ChargeCategory = string.IsNullOrEmpty(f.ChargeCategory) ? "Fee" : f.ChargeCategory
+                        }).ToList()
+                    });
                 }
             }
 
+            var activeSectionIds = sectionPrices.Keys.ToList();
             var activeRowIds = rowPrices.Keys.ToList();
             var activeSeatIds = seatPrices.Keys.ToList();
 
             var seatQuery = _dbContext.BaseSeats
-                            .Include(bs => bs.BaseRow)
-                                .ThenInclude(br => br.BaseSection)
-                            .AsNoTracking()
-                            .Where(s => activeRowIds.Contains(s.BaseRowId)
-                                || activeSeatIds.Contains(s.Id));
+                .Include(bs => bs.BaseRow)
+                    .ThenInclude(br => br.BaseSection)
+                .AsNoTracking()
+                .Where(s =>
+                    activeSeatIds.Contains(s.Id) ||
+                    activeRowIds.Contains(s.BaseRowId) ||
+                    activeSectionIds.Contains(s.BaseRow.BaseSectionId));
 
             if (filters.ZoneId.HasValue)
             {
-                seatQuery = seatQuery.Where(s => s.BaseRow.BaseSection.BaseZoneId == filters.ZoneId.Value);
+                seatQuery = seatQuery.Where(s =>
+                    s.BaseRow.BaseSection.BaseZoneId == filters.ZoneId.Value);
             }
-            //if (filters.SectionId.HasValue)
-            //{
-            //    seatQuery = seatQuery.Where(s => s.BaseRow.BaseSectionId == filters.SectionId.Value);
-            //}
 
             var dbSeats = await seatQuery.ToListAsync();
             var seatOverrides = new List<SeatResponse>();
@@ -290,28 +323,43 @@ namespace XBOL.Ticketing.Services
             foreach (var seat in dbSeats)
             {
                 PriceListItem? matchedPriceItem = null;
-                if (seatPrices.TryGetValue(seat.Id, out var stPli))
+
+                if (seatPrices.TryGetValue(seat.Id, out var seatPli))
                 {
-                    matchedPriceItem = stPli;
+                    matchedPriceItem = seatPli;
                 }
-                else if (rowPrices.TryGetValue(seat.BaseRowId, out var rPli))
+                else if (rowPrices.TryGetValue(seat.BaseRowId, out var rowPli))
                 {
-                    matchedPriceItem = rPli;
+                    matchedPriceItem = rowPli;
+                }
+                else if (sectionPrices.TryGetValue(seat.BaseRow.BaseSectionId, out var sectionPli))
+                {
+                    matchedPriceItem = sectionPli;
                 }
 
-                if (matchedPriceItem != null)
+                if (matchedPriceItem == null)
                 {
-                    decimal price = matchedPriceItem.FinalPrice;
-                    if (price >= min && (max == null || price <= max.Value))
+                    continue;
+                }
+
+                decimal price = matchedPriceItem.FinalPrice;
+
+                if (price >= min && (max == null || price <= max.Value))
+                {
+                    seatOverrides.Add(new SeatResponse
                     {
-                        seatOverrides.Add(new SeatResponse
+                        Id = seat.Id,
+                        ExternalSeatObjectKey =
+                            $"{seat.BaseRow.BaseSection.Name}-{seat.BaseRow.RowLabel}-{seat.SeatNumber}",
+                        PriceOverride = price,
+                        PriceListItemId = matchedPriceItem.Id,
+                        Fees = matchedPriceItem.FeeList.Select(f => new FeeResponse
                         {
-                            Id = seat.Id,
-                            ExternalSeatObjectKey = $"{seat.BaseRow.BaseSection.Name}-{seat.BaseRow.RowLabel}-{seat.SeatNumber}",
-                            PriceOverride = price,
-                            PriceListItemId = matchedPriceItem.Id
-                        });
-                    }
+                            FeeName = f.FeeName,
+                            FeeAmount = f.FeeAmount,
+                            ChargeCategory = string.IsNullOrEmpty(f.ChargeCategory) ? "Fee" : f.ChargeCategory
+                        }).ToList()
+                    });
                 }
             }
 

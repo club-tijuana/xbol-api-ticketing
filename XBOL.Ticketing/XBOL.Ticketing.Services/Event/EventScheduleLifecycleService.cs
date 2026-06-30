@@ -15,10 +15,33 @@ public class EventScheduleLifecycleService(
     public async Task PublishAsync(long eventScheduleId, Guid userId, CancellationToken cancellation = default)
     {
         var schedule = await LoadScheduleAsync(eventScheduleId);
-        await EnsureNotSeasonPassOwnedAsync(eventScheduleId);
+        var seasonPassLink = await GetSeasonPassLinkAsync(eventScheduleId);
 
         ScheduleStatusTransitions.ValidateTransition(schedule.Status, ScheduleStatus.OnSale);
         ScheduleStatusTransitions.ValidateCanGoOnSale(schedule.Event.Status);
+
+        if (seasonPassLink is not null)
+        {
+            if (seasonPassLink.Bundle?.Status != EventStatus.Published ||
+                string.IsNullOrWhiteSpace(seasonPassLink.Bundle.ExternalKey))
+            {
+                throw new InvalidOperationException(
+                    $"EventSchedule {eventScheduleId} is linked to a SeasonPass bundle that has not been published.");
+            }
+
+            if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
+            {
+                await bus.InvokeAsync(
+                    new AddEventsToSeasonCommand(seasonPassLink.BundleId, [eventScheduleId], userId),
+                    cancellation);
+                return;
+            }
+
+            schedule.Status = ScheduleStatus.OnSale;
+            schedule.PublishedDate ??= DateTimeOffset.UtcNow;
+            await eventScheduleRepository.UpdateAsync(schedule);
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(schedule.ExternalEventKey))
         {
@@ -101,7 +124,12 @@ public class EventScheduleLifecycleService(
 
     private async Task<bool> IsSeasonPassOwnedAsync(long eventScheduleId)
     {
+        return await GetSeasonPassLinkAsync(eventScheduleId) is not null;
+    }
+
+    private async Task<BundleEventSchedule?> GetSeasonPassLinkAsync(long eventScheduleId)
+    {
         var links = await bundleEventScheduleRepository.GetByEventScheduleIdAsync(eventScheduleId);
-        return links.Any(link => link.Bundle?.BundleType == BundleType.SeasonPass);
+        return links.FirstOrDefault(link => link.Bundle?.BundleType == BundleType.SeasonPass);
     }
 }

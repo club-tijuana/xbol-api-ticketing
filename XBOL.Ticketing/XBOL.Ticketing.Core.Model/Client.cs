@@ -9,9 +9,9 @@ namespace XBOL.Ticketing.Core.Model
         public string? FullName { get; set; }
         public string? BusinessName { get; set; }
         public string? Email { get; set; }
-        public long? PhoneRegionCodeId { get; set; }
-        public PhoneRegionCode? PhoneRegionCode { get; set; }
-        public string? PhoneNumber { get; set; }
+        public long PhoneRegionCodeId { get; set; }
+        public PhoneRegionCode PhoneRegionCode { get; set; } = null!;
+        public string PhoneNumber { get; set; } = null!;
         public bool IsActive { get; set; }
 
         public DateTimeOffset CreatedAt { get; set; }
@@ -20,7 +20,7 @@ namespace XBOL.Ticketing.Core.Model
         public Guid UpdatedBy { get; set; }
 
         public IList<Order> Orders { get; set; } = [];
-        public IList<ClientCreditAccount> ClientCreditAccounts { get; set; } = [];
+        public ClientCreditAccount? ClientCreditAccount { get; set; }
         public IList<SeatHold> SeatHolds { get; set; } = [];
         public IList<Ticket> Tickets { get; set; } = [];
     }

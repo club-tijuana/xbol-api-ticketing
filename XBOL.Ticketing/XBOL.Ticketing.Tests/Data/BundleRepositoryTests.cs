@@ -1,6 +1,8 @@
+using System.Data.Common;
 using FluentAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using XBOL.Ticketing.Core.Commons.Enums;
 using XBOL.Ticketing.Core.Model;
 using XBOL.Ticketing.Data;
@@ -15,9 +17,11 @@ public sealed class BundleRepositoryTests
     {
         await using var connection = new SqliteConnection("DataSource=:memory:");
         await connection.OpenAsync();
+        var commandCounter = new SelectCommandCounter();
 
         var options = new DbContextOptionsBuilder<XBOLDbContext>()
             .UseSqlite(connection)
+            .AddInterceptors(commandCounter)
             .Options;
         long bundleId;
 
@@ -73,6 +77,13 @@ public sealed class BundleRepositoryTests
                 CreatedAt = now,
                 UpdatedAt = now
             };
+            var category = new EventCategory
+            {
+                Id = 8,
+                Name = "sports",
+                DisplayName = "Sports",
+                IsActive = true
+            };
             var schedule = new EventSchedule
             {
                 Id = 6,
@@ -105,6 +116,7 @@ public sealed class BundleRepositoryTests
                 BundlePricingType = BundlePricingType.Composite,
                 CreatedAt = now,
                 UpdatedAt = now,
+                Categories = [category],
                 BundleEventSchedules =
                 [
                     new BundleEventSchedule
@@ -129,7 +141,41 @@ public sealed class BundleRepositoryTests
         result!.VenueMap.Should().NotBeNull();
         result.VenueMap!.ExternalMapKey.Should().Be("chart-key");
         result.VenueMap.Venue.Should().BeNull();
+        result.Categories.Should().ContainSingle().Which.DisplayName.Should().Be("Sports");
         result.BundleEventSchedules.Should().ContainSingle();
         result.BundleEventSchedules.Single().EventSchedule.Sections.Should().ContainSingle();
+        commandCounter.SelectCommandCount.Should().BeGreaterThan(1);
+    }
+
+    private sealed class SelectCommandCounter : DbCommandInterceptor
+    {
+        public int SelectCommandCount { get; private set; }
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result)
+        {
+            CountSelect(command);
+            return base.ReaderExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            CountSelect(command);
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        private void CountSelect(DbCommand command)
+        {
+            if (command.CommandText.TrimStart().StartsWith("SELECT", StringComparison.OrdinalIgnoreCase))
+            {
+                SelectCommandCount++;
+            }
+        }
     }
 }

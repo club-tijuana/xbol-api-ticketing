@@ -32,7 +32,7 @@ namespace XBOL.Ticketing.Core.Model
 
         public string TicketCode { get; set; } = null!;
         public string TicketType { get; set; } = null!;
-        public string PrivateToken { get; set; } = null!;
+        public string? PrivateToken { get; set; }
 
         public string SectionLabelSnapshot { get; set; } = null!;
         public string SeatLabelSnapshot { get; set; } = null!;

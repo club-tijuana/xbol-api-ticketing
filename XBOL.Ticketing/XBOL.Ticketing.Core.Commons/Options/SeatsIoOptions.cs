@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 
-namespace XBOL.Ticketing.Services;
+namespace XBOL.Ticketing.Core.Commons.Options;
 
 public class SeatsIoOptions
 {

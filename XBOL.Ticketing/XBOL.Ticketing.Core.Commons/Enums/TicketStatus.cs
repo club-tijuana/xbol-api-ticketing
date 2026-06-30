@@ -5,6 +5,8 @@
         Issued,
         Used,
         Cancelled,
-        Transferred
+        Transferred,
+        PendingPayment,
+        Expired
     }
 }
